@@ -1,4 +1,4 @@
-# Brutality : A Biomechanical Ragdolls modification for Tushonka enjoyers
+# Brutality : A Tushinka Biomechanical Ragdolls modification
 
 [![Brutality Formal Proofs](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml/badge.svg)](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml)
 
