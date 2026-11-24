@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64" viewBox="0 0 220 64" role="img" aria-label="NVIDIA PhysX">
+  <defs>
+    <linearGradient id="physx-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#181b20"/>
+      <stop offset="100%" stop-color="#101216"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="218" height="62" rx="10" fill="url(#physx-bg)" stroke="#2e3440" stroke-width="1.5"/>
+  <!-- Geometric PhysX cube/orbit mark -->
+  <g transform="translate(18, 16)">
+    <polygon points="16,2 30,10 30,24 16,32 2,24 2,10" fill="none" stroke="#76b900" stroke-width="2" stroke-linejoin="round"/>
+    <polyline points="2,10 16,18 30,10" fill="none" stroke="#76b900" stroke-width="1.8" stroke-linejoin="round"/>
+    <line x1="16" y1="18" x2="16" y2="32" stroke="#76b900" stroke-width="1.8"/>
+    <circle cx="16" cy="18" r="2.5" fill="#ffffff"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="60" y="21" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="1.8" fill="#76b900">NVIDIA</text>
+  <text x="60" y="43" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="-0.4" fill="#f3f4f6">Phys<tspan fill="#76b900">X</tspan></text>
+  <text x="134" y="43" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" letter-spacing="0.8" fill="#9ca3af">ARTICULATION</text>
+</svg>
