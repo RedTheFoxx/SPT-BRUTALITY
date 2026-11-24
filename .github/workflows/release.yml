@@ -78,7 +78,7 @@ jobs:
             curl -fsSL -o "$archive" "$SPT_REFS_URL"
           fi
 
-          if file "$archive" | grep -qi 'zip'; then
+          if file -b "$archive" | grep -qi '^Zip archive'; then
             unzip -q "$archive" -d "$RUNNER_TEMP/spt-refs"
           else
             tar -xzf "$archive" -C "$RUNNER_TEMP/spt-refs"
