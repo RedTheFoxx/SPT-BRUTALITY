@@ -9,7 +9,7 @@ on:
 
 jobs:
   verify:
-    name: Delirium & Kinematics (77 tests)
+    name: Delirium & Kinematics (85 tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -29,7 +29,7 @@ jobs:
           test -n "$plugin_guid"
           test "$csproj_ver" = "$plugin_ver"
 
-      - name: Run Delirium proofs (31 tests)
+      - name: Run Delirium proofs (39 tests)
         run: dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
 
       - name: Run Kinematics & Anatomy proofs (46 tests)

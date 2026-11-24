@@ -81,7 +81,8 @@ namespace Brutality.Core
                 float a = BMath.Range(rng, 0f, BMath.TwoPi);
                 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
             }
-            dir = (dir.normalized + Vector3.up * 0.35f).normalized;
+            float loft = ctx.Damage > 110f ? 0.50f : 0.45f;
+            dir = (dir.normalized + Vector3.up * loft).normalized;
 
             float sum = 0f;
             var w = new float[body.Segs.Length];

@@ -112,8 +112,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 
 <aside id="panel" class="console" aria-label="Settings">
   <header>
-    <h1>Brutality 1.0.0 Test Bench</h1>
-    <p class="hint">Click the stickman to shoot: hit zone and shot direction decide the death. The body stays simulated: shoot it again, on the ground too. Drag to orbit the camera, scroll to zoom. Delirium 1.0.0 parity: environment grabs, forearm pronation, upperBodyFlinch guard reflex, 1- or 2-leg give-way, rolls (rollUp); Brutality agony, breathing, and reflexes remain layered on top.</p>
+    <h1>Brutality 1.1.0 Test Bench</h1>
+    <p class="hint">Click the stickman to shoot: weapon class, hit zone, and shot direction drive the reaction. Drag to orbit, scroll to zoom. Delirium 1.1.0: grounded multi-step stagger &amp; bullet recoil, wall brace/slump &amp; low-wall fall-over, HighFall (RPG), OnFire (Molotov), MeleeGuard (Bat/Knife), momentum rolls, and clean agony.</p>
   </header>
   <div class="buttons">
     <button id="btnReset" class="primary" title="Key R">Reset</button>
@@ -128,11 +128,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
       <label class="row">Euphoria behavior
         <select id="nmForce"></select>
       </label>
-      <label class="row">Environment (grab / obstacle)
+      <label class="row">Environment (grab / wall / stairs)
         <select id="scenePreset">
           <option value="standard">Standard room</option>
           <option value="wallRight">Close wall on right (grab)</option>
           <option value="crateFront">Crate / ledge in front (grab)</option>
+          <option value="backWall">Back wall (brace &amp; slump)</option>
+          <option value="lowWallBack">Low wall behind (fallOverWall)</option>
+          <option value="stairsBack">Stairs behind (rollDownStairs)</option>
           <option value="corridor">Narrow corridor + ledge</option>
         </select>
       </label>
@@ -145,24 +148,28 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
           <option value="prone">Prone</option>
         </select>
       </label>
-      <label class="row">Ammunition
+      <label class="row">Weapon / Ammunition
         <select id="caliber">
-          <option value="2.9|9x19 Para|pistol|20">9x19 Para — 2.9 N·s</option>
-          <option value="3.0|5.45x39 PS|inter|28" selected>5.45x39 PS — 3.0 N·s</option>
-          <option value="3.0|5.45x39 BS|inter|54">5.45x39 BS (AP) — 3.0 N·s</option>
-          <option value="3.6|5.56x45 NATO|inter|30">5.56x45 NATO — 3.6 N·s</option>
-          <option value="5.6|7.62x39|inter|35">7.62x39 — 5.6 N·s</option>
-          <option value="4.6|9x39 SP-5|subheavy|28">9x39 SP-5 (subsonic) — 4.6 N·s</option>
-          <option value="8.0|7.62x51 NATO|full|40">7.62x51 NATO — 8.0 N·s</option>
-          <option value="14.6|.338 Lapua|full|47">.338 Lapua — 14.6 N·s</option>
-          <option value="5.4|12.7x55 PS12|big|30">12.7x55 PS12 — 5.4 N·s</option>
-          <option value="14.4|12/70 slug|slug|26">12/70 slug — 14.4 N·s</option>
-          <option value="9.0|12/70 chevrotine|buck|3">12/70 buckshot — 9.0 N·s</option>
+          <option value="2.9|9x19 Para (Pistol)|pistol|20|pistol">Pistol — 9x19 Para (2.9 N·s)</option>
+          <option value="5.4|.50 AE Deagle|big|30|heavyPistol">Deagle — .50 AE (5.4 N·s)</option>
+          <option value="2.9|SMG Burst ×4|pistol|20|smg">SMG — 9x19 Burst ×4</option>
+          <option value="3.0|5.45x39 PS|inter|28|rifle" selected>Rifle — 5.45x39 PS (3.0 N·s)</option>
+          <option value="3.0|5.45x39 BS (AP)|inter|54|rifle">Rifle AP — 5.45x39 BS (3.0 N·s)</option>
+          <option value="5.6|7.62x39 PS|inter|35|rifle">AK-47 — 7.62x39 PS (5.6 N·s)</option>
+          <option value="4.6|9x39 SP-5|subheavy|28|rifle">Subsonic — 9x39 SP-5 (4.6 N·s)</option>
+          <option value="8.0|7.62x51 NATO|full|40|rifle">Battle Rifle — 7.62x51 NATO (8.0 N·s)</option>
+          <option value="14.6|.338 Lapua (Sniper)|full|47|sniper">Sniper — .338 Lapua (14.6 N·s)</option>
+          <option value="14.4|12/70 Slug (Shotgun)|slug|26|shotgun">Shotgun — 12/70 Slug (14.4 N·s)</option>
+          <option value="9.0|12/70 Buckshot|buck|3|shotgun">Shotgun — 12/70 Buckshot (9.0 N·s)</option>
+          <option value="32.0|RPG / Grenade (Blast)|blast|0|blast">RPG / Grenade — HighFall Blast</option>
+          <option value="1.6|Molotov / Flame|fire|0|fire">Molotov / Flame — OnFire</option>
+          <option value="3.2|Bat (Blunt Melee)|melee|0|bat">Melee — Bat (Overhead Guard)</option>
+          <option value="2.0|Knife (Edged Melee)|melee|0|knife">Melee — Knife (Stagger &amp; Clutch)</option>
         </select>
       </label>
       <label class="row">Mechanism
         <select id="mechanism">
-          <option value="auto">By hit zone</option>
+          <option value="auto">By hit zone / weapon</option>
           <option value="Cerebral">Brain</option>
           <option value="CervicalCord">Cervical spinal</option>
           <option value="NeckVascular">Cervical vascular</option>
@@ -171,6 +178,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
           <option value="Abdominal">Abdominal</option>
           <option value="LumbarCord">Lumbar spinal</option>
           <option value="Limb">Limb</option>
+          <option value="Blast">Blast (HighFall)</option>
+          <option value="Burn">Burn (OnFire)</option>
+          <option value="Melee">Melee (Guard)</option>
           <option value="Syncope">Syncope</option>
         </select>
       </label>
@@ -443,6 +453,15 @@ function applyScenePreset(name) {
     DYNAMIC_OBSTACLES.push(staticBox([0.12, 1.15, 1.4], V3(-0.68, 1.15, 0.1), wallMat));
   } else if (name === 'crateFront') {
     DYNAMIC_OBSTACLES.push(staticBox([0.60, 0.425, 0.25], V3(0, 0.425, 0.82), crateMat));
+  } else if (name === 'backWall') {
+    DYNAMIC_OBSTACLES.push(staticBox([1.6, 1.25, 0.14], V3(0, 1.25, -0.78), wallMat));
+  } else if (name === 'lowWallBack') {
+    const lowWallMat = new THREE.MeshStandardMaterial({ color: 0xb86246, roughness: 0.8 });
+    DYNAMIC_OBSTACLES.push(staticBox([1.6, 0.37, 0.16], V3(0, 0.37, -0.72), lowWallMat));
+  } else if (name === 'stairsBack') {
+    for (let i = 0; i < 6; i++) {
+      DYNAMIC_OBSTACLES.push(staticBox([1.4, 0.11, 0.22], V3(0, 0.11 + i * 0.22, -0.85 - i * 0.38), crateMat));
+    }
   } else if (name === 'corridor') {
     DYNAMIC_OBSTACLES.push(staticBox([0.12, 1.15, 1.8], V3(-0.82, 1.15, 0.2), wallMat));
     DYNAMIC_OBSTACLES.push(staticBox([0.12, 1.15, 1.8], V3(0.82, 1.15, 0.2), wallMat));
@@ -1290,11 +1309,8 @@ const AE = ['Curl', 'Opisthotonus', 'Clonic', 'Pedal', 'Kick', 'Flail', 'Roll', 
   'HipBridge', 'ElbowDrag', 'HeadBang', 'LegCross', 'ArmsOverhead', 'ChestClutch', 'TwistArch', 'HeelSlide', 'ShoulderHunch', 'NeckArch', 'Shudder'];
 const AE_ELABORATE = AE.indexOf('Lazarus'); // from here on: elaborate gestures ('Gesture variety' setting)
 // Default weights for cross-cutting gestures when a profile omits them (MechanismProfile.Shared).
-const AE_SHARED = { HipBridge: 0.65, ElbowDrag: 0.55, HeadBang: 0.6, LegCross: 0.6, ArmsOverhead: 0.55, ChestClutch: 0.7,
-  TwistArch: 0.7, HeelSlide: 0.55, ShoulderHunch: 0.5, NeckArch: 0.55, Shudder: 0.65 };
+const AE_SHARED = { ChestClutch: 0.40, HeelSlide: 0.30, Shudder: 0.25, LegCross: 0.25 };
 function profile(mech) {
-  // startle, buckle, guarding, earlyClutch and deathThrow are historical: 0.2.0 no longer reads them (the fall is
-  // driven by Euphoria); they stay in profiles as a record of the original tuning.
   const P = (o, w) => {
     const p = Object.assign({ startle: false, toneDelay: 0, buckle: 0, lock: 0, decor: 0, fencing: 0, guarding: 0, earlyClutch: 0, deathThrow: 0, agonyStart: [0.5, 1], gasp: 0, writhing: 0, headLoll: true,
       rigidity: 0, breathing: 0.85, lastBreath: 0.65 }, o);
@@ -1302,55 +1318,54 @@ function profile(mech) {
   };
   const set = (p, pairs) => { for (const [n, v] of pairs) p.w[AE.indexOf(n)] = v; return p; };
   switch (mech) {
-    case 'Cerebral': return P({ toneTau: [[0.02, 0.04], [0.02, 0.05], [0.015, 0.035], [0.02, 0.05]], buckle: 0.45, lock: 0, decor: 0, fencing: 0, deathThrow: 0.35, agonyStart: [0.5, 1.1], i0: [0.35, 0.6], dur: [3.5, 7], rate: 1.4, gasp: 0.15, writhing: 0.3, headLoll: false,
-      rigidity: 0, breathing: 0.2, lastBreath: 0.15 },
-      { Clonic: 2, Spasm: 2, ArmThrust: 2, LegJerk: 2, Opisthotonus: 1, Pedal: 0.8, Kick: 0.8, Flail: 0.6, HeadTurn: 0.3,
-        Lazarus: 1.4, Seizure: 1.4, Scissor: 1, HeelDrum: 0.9, Reach: 0.4, GroundSlap: 0.5,
-        HipBridge: 1.5, Shudder: 1.6, NeckArch: 1.2, ArmsOverhead: 0.9 });
-    case 'CervicalCord': return P({ toneTau: [[0.02, 0.04], [0.02, 0.05], [0.2, 0.5], [0.02, 0.04]], buckle: 0.3, lock: 0.05, agonyStart: [0.5, 1], i0: [0.4, 0.6], dur: [3, 7], rate: 1.2, gasp: 0.7, writhing: 0.3, breathing: 0.95, lastBreath: 0.8 },
-      { HeadTurn: 3, Clonic: 0.5, HeadLift: 2.5, HeadBang: 1.6, ShoulderHunch: 2.2, NeckArch: 1.4, ChestClutch: 0.8 });
-    case 'NeckVascular': return P({ startle: true, toneDelay: 0.08, toneTau: [[0.25, 0.6], [0.4, 0.9], [0.3, 0.8], [0.6, 1.5]], buckle: 0.85, lock: 0.15, earlyClutch: 0.75, deathThrow: 0.3, agonyStart: [0.6, 1.1], i0: [0.9, 1], dur: [6, 9], rate: 2, gasp: 0.9, writhing: 0.9,
-      rigidity: 0.05, breathing: 0.95, lastBreath: 0.8 },
-      { Clutch: 4, Curl: 1, Roll: 1.5, Pedal: 1, Clonic: 1, Flail: 1, Kick: 0.8, HeadTurn: 0.8, ArmThrust: 1.5, LegJerk: 1.5, Spasm: 1,
-        Reach: 2, HeadLift: 1.5, Crawl: 1.2, PushUp: 1.2, SitUp: 0.8, KneeRaise: 1, HeelDrum: 1, GroundSlap: 1.2, Rocking: 1, Seizure: 0.6, HandsToFace: 0.8,
-        ChestClutch: 2.4, ShoulderHunch: 2, NeckArch: 1.4, HeelSlide: 1, TwistArch: 1 });
+    case 'Cerebral': return P({ toneTau: [[0.02, 0.04], [0.02, 0.05], [0.015, 0.035], [0.02, 0.05]], buckle: 0.45, lock: 0, decor: 0, fencing: 0, deathThrow: 0.25, agonyStart: [0.6, 1.2], i0: [0.05, 0.18], dur: [1.2, 2.5], rate: 0.30, gasp: 0.1, writhing: 0.05, headLoll: false,
+      rigidity: 0, breathing: 0.15, lastBreath: 0.1 },
+      { Clonic: 0.4, Spasm: 0.3, ArmThrust: 0.15, LegJerk: 0.2, Decorticate: 0.5, Shudder: 0.4, HeadTurn: 0.2,
+        HipBridge: 0, HeadBang: 0, ArmsOverhead: 0, Lazarus: 0, GroundSlap: 0, HeelDrum: 0 });
+    case 'CervicalCord': return P({ toneTau: [[0.02, 0.04], [0.02, 0.05], [0.2, 0.5], [0.02, 0.04]], buckle: 0.3, lock: 0, agonyStart: [0.5, 1], i0: [0.30, 0.50], dur: [2.5, 5], rate: 0.7, gasp: 0.6, writhing: 0.15, breathing: 0.9, lastBreath: 0.75 },
+      { HeadTurn: 2.5, HeadLift: 1.8, ShoulderHunch: 1.5, HipBridge: 0, HeadBang: 0, ArmsOverhead: 0 });
+    case 'NeckVascular': return P({ startle: true, toneDelay: 0.08, toneTau: [[0.25, 0.6], [0.4, 0.9], [0.3, 0.8], [0.6, 1.5]], buckle: 0.85, lock: 0, earlyClutch: 0.75, deathThrow: 0.3, agonyStart: [0.6, 1.1], i0: [0.50, 0.72], dur: [4.5, 7.5], rate: 0.85, gasp: 0.85, writhing: 0.45,
+      rigidity: 0.04, breathing: 0.95, lastBreath: 0.8 },
+      { Clutch: 4, Curl: 1.4, Roll: 1.6, HeadTurn: 0.8, Reach: 1.5, HeadLift: 1.2, Crawl: 0.9, KneeRaise: 1.1, Rocking: 0.8,
+        ChestClutch: 2.5, ShoulderHunch: 1.4, HeelSlide: 0.9, ArmThrust: 0.1, LegJerk: 0.1, Seizure: 0 });
     case 'Thoracic': case 'ThoracicCord': {
-      const p = P({ startle: true, toneDelay: 0.05, toneTau: [[0.15, 0.45], [0.3, 0.8], [0.3, 0.9], [0.3, 1]], buckle: 0.8, lock: 0.25, earlyClutch: 0.3, deathThrow: 0.5, agonyStart: [0.5, 1], i0: [0.8, 1], dur: [5, 9], rate: 1.9, gasp: 0.9, writhing: 0.7,
-        rigidity: 0.08, breathing: 0.95, lastBreath: 0.8 },
-        { Clonic: 2.5, Clutch: 2, Curl: 1, Roll: 1.2, Opisthotonus: 1, Pedal: 0.8, Flail: 1, Kick: 0.8, HeadTurn: 0.6, Spasm: 2, ArmThrust: 1.8, LegJerk: 1.8,
-          Seizure: 1.2, Reach: 1.6, Crawl: 1.2, PushUp: 1, SitUp: 0.8, HeadLift: 1.2, KneeRaise: 1.2, HeelDrum: 1, GroundSlap: 1, Shield: 0.6, Rocking: 0.8, Scissor: 0.4, Decorticate: 0.35,
-          ChestClutch: 2.2, ShoulderHunch: 1.8, HipBridge: 1.2, Shudder: 1.4, HeadBang: 0.8 });
+      const p = P({ startle: true, toneDelay: 0.05, toneTau: [[0.15, 0.45], [0.3, 0.8], [0.3, 0.9], [0.3, 1]], buckle: 0.8, lock: 0, earlyClutch: 0.3, deathThrow: 0.5, agonyStart: [0.5, 1], i0: [0.45, 0.70], dur: [4, 7], rate: 0.75, gasp: 0.85, writhing: 0.30,
+        rigidity: 0.05, breathing: 0.95, lastBreath: 0.8 },
+        { Clutch: 2.8, ChestClutch: 2.6, Curl: 1.5, Roll: 1.4, HeadTurn: 0.8, Reach: 1.3, Crawl: 0.9, HeadLift: 1.0, KneeRaise: 1.2, Rocking: 0.8,
+          ShoulderHunch: 1.4, Clonic: 0.2, Spasm: 0.15, ArmThrust: 0.1, LegJerk: 0.1, Seizure: 0 });
       if (mech === 'ThoracicCord') {
         p.buckle = 0.2;
-        set(p, [['Pedal', 0], ['Kick', 0], ['LegJerk', 0], ['Curl', 0.3], ['Flail', 1.6], ['ArmThrust', 2.5],
-          ['KneeRaise', 0], ['HeelDrum', 0], ['Scissor', 0], ['SitUp', 0], ['Rocking', 0.3], ['Crawl', 2.5], ['PushUp', 1.8], ['Reach', 2],
-          ['ElbowDrag', 2.5], ['ChestClutch', 1.5], ['ArmsOverhead', 1.4], ['HipBridge', 0], ['LegCross', 0], ['HeelSlide', 0]]);
+        set(p, [['Pedal', 0], ['Kick', 0], ['LegJerk', 0], ['Curl', 0.3], ['Flail', 0.5], ['ArmThrust', 0.2],
+          ['KneeRaise', 0], ['HeelDrum', 0], ['Scissor', 0], ['SitUp', 0], ['Rocking', 0.3], ['Crawl', 2], ['PushUp', 1.2], ['Reach', 1.8],
+          ['ElbowDrag', 1.6], ['ChestClutch', 1.6], ['HipBridge', 0], ['LegCross', 0], ['HeelSlide', 0]]);
       }
       return p;
     }
     case 'Abdominal': case 'LumbarCord': {
-      const p = P({ startle: true, toneDelay: 0.08, toneTau: [[0.2, 0.5], [0.6, 1.4], [0.6, 1.4], [0.8, 1.6]], buckle: 0.9, lock: 0.15, guarding: 0.85, earlyClutch: 0.5, deathThrow: 0.25, agonyStart: [0.6, 1.2], i0: [0.9, 1], dur: [6, 9], rate: 2, gasp: 0.6, writhing: 1,
+      const p = P({ startle: true, toneDelay: 0.08, toneTau: [[0.2, 0.5], [0.6, 1.4], [0.6, 1.4], [0.8, 1.6]], buckle: 0.9, lock: 0, guarding: 0.85, earlyClutch: 0.5, deathThrow: 0.25, agonyStart: [0.6, 1.2], i0: [0.50, 0.72], dur: [4.5, 7.5], rate: 0.80, gasp: 0.6, writhing: 0.40,
         breathing: 0.9, lastBreath: 0.75 },
-        { Curl: 3, Clutch: 3, Roll: 2, Pedal: 1.2, Clonic: 0.8, Flail: 0.6, Opisthotonus: 0.4, Kick: 1, HeadTurn: 0.6, LegJerk: 2, ArmThrust: 1, Spasm: 1,
-          Rocking: 2, KneeRaise: 2.2, SitUp: 1.2, Crawl: 1.3, PushUp: 1, Reach: 1.2, HeadLift: 1, HeelDrum: 0.8, GroundSlap: 0.8, Seizure: 0.3,
-          HipBridge: 1.6, ElbowDrag: 1.4, LegCross: 1.2, ChestClutch: 1.2 });
+        { Curl: 3.2, Clutch: 3.2, Roll: 1.8, HeadTurn: 0.6, Rocking: 1.6, KneeRaise: 2.0, Crawl: 1.0, Reach: 1.0, HeadLift: 0.9,
+          LegCross: 1.0, ChestClutch: 1.2, ArmThrust: 0.1, LegJerk: 0.15, Seizure: 0 });
       if (mech === 'LumbarCord') {
         p.buckle = 0.2; p.guarding = 0.4;
-        set(p, [['Pedal', 0], ['Kick', 0], ['LegJerk', 0], ['Flail', 1.5], ['Roll', 1.2], ['ArmThrust', 2],
-          ['KneeRaise', 0], ['HeelDrum', 0], ['Scissor', 0], ['Rocking', 0.6], ['Crawl', 2.5], ['PushUp', 1.5],
-          ['ElbowDrag', 2.2], ['ChestClutch', 1.3], ['HipBridge', 0], ['LegCross', 0], ['HeelSlide', 0]]);
+        set(p, [['Pedal', 0], ['Kick', 0], ['LegJerk', 0], ['Flail', 0.4], ['Roll', 1.2], ['ArmThrust', 0.2],
+          ['KneeRaise', 0], ['HeelDrum', 0], ['Scissor', 0], ['Rocking', 0.6], ['Crawl', 2], ['PushUp', 1.1],
+          ['ElbowDrag', 1.6], ['ChestClutch', 1.3], ['HipBridge', 0], ['LegCross', 0], ['HeelSlide', 0]]);
       }
       return p;
     }
-    case 'Syncope': return P({ toneDelay: 0.12, toneTau: [[0.35, 0.8], [0.6, 1.3], [0.5, 1.2], [0.5, 1.2]], buckle: 0.95, lock: 0.05, agonyStart: [0.9, 1.6], i0: [0.5, 0.8], dur: [4, 7], rate: 1.5, gasp: 0.7, writhing: 0.4,
-      rigidity: 0.1, breathing: 0.9, lastBreath: 0.85 },
-      { Clonic: 2.5, Opisthotonus: 0.6, Curl: 0.5, Roll: 0.3, HeadTurn: 0.8, Spasm: 1.5, ArmThrust: 1, LegJerk: 1, Seizure: 2.2, HeelDrum: 1, HeadLift: 0.5, Reach: 0.6, Scissor: 0.4,
-        Shudder: 2, HeadBang: 0.9, NeckArch: 1, ArmsOverhead: 0.7 });
-    default: return P({ startle: true, toneDelay: 0.06, toneTau: [[0.2, 0.6], [0.5, 1.2], [0.5, 1.2], [0.5, 1.3]], buckle: 0.85, lock: 0.2, earlyClutch: 0.35, deathThrow: 0.35, agonyStart: [0.5, 1.1], i0: [0.8, 1], dur: [5, 9], rate: 1.9, gasp: 0.6, writhing: 0.8,
+    case 'Blast': return P({ toneTau: [[0.01, 0.03], [0.01, 0.03], [0.01, 0.03], [0.01, 0.03]], buckle: 0, lock: 0, agonyStart: [1, 1.8], i0: [0.08, 0.22], dur: [1.2, 2.5], rate: 0.30, gasp: 0.2, writhing: 0.10, breathing: 0.4, lastBreath: 0.3 },
+      { Curl: 0.8, Shudder: 0.6, HeadTurn: 0.4, HipBridge: 0, HeadBang: 0, ArmsOverhead: 0 });
+    case 'Burn': return P({ startle: true, toneDelay: 0.1, toneTau: [[0.3, 0.7], [0.5, 1.2], [0.5, 1.2], [0.5, 1.2]], buckle: 0.9, lock: 0, agonyStart: [0.5, 1], i0: [0.65, 0.85], dur: [5, 8], rate: 1.0, gasp: 0.7, writhing: 0.75, breathing: 0.95, lastBreath: 0.7 },
+      { Roll: 3.5, Curl: 2.5, Rocking: 1.8, Shield: 1.6, HandsToFace: 1.6, Crawl: 1.2, KneeRaise: 1.0, Shudder: 1.0 });
+    case 'Melee': return P({ startle: true, toneDelay: 0.06, toneTau: [[0.2, 0.5], [0.4, 0.9], [0.4, 0.9], [0.5, 1.1]], buckle: 0.85, lock: 0, agonyStart: [0.5, 1], i0: [0.45, 0.68], dur: [3.5, 6.5], rate: 0.70, gasp: 0.65, writhing: 0.30, breathing: 0.9, lastBreath: 0.75 },
+      { Clutch: 2.5, Curl: 2.0, Shield: 1.4, HandsToFace: 1.2, Roll: 1.2, HeadTurn: 0.7, KneeRaise: 1.0, ChestClutch: 1.4 });
+    case 'Syncope': return P({ toneDelay: 0.12, toneTau: [[0.35, 0.8], [0.6, 1.3], [0.5, 1.2], [0.5, 1.2]], buckle: 0.95, lock: 0, agonyStart: [0.9, 1.6], i0: [0.35, 0.55], dur: [3, 5.5], rate: 0.55, gasp: 0.7, writhing: 0.20,
+      rigidity: 0.05, breathing: 0.9, lastBreath: 0.85 },
+      { Curl: 0.8, Roll: 0.5, HeadTurn: 0.8, HeadLift: 0.5, Reach: 0.6, Shudder: 1.2, Clonic: 0.35, Seizure: 0.2 });
+    default: return P({ startle: true, toneDelay: 0.06, toneTau: [[0.2, 0.6], [0.5, 1.2], [0.5, 1.2], [0.5, 1.3]], buckle: 0.85, lock: 0, earlyClutch: 0.35, deathThrow: 0.35, agonyStart: [0.5, 1.1], i0: [0.45, 0.70], dur: [4, 7], rate: 0.75, gasp: 0.6, writhing: 0.35,
       breathing: 0.9, lastBreath: 0.75 },
-      { Clutch: 3, Curl: 1.5, Roll: 1.5, Pedal: 1, Clonic: 0.6, Flail: 1, Kick: 1.2, HeadTurn: 0.6, LegJerk: 1.5, ArmThrust: 1.2, Spasm: 1,
-        Crawl: 2, PushUp: 1.5, Reach: 1.6, KneeRaise: 1, GroundSlap: 1.2, HeadLift: 1, SitUp: 0.8, Rocking: 1, HeelDrum: 0.6, Seizure: 0.4,
-        ElbowDrag: 1.2, HeelSlide: 1.4, LegCross: 1.2, HipBridge: 0.8 });
+      { Clutch: 3, Curl: 1.6, Roll: 1.4, HeadTurn: 0.7, Crawl: 1.4, Reach: 1.3, KneeRaise: 1.1, HeadLift: 0.9, Rocking: 0.9, HeelSlide: 1.2, LegCross: 1.0, ArmThrust: 0.1, LegJerk: 0.15, Seizure: 0 });
   }
 }
 function weightedPick(rng, w) {
@@ -1360,7 +1375,7 @@ function weightedPick(rng, w) {
   for (let i = w.length - 1; i >= 0; i--) if (w[i] > 0) return i;
   return 0;
 }
-const MECH_EN = { Cerebral: 'brain', CervicalCord: 'cervical spinal', NeckVascular: 'cervical vascular', Thoracic: 'thoracic', ThoracicCord: 'thoracic spinal', Abdominal: 'abdominal', LumbarCord: 'lumbar spinal', Limb: 'limb', Syncope: 'syncope' };
+const MECH_EN = { Cerebral: 'brain', CervicalCord: 'cervical spinal', NeckVascular: 'cervical vascular', Thoracic: 'thoracic', ThoracicCord: 'thoracic spinal', Abdominal: 'abdominal', LumbarCord: 'lumbar spinal', Limb: 'limb', Blast: 'blast', Burn: 'burn', Melee: 'melee', Syncope: 'syncope' };
 
 // --------------------------------------------------------------- variety director (Core/VarietyDirector.cs)
 // Same role as in the plugin: memory of the last five plans and last two deaths, and gesture palette
@@ -1422,15 +1437,10 @@ class Neural {
     // posturing, locks, agony, breathing, and final breath remain active on top.
     const u0 = ctx.pose === 'prone' ? 0.25 : ctx.pose === 'duck' ? 0.4 : 0.55; this.initialTone = u0;
     this.add(new PosturalTone(u0, P.toneDelay, P.toneTau, rng, ctx.pose !== 'prone'));
-    if (reflex > 0.01) {
-      // Posturing and fencing response (brain injuries), then localized muscle locks.
-      const roll = rng.next(), pz = Math.min(1, S.posturing), pCor = P.decor * pz;
+    if (reflex > 0.01 && c.mechanism === 'Cerebral' && S.posturing > 0.01) {
+      const roll = rng.next(), pz = Math.min(1, S.posturing) * 0.5, pCor = P.decor * pz;
       if (roll < pCor) this.add(new Posturing(rng.range(0.05, 0.12), rng.range(0.6, 1.5), clamp01(0.55 * reflex), rng));
-      else if (roll < pCor + P.fencing) this.add(new Fencing(rng.chance(0.5) ? 1 : -1, rng.range(0.05, 0.15), rng.range(1.5, 4), clamp01(0.7 * reflex)));
-      if (P.lock > 0) for (const [j, w] of [[J.LElbow, 1.2], [J.RElbow, 1.2], [J.LKnee, 0.8], [J.RKnee, 0.8], [J.Neck, 0.6], [J.LShoulder, 0.6], [J.RShoulder, 0.6]]) {
-        if (!rng.chance(P.lock * w * 0.5) || joints[j].cap[0] < 0.2) continue;
-        this.add(new JointLock(j, rng.range(0, 0.08), rng.range(0.4, 2.5), clamp01(0.85 * reflex)));
-      }
+      else if (roll < pCor + P.fencing * pz) this.add(new Fencing(rng.chance(0.5) ? 1 : -1, rng.range(0.05, 0.15), rng.range(1.5, 4), clamp01(0.7 * reflex)));
     }
     this.agonyStart = rng.rv(P.agonyStart);
     this.agonyEnd = Math.min(this.agonyStart + rng.rv(P.dur), maxDur - 2.3);
@@ -1527,8 +1537,8 @@ class Neural {
     const I = this.ns.agony; if (I <= 0.02 || this.lbSpawned || t >= this.agonyEnd - 0.45) return;
     let active = 0, busy = G.None;
     for (const p of this.programs) { if (!p.agony || p.done(t) || t < p.start) continue; active++; busy |= p.groups; }
-    if (active >= 2) return;
-    const rate = this.prof.rate * this.vigor * this.sig.tempo * clamp01(I) * (active === 0 ? 1 : 0.6) * 0.6; // Euphoria already drives the fall.
+    if (active >= 1) return;
+    const rate = this.prof.rate * this.vigor * this.sig.tempo * clamp01(I) * 0.55;
     if (!this.rng.chance(rate * dt)) return;
     const ev = this.pick(busy); if (ev < 0) return;
     const p = this.make(ev, t, I); if (!p || (p.groups & busy)) return;
@@ -1661,7 +1671,7 @@ const NM = {
 // impulseReductionPerShot 0.25 and impulseRecovery 0.5 /s: Brutality values (NaturalMotion default 0 / 0) for bursts.
 const NM_TUNE = { exagDuration: 0.22, exagSmooth2Zero: 0.3, cpainDuration: 0.25, spineLeanUnit: 1.0, amountUnitSpine: 0.1, amountUnitNeck: 0.25, amountUnitHip: 0.22, kneeAmountUnit: 4 };
 const NM_NAMES = { shot: 'shot', balance: 'bodyBalance', stagger: 'staggerFall', ftk: 'shotFallToKnees', sit: 'sitDown', sfb: 'shotFromBehind', sig: 'shotInGuts', windmill: 'armsWindmill',
-  catchFall: 'catchFall', rds: 'rollDownStairs', rollUp: 'bodyRollUp', grab: 'grab (env)', flinch: 'upperBodyFlinch', iog: 'injuredOnGround', writhe: 'bodyWrithe', pedal: 'pedalLegs', foetal: 'bodyFoetal', relax: 'bodyRelax', bcr: 'balancerCollisionsReaction', lastStand: 'stayUpright (lastStand)' };
+  catchFall: 'catchFall', rds: 'rollDownStairs', rollUp: 'bodyRollUp', grab: 'grab (env)', flinch: 'upperBodyFlinch', iog: 'injuredOnGround', writhe: 'bodyWrithe', pedal: 'pedalLegs', foetal: 'bodyFoetal', relax: 'bodyRelax', bcr: 'balancerCollisionsReaction', fow: 'fallOverWall', highFall: 'highFall', onFire: 'onFire', meleeGuard: 'meleeGuard', lastStand: 'stayUpright (lastStand)' };
 
 // --------------------------------------------------------------- character sensors (NmCharacter)
 const CH = { com: V3(0, 0, 0), vel: V3(0, 0, 0), ankle: [V3(0, 0, 0), V3(0, 0, 0)], foot: [V3(0, 0, 0), V3(0, 0, 0)], hand: [V3(0, 0, 0), V3(0, 0, 0)],
@@ -1813,6 +1823,8 @@ const DLC = {
   grabArmStiffness: 12, grabBodyStiffness: 11, grabHoldStiffness: 14, grabStrength: 160, grabDist: 0.24,
   grabMaxReach: 0.85, grabSearchDist: 1.15, grabReachAngle: 1.65, grabOneSideReachAngle: 0.85, grabHoldMaxTime: 1.6, grabPullUpTime: 0.7,
   flinchBodyStiffness: 11, flinchDamping: 1,
+  braceBodyStiffness: 11, braceArmStiffness: 13, braceSearchDist: 1.05,
+  highFallBodyStiffness: 11, highFallCatchTime: 0.45, onFireBodyStiffness: 11, meleeGuardStiffness: 12,
   stepHeight: 0.1, stepClamp: 1, giveUpHeight: 0.5, balanceAbortThreshold: 0.6, armReachLength: 0.9, armProbeLength: 1.25, opposeGravityScale: 0.35,
 };
 const dlRange = (j, d) => { const sp = JD[j].spec[d]; return [sp.min * DEG, sp.max * DEG]; };
@@ -2016,14 +2028,14 @@ class DlShot extends DlBeh {
     if (hit.armSide < 0) this.looseArms[0] = true;
     if (hit.armSide > 0) this.looseArms[1] = true;
     const thighHit = hit.seg === SEG.LThigh || hit.seg === SEG.RThigh;
-    if (this.P.reachForWound && (hit.reachable || thighHit) && this.behind < 0.25) {
+    if (!this.P.bluntMelee && this.P.reachForWound && (hit.reachable || thighHit) && this.behind < 0.25) {
       let r7 = (hit.side >= 0 || thighHit || hit.armSide > 0) && hit.armSide >= 0 && !this.looseArms[0] && dlArmCap(-1) >= 0.25;
       let r8 = (hit.side <= 0 || thighHit || hit.armSide < 0) && hit.armSide <= 0 && !this.looseArms[1] && dlArmCap(1) >= 0.25;
       if (r7 && r8 && hit.side !== 0 && !thighHit && rng.chance(0.55)) { if (hit.side < 0) r7 = false; else r8 = false; }
       if (r7) { this.reachArms[0] = true; this.reachT[0] = 0; this.reachSide = -1; }
       if (r8) { this.reachArms[1] = true; this.reachT[1] = r7 ? -0.18 : 0; if (this.reachSide === 0) this.reachSide = 1; }
     }
-    if (this.P.fling) {
+    if (!this.P.bluntMelee && this.P.fling) {
       const side = this.reachSide !== 0 ? -this.reachSide : (hit.side !== 0 ? hit.side : (rng.chance(0.5) ? -1 : 1));
       if (dlArmCap(side) >= 0.25 && !this.reachArms[sideIdx(side)]) this.flingSide = side;
     }
@@ -2061,14 +2073,19 @@ class DlShot extends DlBeh {
     if (!this.hit || this.P.spinePainTime <= 0) return;
     const k = (this.P.spinePainTime - this.since) / this.P.spinePainTime;
     if (k <= 0) return;
-    let lean = this.P.spinePainMultiplier * k;
-    if (this.behind > 0) lean *= 0.5;
-    if (this.hit.legSide) lean *= 0.65;
-    const tw = this.side * this.P.spinePainTwistMultiplier * k * -0.35;
-    this.ch.blendDesired(J.Lumbar, 0, dlMid(J.Lumbar, 0) + lean * 0.6, u);
-    this.ch.blendDesired(J.Lumbar, 1, dlMid(J.Lumbar, 1) + tw * 0.5, u);
-    this.ch.blendDesired(J.Lumbar, 2, dlMid(J.Lumbar, 2) + tw, u);
-    this.ch.blendToZero(J.Lumbar, clamp01(1 - lean));
+    if (k < 0.7) this.ch.blendToZero(J.Lumbar, clamp01(0.7 - k));
+    let mult = this.P.spinePainMultiplier;
+    if (this.hit.legSide) mult *= 0.65;
+    let flex, lat = this.side * 0.18 * k * mult, tw = -this.side * this.P.spinePainTwistMultiplier * 0.85 * k;
+    const guts = this.hit.seg === SEG.Pelvis || this.perf.plan.sig;
+    if (guts && this.behind <= 0.25) { flex = 0.62 * k * mult; tw = -this.side * this.P.spinePainTwistMultiplier * 0.55 * k; }
+    else if (this.behind < -0.25) { flex = lerp(-0.18, 0.44, smoothstep(0.10, 0.24, this.since)) * k * mult; }
+    else if (this.behind > 0.25) { flex = -0.24 * k * mult; lat *= 0.5; }
+    else flex = 0.25 * k * mult;
+    const r0 = dlRange(J.Lumbar, 0), r1 = dlRange(J.Lumbar, 1), r2 = dlRange(J.Lumbar, 2);
+    this.ch.blendDesired(J.Lumbar, 0, clamp(0.5 * (r0[0] + r0[1]) + flex, r0[0], r0[1]), u);
+    this.ch.blendDesired(J.Lumbar, 1, clamp(0.5 * (r1[0] + r1[1]) + lat, r1[0], r1[1]), u);
+    this.ch.blendDesired(J.Lumbar, 2, clamp(0.5 * (r2[0] + r2[1]) + tw, r2[0], r2[1]), u);
   }
   stiff(fall, hold, u, dt) {
     const P = this.P, og = (fall + 1) * 0.5;
@@ -2172,7 +2189,7 @@ class DlShot extends DlBeh {
       const x = rt - this.P.timeBeforeReach;
       const w = smoothstep(0, 0.14, x) * (1 - smoothstep(this.P.grabHoldTime - 0.3, this.P.grabHoldTime, x)) * u;
       if (w <= 0.01) continue;
-      this.armTo(sd, tgt, w, this.P.armStiffness, 1);
+      this.armTo(sd, tgt, w, Math.max(this.P.armStiffness, 12.5), 1);
       this.ch.blendDesired(Elbow(sd), 2, dlForearmPronationForNormal(sd, woundN), w * 0.85);
       this.ch.oppose(Shoulder(sd), 1); this.ch.oppose(Elbow(sd), 1);
       this.pullActive[i] = true; this.pullTarget[i].copy(tgt); this.pullStrength[i] = (this.fallen ? 0.55 : 1) * w;
@@ -2253,6 +2270,7 @@ class DlBalance extends DlBeh {
     this.steps = 0; this.swing = 0; this.lastSwing = 0; this.sink = o.sink0 || 0; this.maxTime = o.maxTime; this.maxSteps = o.maxSteps;
     this.y0 = segs[SEG.Pelvis].pos.y; this.legLength = 0.88; this.leanVec = V3(0, 0, 0);
     this.kneeScale = [1, 1]; this.legBuckle = [0, 0]; this.shotCollapsed = [false, false]; this.accBias = 0; this.buckleLogged = false;
+    this.externalKneeStiffReduction = 0; this.wallBracing = false;
     this.footWidth = clamp(flat(CH.ankle[0].clone().sub(CH.ankle[1])).length() * 0.5, 0.09, 0.18);
     this.ankle = [CH.ankle[0].clone(), CH.ankle[1].clone()]; this.from = [null, null]; this.planted = [true, true];
     this.stepT = 0; this.stepDur = 0.3; this.bendT = -1; this.kneelT = 0; this.kneesDown = false;
@@ -2267,8 +2285,12 @@ class DlBalance extends DlBeh {
     this.ch.blendToZero(dlMask('uc'), 1);
     perf.log(t, this.name);
   }
+  reduceLegStiffness(delta) {
+    this.externalKneeStiffReduction = Math.min(Math.max(0, this.lowerK - 3.5), this.externalKneeStiffReduction + Math.max(0, delta));
+  }
   strength(t) {
-    const k = clamp01((this.lowerK - 4) / (DLC.balanceLegStiffness - 4)) * this.perf.u(t);
+    const effK = Math.max(3.5, this.lowerK - this.externalKneeStiffReduction);
+    const k = clamp01((effK - 4) / (DLC.balanceLegStiffness - 4)) * this.perf.u(t);
     return this.failed ? k * (1 - clamp01((t - this.failT) / 0.18)) : k;
   }
   fail(t, why) { if (this.failed) return; this.failed = true; this.failT = t; this.why = why; this.perf.log(t, 'imbalance: ' + why); }
@@ -2285,10 +2307,10 @@ class DlBalance extends DlBeh {
     this.touch(t);
     if (this.failed) { if (this.strength(t) <= 0.01) this.stop(t); return; }
     const lean = Math.sqrt(Math.max(0, 1 - CH.hip2headUp * CH.hip2headUp)), lastStand = this.perf.lastStandUntil > t;
-    if (!this.O.ftk && lean > (lastStand ? 0.85 : DLC.balanceAbortThreshold)) return this.fail(t, 'inclinaison');
+    if (!this.O.ftk && lean > (lastStand ? 0.85 : (this.O.stagger ? 0.68 : DLC.balanceAbortThreshold))) return this.fail(t, 'inclinaison');
     if (!this.O.ftk && CH.com.y - CH.footMinY < DLC.giveUpHeight) return this.fail(t, 'hauteur');
     if (t - this.start > this.maxTime) return this.fail(t, 'max duration');
-    if (this.O.stagger && this.lowerK <= 8.01) return this.fail(t, 'jambes');
+    if (this.O.stagger && (this.lowerK - this.externalKneeStiffReduction) <= 8.01 && !this.wallBracing) return this.fail(t, 'jambes');
 
     this.ch.setMask('ub', DLC.balanceBodyStiffness, DLC.balanceDamping);
     this.ch.setMask('ua', DLC.balanceBodyStiffness, DLC.balanceDamping);
@@ -2378,7 +2400,7 @@ class DlBalance extends DlBeh {
     this.updateBuckle(t, giveWay);
     const g = 9.81, w0 = Math.sqrt(g / Math.max(0.4, CH.h));
     const comH = flat(CH.com), velH = flat(CH.vel);
-    const apex = comH.clone().addScaledVector(velH, 1 / w0 + (this.O.stagger ? 0.1 : 0));
+    const apex = comH.clone().addScaledVector(velH, 1 / w0 + (this.O.stagger ? 0.14 : 0.04));
     if (this.O.leanSide) apex.addScaledVector(CH.right, this.O.leanSide * 0.24);
 
     if (this.O.sit && t - this.start > 0.1) {
@@ -2418,14 +2440,14 @@ class DlBalance extends DlBeh {
       const a = flat(CH.ankle[0]), c = flat(CH.ankle[1]), ac = c.clone().sub(a);
       const u01 = clamp01(apex.clone().sub(a).dot(ac) / Math.max(1e-6, ac.lengthSq()));
       const dist = apex.distanceTo(a.clone().addScaledVector(ac, u01));
-      if (dist > 0.08 || ac.length() > 0.68) {
+      if (dist > 0.065 || ac.length() > 0.68) {
         if (this.steps >= this.maxSteps) return this.fail(t, 'pas max');
         const lat = apex.clone().sub(comH).dot(CH.right);
         let sw = Math.abs(lat) > 0.06 ? (lat > 0 ? 1 : -1) : (a.distanceTo(apex) > c.distanceTo(apex) ? -1 : 1);
         if (sw === this.lastSwing && Math.abs(lat) < 0.12) sw = -sw;
         if (this.O.injuredLeg === sw && this.perf.rng.chance(0.5)) sw = -sw;
         this.swing = sw; this.stepT = 0;
-        this.stepDur = this.perf.rng.range(0.26, 0.34) + (1 - clamp01(this.strength(t))) * 0.08;
+        this.stepDur = this.perf.rng.range(0.24, 0.32) + (1 - clamp01(this.strength(t))) * 0.08;
         this.from[sideIdx(sw)] = CH.ankle[sideIdx(sw)].clone();
         this.planted[sideIdx(sw)] = false;
       }
@@ -2462,12 +2484,13 @@ class DlBalance extends DlBeh {
         this.ankle[k] = target;
       }
       const hipPos = dlJointPos(Hip(side)), ik = legIK(side, target, null, hipPos), buckle = this.legBuckle[k];
+      const effLowerK = Math.max(3.5, this.lowerK - this.externalKneeStiffReduction);
       const wk = (this.O.injuredLeg === side ? 0.7 : 1) * lerp(1, 0.35, buckle);
-      const knk = this.lowerK * wk * this.kneeScale[k] * lerp(1, 0.22, buckle);
-      this.ch.setStiffness(Hip(side), this.lowerK * wk, 1);
+      const knk = effLowerK * wk * this.kneeScale[k] * lerp(1, 0.22, buckle);
+      this.ch.setStiffness(Hip(side), effLowerK * wk, 1);
       this.ch.setStiffness(Knee(side), Math.max(1.8, knk), 1);
       this.ch.setDesired(Hip(side), 0, (ik.f + buckle * 20) * DEG);
-      this.ch.setDesired(Hip(side), 1, ik.a * DEG);
+      this.ch.setDesired(Hip(side), 1, clamp(ik.a, -18, 32) * DEG);
       this.ch.setDesired(Knee(side), 0, Math.max(ik.k + buckle * 52, 5) * DEG);
       const dir = flat(CH.vel);
       let yaw = 0;
@@ -2494,10 +2517,11 @@ class DlBalance extends DlBeh {
     this.p52 = lerp(this.p52, clamp(side * 1.5 + vSide * 0.15, -0.5, 0.5), 1 - Math.exp(-dt * 8));
     this.ch.setDesired(J.Lumbar, 1, clamp(this.ch.des[J.Lumbar][1] + this.p52 * 0.5, -0.5, 0.5));
     this.ch.setDesired(J.Lumbar, 0, this.ch.des[J.Lumbar][0] + this.p56 * 0.5);
+    const effLowerK = Math.max(3.5, this.lowerK - this.externalKneeStiffReduction);
     for (const sd of [-1, 1]) {
       const k = sideIdx(sd), b = this.legBuckle[k], wk = (this.O.injuredLeg === sd ? 0.7 : 1) * lerp(1, 0.35, b);
-      const knk = this.lowerK * wk * this.kneeScale[k] * lerp(1, 0.22, b);
-      this.ch.setStiffness(Hip(sd), this.lowerK * wk, 1);
+      const knk = effLowerK * wk * this.kneeScale[k] * lerp(1, 0.22, b);
+      this.ch.setStiffness(Hip(sd), effLowerK * wk, 1);
       this.ch.setStiffness(Knee(sd), Math.max(1.8, knk), 1);
     }
 
@@ -2540,27 +2564,39 @@ class DlBalance extends DlBeh {
       const fLean = flat(gVec.clone().addScaledVector(uLean, -uLean.dot(gVec)));
       addForce(SEG.Pelvis, fLean.multiplyScalar(s).clampLength(0, 0.28 * M * g));
     }
+    if (!this.failed && !this.O.sit && (CH.contact[0] || CH.contact[1])) {
+      const avgHold = clamp01(1 - bAvg), cUp = clamp01(upOf(pv.q).dot(UP));
+      const hTarget = this.y0 - this.sink - 0.28 * (1 - avgHold);
+      if (pv.pos.y <= hTarget + 0.04) {
+        const footScale = (CH.contact[0] && CH.contact[1]) ? 1 : 0.78;
+        const supportFrac = clamp01(avgHold * s * cUp * cUp * footScale);
+        const yErr = hTarget - pv.pos.y;
+        const upAccel = g * supportFrac + clamp(yErr * 22 - pv.v.y * 7.5, -12, 16) * supportFrac;
+        const fUp = Math.max(0, M * upAccel);
+        addForce(SEG.Pelvis, V3(0, fUp * 0.62, 0)); addForce(SEG.Thorax, V3(0, fUp * 0.38, 0));
+      }
+    }
     if (CH.contact[0] || CH.contact[1]) {
       const midFoot = CH.ankle[0].clone().add(CH.ankle[1]).multiplyScalar(0.5);
       const dCom = CH.com.clone().sub(midFoot);
       const cUp = Math.max(0, dCom.clone().normalize().dot(UP)), c4 = cUp * cUp * cUp * cUp;
-      const stabK = (1 - 0.7 * bAvg) * s * c4, vH = flat(CH.vel);
-      const fStab = flat(dCom.addScaledVector(vH, 0.12)).multiplyScalar(-24 * stabK).addScaledVector(vH, -35 * s).clampLength(0, 0.16 * M * g * s);
+      const stabK = (1 - 0.7 * bAvg) * s * c4, vH = flat(CH.vel), brake = this.O.stagger ? 10 : 18;
+      const fStab = flat(dCom.addScaledVector(vH, 0.12)).multiplyScalar(-14 * stabK).addScaledVector(vH, -brake * s).clampLength(0, 0.16 * M * g * s);
       addForce(SEG.Pelvis, fStab.clone().multiplyScalar(0.7)); addForce(SEG.Thorax, fStab.clone().multiplyScalar(0.3));
     }
     const upT = UP.clone().add(this.leanVec || V3(0, 0, 0)).normalize();
     let Iub = 0.5;
     for (const id of [SEG.Pelvis, SEG.Thorax, SEG.Head, SEG.LUpperArm, SEG.RUpperArm, SEG.LForearm, SEG.RForearm]) Iub += segs[id].mass * segs[id].pos.distanceToSquared(pv.pos);
-    const ls = this.perf.lastStandUntil > t ? 1.6 : 1;
-    this.upright(SEG.Thorax, upT, Iub * 0.25 * s * ls, dt);
-    this.upright(SEG.Pelvis, UP.clone().lerp(upT, 0.5).normalize(), Iub * 0.2 * s * ls, dt);
+    const ls = this.perf.lastStandUntil > t ? 1.6 : 1, upHold = 1 - 0.50 * bAvg;
+    this.upright(SEG.Thorax, upT, Iub * 0.40 * s * ls * upHold, dt, 135);
+    this.upright(SEG.Pelvis, UP.clone().lerp(upT, 0.5).normalize(), Iub * 0.28 * s * ls * upHold, dt, 110);
   }
-  upright(sid, target, gain, dt) {
+  upright(sid, target, gain, dt, maxTq = 90) {
     const sg = segs[sid], err = upOf(sg.q).cross(target), wH = sg.w.clone().sub(UP.clone().multiplyScalar(sg.w.dot(UP)));
     const iSeg = Math.max(0.05, (sg.body.inertia.x + sg.body.inertia.y + sg.body.inertia.z) / 3);
     const kp = Math.min(60 * gain, dt > 1e-4 ? 0.3 * iSeg / (dt * dt) : 60 * gain);
     const kd = Math.min(14 * gain, dt > 1e-4 ? 0.9 * iSeg / dt : 14 * gain);
-    const tq = err.multiplyScalar(kp).sub(wH.multiplyScalar(kd)).clampLength(0, 90);
+    const tq = err.multiplyScalar(kp).sub(wH.multiplyScalar(kd)).clampLength(0, maxTq);
     dlTorque(sid, tq);
   }
 }
@@ -2725,17 +2761,237 @@ class DlFlinch extends DlBeh {
     const th = segs[SEG.Thorax], rAx = rightOf(th.q), uAx = upOf(th.q), fAx = fwdOf(th.q);
     const toT = dlSafeNorm(this.threat.clone().sub(th.pos), fAx), bearing = Math.atan2(toT.dot(rAx), toT.dot(fAx));
     const fromBehind = Math.abs(bearing) > 1.7;
-    this.ch.setMask('ub', DLC.flinchBodyStiffness * env, DLC.flinchDamping);
+    this.ch.setMask('uk', DLC.flinchBodyStiffness * env, DLC.flinchDamping);
     this.ch.blendDesired(J.Lumbar, 0, fromBehind ? -0.15 : 0.28, 0.65 * env);
     this.ch.blendDesired(J.Lumbar, 2, clamp(-bearing * 0.35, -0.45, 0.45), 0.6 * env);
     this.ch.blendDesired(J.Neck, 0, 0.25, 0.55 * env);
     for (const i of [0, 1]) {
-      if (this.ch.busy[i]) continue;
+      if (this.ch.busy[i] || (this.perf.shot && this.perf.shot.looseArms[i])) continue;
       const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
       const n = (dlNoise01(this.age * 2, this.seed, i * 3.1) - 0.5) * 0.08;
       const guard = th.pos.clone().addScaledVector(uAx, 0.20 + n).addScaledVector(fAx, 0.30).addScaledVector(rAx, sd * 0.14);
       this.armTo(sd, guard, 0.85 * env, DLC.flinchBodyStiffness, 1);
       this.ch.blendDesired(Elbow(sd), 2, 0.85 * IR(sd), 0.85 * env);
+      this.ch.oppose(Shoulder(sd), 1); this.ch.oppose(Elbow(sd), 1);
+    }
+  }
+}
+
+// --------------------------------------------------------------- extra behaviors (DlExtraBehaviours.cs: wallBrace/fallOverWall, highFall, onFire, meleeGuard)
+class DlWallBrace extends DlBeh {
+  constructor(perf, t, point, normal, isLowWall) {
+    super(perf, isLowWall ? 'fow' : 'bcr', t);
+    this.wallPoint = point.clone();
+    this.wallNormal = dlSafeNorm(flat(normal), CH.fwd.clone().negate());
+    this.isLowWall = isLowWall; this.bracingWall = false; this.slumping = false; this.fallingOverWall = isLowWall;
+    this.nearWallTime = 0; this.age = 0; this.impactReduced = false;
+  }
+  static probeWall(moveHint) {
+    const pv = segs[SEG.Pelvis], th = segs[SEG.Thorax];
+    const moveDir = dlSafeNorm(flat(moveHint), CH.fwd.clone().negate());
+    let right = V3().crossVectors(UP, moveDir); if (right.lengthSq() < 1e-4) right.copy(CH.right); right.normalize();
+    const dirs = [moveDir, dlSafeNorm(CH.fwd.clone().negate(), moveDir), dlSafeNorm(moveDir.clone().addScaledVector(right, 0.55), moveDir),
+      dlSafeNorm(moveDir.clone().addScaledVector(right, -0.55), moveDir), right, right.clone().negate()];
+    const waistY = Math.max(CH.groundY + 0.55, pv.pos.y + 0.05), chestY = Math.max(waistY + 0.25, th.pos.y + 0.10);
+    let bestDist = Infinity, found = null;
+    for (const d of dirs) {
+      for (const h of [0, 1]) {
+        const o = h === 0 ? V3(pv.pos.x, waistY, pv.pos.z) : V3(th.pos.x, chestY, th.pos.z);
+        const hit = dlCast(o, d, DLC.braceSearchDist);
+        if (!hit || Math.abs(hit.normal.dot(UP)) >= 0.45) continue;
+        if (hit.dist < 0.12 || hit.dist > DLC.braceSearchDist) continue;
+        if (hit.dist < bestDist) {
+          bestDist = hit.dist;
+          const overO = V3(o.x, hit.point.y + 0.50, o.z);
+          const upHit = dlCast(overO, d, hit.dist + 0.35);
+          const isLowWall = h === 0 && (!upHit || upHit.dist > hit.dist + 0.25);
+          found = { point: hit.point.clone(), normal: dlSafeNorm(flat(hit.normal), d.clone().negate()), isLowWall };
+        }
+      }
+    }
+    return found;
+  }
+  tick(t, dt, weight) {
+    if (!this.active) return;
+    const u = clamp01(weight); if (u <= 0.05) { this.stop(t); return; }
+    this.touch(t); this.age += dt; if (this.age > 3.2) { this.stop(t); return; }
+    const pv = segs[SEG.Pelvis], th = segs[SEG.Thorax];
+    const minDist = Math.min(th.pos.clone().sub(this.wallPoint).dot(this.wallNormal), pv.pos.clone().sub(this.wallPoint).dot(this.wallNormal));
+    if (minDist > DLC.braceSearchDist + 0.45) {
+      if (this.perf.balancer) this.perf.balancer.wallBracing = false;
+      if (this.age > 0.6) this.stop(t);
+      return;
+    }
+    if (this.isLowWall) {
+      this.fallingOverWall = true;
+      this.ch.setMask('us', DLC.braceBodyStiffness * u, 0.8);
+      this.ch.blendDesired(J.Lumbar, 0, -0.25, 0.55 * u);
+      if (minDist < 0.65 && this.perf.balancer) this.perf.balancer.reduceLegStiffness(NM.bcr.slumpLegStiffRate * 0.7 * dt);
+      return;
+    }
+    if (minDist < 0.70) {
+      this.bracingWall = true; this.nearWallTime += dt;
+      if (this.perf.balancer) this.perf.balancer.wallBracing = true;
+      if (!this.impactReduced && minDist < 0.55) {
+        this.impactReduced = true;
+        if (this.perf.balancer) this.perf.balancer.reduceLegStiffness(NM.bcr.impactLegStiffReduction);
+        this.perf.log(t, 'wall brace impact');
+      }
+    }
+    let tangent = V3().crossVectors(this.wallNormal, UP); if (tangent.lengthSq() < 1e-4) tangent.copy(CH.right); tangent.normalize();
+    this.ch.setMask('us', DLC.braceBodyStiffness * u, 0.85);
+    for (const i of [0, 1]) {
+      const sd = i === 0 ? -1 : 1;
+      if (this.ch.busy[i] || (this.perf.shot && this.perf.shot.looseArms[i]) || dlArmCap(sd) < 0.25) continue;
+      const sh = dlJointPos(Shoulder(sd)), wallPlanePt = this.wallPoint.clone().addScaledVector(tangent, sh.clone().sub(this.wallPoint).dot(tangent));
+      wallPlanePt.y = clamp(sh.y - 0.08, CH.groundY + 0.45, sh.y + 0.18);
+      if (sh.distanceTo(wallPlanePt) > 1.05) continue;
+      this.armTo(sd, wallPlanePt.addScaledVector(this.wallNormal, 0.03), 0.85 * u, DLC.braceArmStiffness, 1);
+      this.ch.blendDesired(Elbow(sd), 2, dlForearmPronationForNormal(sd, this.wallNormal), 0.85 * u);
+      this.ch.oppose(Shoulder(sd), 0.9); this.ch.oppose(Elbow(sd), 0.9);
+    }
+    this.ch.blendDesired(J.Neck, 0, 0.18, 0.45 * u);
+    if (this.nearWallTime > 0.18) {
+      if (!this.slumping) { this.slumping = true; this.perf.log(t, 'wall slump'); }
+      if (this.perf.balancer) this.perf.balancer.reduceLegStiffness(NM.bcr.slumpLegStiffRate * dt);
+      const slumpW = clamp01((this.nearWallTime - 0.18) / 0.8) * u;
+      for (const sd of [-1, 1]) {
+        const hp = Hip(sd), kn = Knee(sd);
+        this.ch.blendDesired(hp, 0, Math.max(this.ch.des[hp][0], 0.65 * slumpW), 0.55 * slumpW);
+        this.ch.blendDesired(kn, 0, Math.max(this.ch.des[kn][0], 1.05 * slumpW), 0.55 * slumpW);
+      }
+    }
+  }
+  forces(t, dt, weight) {
+    if (!this.active) return;
+    const u = clamp01(weight); if (u <= 0.05) return;
+    const pv = segs[SEG.Pelvis], th = segs[SEG.Thorax], M = TOTAL_MASS, g = 9.81;
+    if (this.isLowWall) {
+      const distN = pv.pos.clone().sub(this.wallPoint).dot(this.wallNormal), vToward = -CH.vel.dot(this.wallNormal);
+      if (distN < 0.68 && (vToward > 0.1 || this.age < 0.7)) {
+        const edgeAx = dlSafeNorm(V3().crossVectors(UP, this.wallNormal.clone().negate()), CH.right);
+        const env = smoothstep(0, 0.12, this.age) * (1 - smoothstep(0.65, 1.15, this.age));
+        addBodyAngularAcc(edgeAx.multiplyScalar(7.5 * env * u));
+        addForce(SEG.Thorax, this.wallNormal.clone().multiplyScalar(-0.65).addScaledVector(UP, 0.45).multiplyScalar(0.42 * M * g * env * u));
+      }
+      return;
+    }
+    const thDist = th.pos.clone().sub(this.wallPoint).dot(this.wallNormal);
+    if (thDist < 0.58) {
+      const vInto = -th.v.dot(this.wallNormal);
+      if (vInto > 0.1) {
+        const cush = Math.min(vInto * 65, 0.55 * M * g) * u;
+        addForce(SEG.Thorax, this.wallNormal.clone().multiplyScalar(cush * 0.65));
+        addForce(SEG.Pelvis, this.wallNormal.clone().multiplyScalar(cush * 0.35));
+      }
+      if (CH.vel.y < -0.1) addForce(SEG.Thorax, V3(0, Math.min(-CH.vel.y * 18, 0.25 * M * g) * u, 0));
+    }
+  }
+  stop(t) { if (this.perf.balancer) this.perf.balancer.wallBracing = false; super.stop(t); }
+}
+
+class DlHighFall extends DlBeh {
+  constructor(perf, t) { super(perf, 'highFall', t); this.preparingToLand = false; this.age = 0; this.phase = perf.rng.range(0, 2 * Math.PI); }
+  tick(t, dt, weight) {
+    if (!this.active) return;
+    const u = clamp01(weight); if (u <= 0.03) { this.stop(t); return; }
+    this.touch(t); this.age += dt; if (this.age > 2.6) { this.stop(t); return; }
+    const pv = segs[SEG.Pelvis], th = segs[SEG.Thorax], rAx = rightOf(th.q), uAx = upOf(th.q), fAx = fwdOf(th.q);
+    let tti = 99;
+    if (CH.vel.y < -0.8) { const hit = dlCast(pv.pos, DOWN, 4.5); if (hit) tti = Math.max(0, (pv.pos.y - hit.point.y) / Math.max(0.8, -CH.vel.y)); }
+    this.preparingToLand = CH.vel.y < -1.2 && tti < DLC.highFallCatchTime;
+    this.ch.setMask('ub', DLC.highFallBodyStiffness * u, 0.85); this.ch.setMask('lb', 9 * u, 0.85);
+    this.ch.blendDesired(J.Lumbar, 0, this.preparingToLand ? 0.35 : 0.15, 0.55 * u);
+    this.ch.blendDesired(J.Neck, 0, this.preparingToLand ? 0.35 : -0.15, 0.55 * u);
+    if (this.preparingToLand) {
+      for (const i of [0, 1]) {
+        if (this.ch.busy[i]) continue; const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
+        const sh = dlJointPos(Shoulder(sd)), tgt = sh.clone().add(V3(0, -0.7, 0).addScaledVector(fAx, 0.35).addScaledVector(rAx, sd * 0.28).normalize().multiplyScalar(0.65));
+        this.armTo(sd, tgt, u, DLC.catchArmsStiffness, 1);
+        this.ch.blendDesired(Elbow(sd), 2, dlForearmPronationForNormal(sd, UP), 0.85 * u);
+      }
+    } else {
+      const ph = this.phase + this.age * 7.5;
+      for (const i of [0, 1]) {
+        if (this.ch.busy[i]) continue; const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
+        const a = i === 0 ? ph : ph + Math.PI * 0.85, sh = dlJointPos(Shoulder(sd));
+        const ctr = sh.clone().addScaledVector(uAx, 0.26).addScaledVector(rAx, sd * 0.22).addScaledVector(fAx, 0.12);
+        this.armTo(sd, ctr.addScaledVector(fAx, 0.28 * Math.cos(a)).addScaledVector(uAx, 0.28 * Math.sin(a)), 0.85 * u, DLC.highFallBodyStiffness, 0.85);
+        this.ch.blendDesired(Elbow(sd), 2, 0.4 * Math.sin(a) * IR(sd), 0.6 * u); this.ch.oppose(Shoulder(sd), 0.7);
+      }
+    }
+    const pR = rightOf(pv.q), pU = upOf(pv.q), pF = fwdOf(pv.q);
+    for (const sd of [-1, 1]) {
+      const k = sideIdx(sd), a = this.phase + this.age * 6.5 + (k === 0 ? 0 : Math.PI), hip = dlJointPos(Hip(sd));
+      const c = hip.clone().addScaledVector(pU, -0.48).addScaledVector(pF, 0.12);
+      const ik = legIK(sd, c.addScaledVector(pU, 0.20 * Math.sin(a)).addScaledVector(pF, 0.20 * Math.cos(a)), null, hip);
+      this.ch.blendDesired(Hip(sd), 0, ik.f * DEG, 0.75 * u); this.ch.blendDesired(Hip(sd), 1, clamp(ik.a, -15, 25) * DEG, 0.65 * u);
+      this.ch.blendDesired(Knee(sd), 0, Math.max(12, ik.k) * DEG, 0.75 * u);
+    }
+  }
+  forces(t, dt, weight) {
+    if (!this.active) return;
+    const u = clamp01(weight); if (u <= 0.05 || !CH.airborne) return;
+    const th = segs[SEG.Thorax], wantUp = dlSafeNorm(V3(0, 0.65, 0).addScaledVector(flat(CH.vel), -0.25), UP);
+    dlTorque(SEG.Thorax, upOf(th.q).cross(wantUp).multiplyScalar(28).addScaledVector(th.w, -5).clampLength(0, 35).multiplyScalar(u));
+  }
+}
+
+class DlOnFire extends DlBeh {
+  constructor(perf, t) { super(perf, 'onFire', t); this.seed = perf.rng.range(0, 50); this.age = 0; this.rollDir = perf.rng.chance(0.5) ? 1 : -1; }
+  tick(t, dt, weight) {
+    if (!this.active) return;
+    const u = clamp01(weight); if (u <= 0.04) { this.stop(t); return; }
+    this.touch(t); this.age += dt;
+    const th = segs[SEG.Thorax], rAx = rightOf(th.q), uAx = upOf(th.q), fAx = fwdOf(th.q);
+    this.ch.setMask('ub', DLC.onFireBodyStiffness * u, 0.85);
+    if (this.perf.phase !== 'ground') {
+      this.ch.blendDesired(J.Lumbar, 0, 0.24 + 0.14 * Math.sin(this.age * 5), 0.7 * u);
+      this.ch.blendDesired(J.Lumbar, 2, 0.35 * Math.sin(this.age * 6.5 + this.seed), 0.7 * u);
+      this.ch.blendDesired(J.Neck, 0, -0.25, 0.55 * u);
+      for (const i of [0, 1]) {
+        if (this.ch.busy[i]) continue; const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
+        const ph = this.age * 7.5 + i * 2.4 + this.seed, swat = 0.5 + 0.5 * Math.sin(ph);
+        const chestT = th.pos.clone().addScaledVector(uAx, 0.04 + 0.14 * Math.cos(ph * 1.3)).addScaledVector(fAx, 0.18).addScaledVector(rAx, sd * 0.06);
+        const flailT = th.pos.clone().addScaledVector(uAx, 0.25).addScaledVector(fAx, 0.22).addScaledVector(rAx, sd * 0.36);
+        this.armTo(sd, flailT.lerp(chestT, swat), 0.85 * u, DLC.onFireBodyStiffness, 0.9);
+        this.ch.blendDesired(Elbow(sd), 2, dlForearmPronationForNormal(sd, fAx), 0.7 * u);
+        this.ch.oppose(Shoulder(sd), 0.85);
+      }
+    } else {
+      this.rollDir = (Math.floor(this.age * 0.9) % 2 === 1) ? -1 : 1;
+      for (const i of [0, 1]) {
+        if (this.ch.busy[i]) continue; const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
+        this.ch.blendDesired(Shoulder(sd), 0, 0.65, 0.6 * u); this.ch.blendDesired(Elbow(sd), 0, 1.35, 0.6 * u);
+      }
+    }
+  }
+  forces(t, dt, weight) {
+    if (!this.active || this.perf.phase !== 'ground') return;
+    const u = clamp01(weight); if (u <= 0.05) return;
+    const ax = dlSafeNorm(upOf(segs[SEG.Thorax].q), CH.fwd), tq = this.rollDir * (0.4 + 0.6 * Math.abs(Math.sin(this.age * 3.8))) * 34 * u;
+    dlTorque(SEG.Thorax, ax.clone().multiplyScalar(tq)); dlTorque(SEG.Pelvis, ax.clone().multiplyScalar(tq * 0.65));
+  }
+}
+
+class DlMeleeGuard extends DlBeh {
+  constructor(perf, t, dur = 0.95) { super(perf, 'meleeGuard', t); this.dur = dur; this.seed = perf.rng.range(0, 30); this.age = 0; }
+  tick(t, dt, weight) {
+    if (!this.active) return;
+    this.age += dt; if (this.age > this.dur) { this.stop(t); return; }
+    this.touch(t);
+    const env = dlEnvelope(this.age, 0, 0.08, this.dur * 0.55, this.dur * 0.35) * clamp01(weight); if (env <= 0.03) return;
+    const th = segs[SEG.Thorax], rAx = rightOf(th.q), uAx = upOf(th.q), fAx = fwdOf(th.q);
+    this.ch.setMask('ub', DLC.meleeGuardStiffness * env, 0.95);
+    this.ch.blendDesired(J.Lumbar, 0, 0.44, 0.78 * env); this.ch.blendDesired(J.Neck, 0, 0.42, 0.75 * env);
+    if (this.perf.balancer && this.perf.balancer.active && !this.perf.balancer.failed) this.perf.balancer.sink = Math.min(0.28, this.perf.balancer.sink + 0.35 * dt);
+    for (const i of [0, 1]) {
+      if (this.ch.busy[i] || (this.perf.shot && this.perf.shot.looseArms[i])) continue;
+      const sd = i === 0 ? -1 : 1; if (dlArmCap(sd) < 0.25) continue;
+      const n = (dlNoise01(this.age * 2.5, this.seed, i * 4.2) - 0.5) * 0.06;
+      const guard = th.pos.clone().addScaledVector(uAx, 0.34 + n).addScaledVector(fAx, 0.24).addScaledVector(rAx, sd * 0.14);
+      this.armTo(sd, guard, 0.90 * env, DLC.meleeGuardStiffness, 1);
+      this.ch.blendDesired(Elbow(sd), 2, 0.90 * IR(sd), 0.90 * env);
       this.ch.oppose(Shoulder(sd), 1); this.ch.oppose(Elbow(sd), 1);
     }
   }
@@ -3159,7 +3415,8 @@ function planBaseAz(kind, pushAz, side) {
   }
 }
 const NM_FORCE_OPTIONS = { auto: 'auto', stagger: 'stagger (staggerFall)', ftk: 'fall to knees (shotFallToKnees)', collapse: 'balance then collapse (bodyBalance)', windmill: 'backward windmill (armsWindmill)', relax: 'slack collapse (bodyRelax)', rds: 'roll (rollDownStairs)',
-  sit: 'seated (sitDown)', lateral: 'sideways (sideCrumple)', dive: 'dive (diveFall)', plank: 'board fall (archFall)', quad: 'all fours (handsKnees)', kneeSlide: 'knee slide (kneeSlide)', pivot: 'pivot (pivotFall)', twist: 'spin (twistDown)' };
+  sit: 'seated (sitDown)', lateral: 'sideways (sideCrumple)', dive: 'dive (diveFall)', plank: 'board fall (archFall)', quad: 'all fours (handsKnees)', kneeSlide: 'knee slide (kneeSlide)', pivot: 'pivot (pivotFall)', twist: 'spin (twistDown)',
+  highFall: 'high fall (highFall)', onFire: 'on fire (onFire)', meleeGuard: 'melee guard (meleeGuard)' };
 // Human-readable label for tip azimuth (0 = front, π/2 = right, π = back).
 function toppleLabel(az) {
   const a = wrapPi(az), d = Math.abs(a), side = a > 0 ? 'right' : 'left';
@@ -3172,21 +3429,24 @@ class NmPerformance {
   constructor(neural, ctx, rng, t0 = 0) {
     nmSense();
     this.neural = neural; this.ctx = ctx; this.rng = rng; this.eff = new DlEff();
-    this.wounds = []; this.journal = []; this.lastStandUntil = -1; this.time = t0; this.nextGrabProbe = t0;
+    this.wounds = []; this.journal = []; this.lastStandUntil = -1; this.time = t0; this.nextGrabProbe = t0; this.nextWallProbe = t0;
     this.phase = ctx.pose === 'prone' ? 'ground' : 'balance'; this.groundT = this.phase === 'ground' ? 0 : -1; this.fallT = -1;
     this.plan = this.choosePlan();
-    this.log(t0, 'plan ' + this.plan.kind);
+    this.log(t0, 'plan ' + this.plan.kind + ' [' + this.plan.weaponClass + ']');
     this.shot = new DlShot(this, t0, {
       bodyStiffness: DLC.shotBodyStiffness, armStiffness: DLC.shotArmStiffness, neckStiffness: DLC.shotNeckStiffness,
-      loosenessAmount: 1, grabHoldTime: DLC.shotGrabHoldTime, timeBeforeReach: DLC.shotTimeBeforeReach,
+      loosenessAmount: 1, grabHoldTime: 2.6, timeBeforeReach: 0.12,
       spinePainTime: this.plan.conscious ? DLC.shotSpinePainTime : 0.2, spinePainMultiplier: 1, spinePainTwistMultiplier: 0.5,
       timeBeforeCollapseLeg: DLC.shotTimeBeforeCollapseLeg,
       headLookAtWoundMin: 0.25, headLookAtWoundMax: 0.8, headLookAtHeadMin: 0.6, headLookAtHeadMax: 1.7,
       shockSpinMin: 50, shockSpinMax: 90, shockSpinDecay: 4, shockSpinScalePerComponent: 0.5,
       legStiffness: DLC.balanceLegStiffness, fallTime: this.plan.conscious ? 1.2 : 0.4,
       reachForWound: this.plan.reach, fling: this.plan.fling, addShockSpin: this.plan.shockSpin,
+      bluntMelee: this.plan.weaponClass === 'melee' && this.plan.kind === 'meleeGuard',
     });
     this.addBeh(this.shot);
+    if (this.plan.kind === 'onFire') this.onFire = this.addBeh(new DlOnFire(this, t0));
+    if (this.plan.kind === 'meleeGuard') this.meleeGuard = this.addBeh(new DlMeleeGuard(this, t0, rng.range(0.75, 1.15)));
     if (this.phase === 'balance' && this.plan.balance) {
       this.balancer = this.addBeh(new DlBalance(this, t0, this.plan.balance));
       if (this.plan.balance.stagger) this.log(t0, `staggerFall: ${this.plan.balance.maxSteps} max steps`);
@@ -3198,6 +3458,7 @@ class NmPerformance {
   u(t) {
     const n = this.neural, cap = n.maxDur - 1.8;
     if (!this.plan.conscious) return Math.max(0, 1 - t / Math.max(0.05, this.plan.relaxTime));
+    if (this.ctx.mechanism === 'Blast') return this.groundT >= 0 ? clamp01(1 - (t - this.groundT) / 0.9) : (t < 3 ? 1 : clamp01(1 - (t - 3) / 0.5));
     if (this.groundT < 0) return t < cap - 1 ? 1 : clamp01(cap - t);
     const end = Math.min(Math.max(n.agonyEnd, this.groundT + 0.5), cap);
     return t < end - 1 ? 1 : clamp01((end - t) / 1);
@@ -3207,12 +3468,13 @@ class NmPerformance {
     const th = segs[SEG.Thorax], fwd = flat(fwdOf(th.q)).normalize(), d = flat(c.direction), hasDir = d.lengthSq() > 0.01;
     if (hasDir) d.normalize();
     const fromBehind = hasDir && d.dot(fwd) > 0.4;
-    const conscious = !['Cerebral', 'CervicalCord', 'Blast', 'FallTrauma'].includes(m);
+    const conscious = !['Cerebral', 'CervicalCord'].includes(m);
     const torsoHit = [SEG.Thorax, SEG.Pelvis].includes(c.hitSeg);
+    const weaponClass = m === 'Blast' ? 'blast' : m === 'Burn' ? 'fire' : m === 'Melee' ? 'melee' : (c.weaponTag || 'rifle');
     const plan = {
-      conscious, relaxTime: m === 'Cerebral' ? rng.range(0.02, 0.06) : 0.08,
-      reach: conscious && c.hitSeg !== SEG.Head && rng.chance(0.85),
-      fling: conscious && rng.chance(0.55 + 0.2 * Math.min(1, (c.kickScale || 1) - 1)),
+      conscious, weaponClass, relaxTime: m === 'Cerebral' ? rng.range(0.02, 0.06) : 0.08,
+      reach: conscious && m !== 'Blast' && m !== 'Burn' && c.hitSeg !== SEG.Head && rng.chance(0.88),
+      fling: conscious && m !== 'Blast' && rng.chance(0.55 + 0.2 * Math.min(1, (c.kickScale || 1) - 1)),
       sfb: conscious && fromBehind && torsoHit, sig: m === 'Abdominal', windmillBack: true, kind: 'collapse',
       moving: speed > 0.8,
     };
@@ -3223,21 +3485,28 @@ class NmPerformance {
     plan.signature = rng.range(0.8, 1.25);
     let kind = forced;
     if (kind === 'auto') {
-      if (!conscious || plan.legsDead) kind = 'relax';
+      if (m === 'Blast') kind = 'highFall';
+      else if (m === 'Burn') kind = 'onFire';
+      else if (m === 'Melee') kind = c.weaponTag === 'knife' ? 'stagger' : 'meleeGuard';
+      else if (!conscious || plan.legsDead) kind = 'relax';
       else if (speed > 2.4) kind = 'rds';
       else if (speed > 1.8) kind = 'collapse';
       else {
         const v = clamp01(S.variety);
         const w = {
-          stagger: 2.4, ftk: 1.7, collapse: 1.1, windmill: 0.75 * v, rds: 0.65 * v,
-          sit: 0.55, lateral: 1.5, dive: 1.1, plank: (m === 'Cerebral' ? 1.5 : 0.35) * clamp(S.posturing, 0.4, 2),
-          quad: 1.2, kneeSlide: 0.85 * v, pivot: 1, twist: 1,
+          stagger: 3.2, ftk: 1.9, collapse: 1.3, windmill: 1.0 * v, rds: 0.80 * v,
+          sit: 0.45, lateral: 1.6, dive: 1.0, plank: (m === 'Cerebral' ? 1.5 : 0.12) * clamp(S.posturing, 0.4, 2),
+          quad: 1.1, kneeSlide: 0.85 * v, pivot: 1.1, twist: 1.0,
         };
+        if (weaponClass === 'sniper') { w.ftk *= 2.2; w.collapse *= 2.0; w.stagger *= 0.25; w.windmill = 0; w.pivot *= 0.3; }
+        else if (weaponClass === 'shotgun') { w.windmill *= 1.8; w.rds *= 1.5; w.dive *= 1.3; w.stagger *= 1.2; }
+        else if (weaponClass === 'pistol' || weaponClass === 'smg') { w.stagger *= 1.35; w.lateral *= 1.15; }
+        else if (weaponClass === 'heavyPistol' || weaponClass === 'rifle') { w.stagger *= 1.15; w.pivot *= 1.25; w.twist *= 1.25; }
         if (m === 'Abdominal') { w.ftk *= 1.5; w.sit *= 1.8; }
         if (m === 'Syncope') { w.stagger = 0.4; w.ftk *= 1.4; w.windmill = 0; w.rds *= 0.5; w.pivot *= 0.6; w.sit *= 1.4; }
         if (c.pose === 'duck') { w.ftk *= 2; w.stagger *= 0.4; w.windmill *= 0.4; w.rds *= 1.4; w.quad *= 1.5; w.sit *= 1.6; }
         if (c.legHit) { w.collapse *= 2; w.stagger *= 0.7; w.rds *= 0.4; w.lateral *= 1.8; w.sit *= 0.7; }
-        if (hasDir && d.dot(fwd) < -0.4) { w.windmill *= 2; w.rds *= 1.4; w.plank *= 1.6; }
+        if (hasDir && d.dot(fwd) < -0.4) { w.windmill *= 2; w.rds *= 1.4; w.plank *= 1.4; }
         if (hasDir && d.dot(fwd) > 0.4) { w.dive *= 1.5; w.quad *= 1.4; w.kneeSlide *= 1.3; }
         if ((c.kickScale || 1) > 1.2) { w.rds *= 1.5; w.dive *= 1.2; w.pivot *= 1.2; }
         if (plan.sfb && !plan.moving) w.rds = 0;
@@ -3249,12 +3518,14 @@ class NmPerformance {
     plan.kind = kind;
     this.configurePlan(plan, kind, pushAz, jitter, side, rng);
     Variety.recordPlan(kind, plan.toppleAz);
-    const k = c.kickScale || 1, scale = kind === 'relax' ? 0.25 : ['ftk', 'sit', 'quad', 'kneeSlide', 'collapse'].includes(kind) ? 0.45 : 1;
-    plan.rbVel = scale * clamp(0.25 + 0.12 * (c.momentum || 3), 0.3, 1.4) * k * S.fallDrive;
-    if (kind === 'windmill') plan.rbVel = Math.max(plan.rbVel, 0.9 * S.fallDrive);
-    const heavy = /chevrotine|slug|gros/.test(c.kickClass || '');
-    plan.snap = (c.kickScale || 1) > 1.35 || heavy;
-    plan.shockSpin = heavy && torsoHit;
+    const k = c.kickScale || 1, scale = kind === 'relax' ? 0.40 : ['ftk', 'sit', 'quad', 'kneeSlide', 'collapse'].includes(kind) ? 0.65 : 1;
+    const rbMap = { pistol: rng.range(0.95, 1.25), heavyPistol: rng.range(1.15, 1.50), smg: rng.range(0.90, 1.20), rifle: rng.range(1.15, 1.60),
+      sniper: rng.range(0.75, 1.15), shotgun: rng.range(1.45, 2.00), melee: rng.range(0.70, 1.10), fire: rng.range(0.45, 0.75), blast: 0.5 };
+    plan.rbVel = scale * (rbMap[weaponClass] || 1.1) * clamp(0.85 + 0.08 * k, 0.7, 1.4) * S.fallDrive;
+    if (kind === 'windmill') plan.rbVel = Math.max(plan.rbVel, 1.05 * S.fallDrive);
+    const heavy = /chevrotine|buckshot|slug|heavy/.test(c.kickClass || '');
+    plan.snap = (c.kickScale || 1) > 1.3 || heavy || ['sniper', 'rifle', 'heavyPistol'].includes(weaponClass);
+    plan.shockSpin = (heavy || weaponClass === 'heavyPistol' || (weaponClass === 'rifle' && !!c.woundSide)) && torsoHit;
     return plan;
   }
   configurePlan(plan, kind, pushAz, jitter, side, rng) {
@@ -3269,8 +3540,8 @@ class NmPerformance {
         plan.toppleDelay = plan.relaxTime + R(0.02, 0.12); plan.catch = false;
         break;
       case 'stagger':
-        plan.balance = { stagger: true, maxSteps: rng.int(2, 6), maxTime: R(2.6, 3.6), perStep: R(1.2, 2.1),
-          buckleMode: legHit ? 1 : (rng.chance(0.35) ? 1 : 0), buckleLeg: legHit || side, buckleDelay: R(0.28, 0.75) };
+        plan.balance = { stagger: true, maxSteps: rng.int(3, 6), maxTime: R(2.6, 3.8), perStep: R(1.1, 1.8),
+          buckleMode: legHit ? 1 : (rng.chance(0.35) ? 1 : 0), buckleLeg: legHit || side, buckleDelay: legHit ? R(0.28, 0.55) : R(0.65, 1.35) };
         plan.toppleGain = R(1.6, 2.8);
         break;
       case 'ftk':
@@ -3288,7 +3559,7 @@ class NmPerformance {
         plan.toppleAz = R(-0.4, 0.4); plan.toppleGain = R(2.6, 4.0);
         break;
       case 'collapse':
-        plan.balance = { maxSteps: rng.int(1, 3), maxTime: R(0.6, 1.4), buckleMode: rng.int(1, 4),
+        plan.balance = { maxSteps: rng.int(1, 3), maxTime: R(0.9, 1.7), buckleMode: rng.int(1, 4),
           buckleLeg: legHit || side, buckleDelay: R(0.05, 0.18), buckleStaggerDelay: R(0.10, 0.22) };
         plan.toppleAz = pushAz + R(-1.2, 1.2); plan.toppleGain = R(2.0, 3.4);
         break;
@@ -3323,6 +3594,17 @@ class NmPerformance {
       case 'twist':
         plan.balance = { maxSteps: 1, maxTime: R(0.35, 0.8), yawAccel: (rng.chance(0.5) ? -1 : 1) * R(4, 8) };
         plan.toppleAz = (rng.chance(0.5) ? -1 : 1) * Math.PI * 0.5 + R(-0.5, 0.5); plan.toppleGain = R(3.2, 4.8);
+        break;
+      case 'highFall':
+        plan.balance = null; plan.toppleGain = 0; plan.catch = true;
+        break;
+      case 'onFire':
+        plan.balance = { stagger: true, maxSteps: rng.int(3, 6), maxTime: R(2.4, 3.6), perStep: 1.2 };
+        plan.toppleAz = pushAz + R(-0.8, 0.8); plan.toppleGain = R(1.8, 3.0);
+        break;
+      case 'meleeGuard':
+        plan.balance = { stagger: true, maxSteps: rng.int(1, 4), maxTime: R(1.1, 1.9), perStep: 1.6, sink0: 0.12 };
+        plan.toppleAz = pushAz + R(-0.6, 0.6); plan.toppleGain = R(2.4, 3.8);
         break;
       default: plan.balance = null; break;
     }
@@ -3396,6 +3678,12 @@ class NmPerformance {
       this.log(t, `grab detected (${target.isLedge ? 'ledge' : 'wall/obstacle'})`);
     }
   }
+  groundSlope(dirHint) {
+    const d = flat(dirHint); if (d.lengthSq() < 1e-4) return 0; d.normalize();
+    const o0 = V3(CH.com.x, CH.com.y + 0.3, CH.com.z), o1 = o0.clone().addScaledVector(d, 0.35);
+    const h0 = dlCast(o0, DOWN, 2.5), h1 = dlCast(o1, DOWN, 2.5);
+    return h0 && h1 ? Math.abs(h1.point.y - h0.point.y) / 0.35 : 0;
+  }
   startFall(t, why) {
     if (this.phase !== 'balance') return;
     this.phase = 'fall'; this.fallT = t; this.log(t, 'fall (' + why + ')');
@@ -3403,8 +3691,13 @@ class NmPerformance {
     this.shot.fallen = true;
     const dir = this.toppleDir(this.plan.toppleAz);
     this.startTopple(t + (this.plan.toppleDelay || 0), dir, this.plan.toppleGain);
-    const vH = flat(CH.vel), back = dir.dot(flat(CH.fwd)) < -0.35;
-    if (this.plan.kind === 'rds' || (this.plan.kind !== 'dive' && this.plan.moving && vH.length() > 1.6)) {
+    if (this.plan.kind === 'highFall') {
+      this.highFall = this.addBeh(new DlHighFall(this, t));
+      if (this.plan.catch) this.catchFall = this.addBeh(new DlCatchFall(this, t));
+      return;
+    }
+    const vH = flat(CH.vel), back = dir.dot(flat(CH.fwd)) < -0.35, slope = this.groundSlope(vH.lengthSq() > 0.04 ? vH : dir);
+    if (this.plan.kind === 'rds' || (this.plan.conscious && !this.plan.stiffFall && this.plan.kind !== 'dive' && (vH.length() > 1.35 || segs[SEG.Thorax].w.length() > 2.6 || slope > 0.22))) {
       this.rds = this.addBeh(new DlRollDownStairs(this, t, vH.lengthSq() > 0.04 ? vH.normalize() : dir));
     } else {
       if (back && this.plan.windmillBack && this.plan.conscious) this.startWindmill(t);
@@ -3426,20 +3719,20 @@ class NmPerformance {
   startGround(t) {
     if (this.phase === 'ground') return;
     this.phase = 'ground'; this.groundT = t; this.log(t, 'on ground');
-    for (const b of [this.catchFall, this.windmill, this.balancer, this.pedal]) if (b) b.stop(t);
-    if (!this.rds && this.plan.conscious) {
-      const vH = flat(CH.vel);
-      if (this.plan.moving && (vH.length() > 1.4 || segs[SEG.Thorax].w.length() > 3)) {
+    for (const b of [this.catchFall, this.windmill, this.balancer, this.pedal, this.highFall, this.meleeGuard, this.wallBrace]) if (b) b.stop(t);
+    if (!this.rds && this.plan.conscious && !this.plan.stiffFall) {
+      const vH = flat(CH.vel), slope = this.groundSlope(vH.lengthSq() > 0.01 ? vH : CH.fwd);
+      if (vH.length() > 1.35 || segs[SEG.Thorax].w.length() > 2.6 || slope > 0.22) {
         this.rds = this.addBeh(new DlRollDownStairs(this, t, vH.lengthSq() > 0.01 ? vH.normalize() : CH.fwd.clone(), 2.4));
         this.log(t, 'ground roll (momentum)');
       }
     }
     this.shot.stop(t);
-    const m = this.ctx.mechanism;
-    if (this.plan.conscious) {
+    const m = this.ctx.mechanism, blastOrFall = m === 'Blast' || m === 'FallTrauma';
+    if (this.plan.conscious && !blastOrFall) {
       this.iog = this.addBeh(new DlInjuredOnGround(this, t));
-      this.writhe = this.addBeh(new DlWrithe(this, t, (m === 'Burn' ? 1.2 : m === 'Abdominal' ? 0.6 : 0.75) * S.vigor * this.rng.range(0.8, 1.25)));
-      if (m === 'Abdominal' || m === 'Burn' || this.rng.chance(0.15 + 0.3 * clamp01(S.variety))) this.foetal = this.addBeh(new DlFoetal(this, t));
+      this.writhe = this.addBeh(new DlWrithe(this, t, (m === 'Burn' ? 1.1 : m === 'Abdominal' ? 0.6 : 0.75) * S.vigor * this.rng.range(0.8, 1.25)));
+      if (m === 'Abdominal' || m === 'Burn' || this.rng.chance(0.15 + 0.25 * clamp01(S.variety))) this.foetal = this.addBeh(new DlFoetal(this, t));
     }
     this.neural.onNmGround(t);
     this.topple = null;
@@ -3462,23 +3755,37 @@ class NmPerformance {
         if (this.balancer.failed) this.startFall(t, this.balancer.why || 'imbalance');
       }
       if (this.phase === 'balance' && this.plan.kind === 'windmill' && t > 0.08) this.startWindmill(t);
+      if (this.phase === 'balance' && !this.wallBrace && this.plan.conscious && !this.plan.stiffFall && t >= this.nextWallProbe && this.balancer && (this.balancer.steps > 0 || CH.vel.length() > 0.45 || CH.hip2headUp < 0.97)) {
+        this.nextWallProbe = t + 0.10;
+        const wHit = DlWallBrace.probeWall(CH.vel.lengthSq() > 0.04 ? CH.vel : this.toppleDir(this.plan.toppleAz));
+        if (wHit) this.wallBrace = this.addBeh(new DlWallBrace(this, t, wHit.point, wHit.normal, wHit.isLowWall));
+      }
       if (this.phase === 'balance' && t >= this.nextGrabProbe && this.balancer && (this.balancer.steps > 0 || this.balancer.legBuckle[0] > 0.2 || this.balancer.legBuckle[1] > 0.2 || CH.vel.length() > 0.7 || CH.hip2headUp < 0.96)) {
         this.nextGrabProbe = t + 0.14;
         this.tryStartGrab(t, CH.vel.lengthSq() > 0.04 ? CH.vel : this.toppleDir(this.plan.toppleAz));
       }
     }
     if (this.phase !== 'ground' && this.shot.active) this.shot.tick(t, dt, w);
+    if (this.meleeGuard && this.meleeGuard.active && this.phase !== 'ground') this.meleeGuard.tick(t, dt, w);
+    if (this.onFire && this.onFire.active) this.onFire.tick(t, dt, w);
     if (this.flinch && this.flinch.active && this.phase !== 'ground') this.flinch.tick(t, dt, w);
+    if (this.wallBrace && this.wallBrace.active && this.phase !== 'ground') this.wallBrace.tick(t, dt, w);
     if (this.phase === 'balance' && this.windmill && this.windmill.active) this.windmill.tick(t, dt, Math.max(w, 0.2));
     if (this.phase === 'fall') {
       const backV = -flat(CH.vel).dot(CH.fwd);
-      if (!this.windmill && !this.rds && this.plan.conscious && this.plan.windmillBack && backV > 0.5) this.startWindmill(t);
-      if (CH.airborne && !this.pedal && t - this.fallT > 0.25 && this.plan.conscious) this.pedal = this.addBeh(new DlPedal(this, t));
+      if (!this.windmill && !this.rds && !this.highFall && this.plan.conscious && this.plan.windmillBack && backV > 0.5) this.startWindmill(t);
+      if (CH.airborne && !this.pedal && !this.highFall && t - this.fallT > 0.25 && this.plan.conscious) this.pedal = this.addBeh(new DlPedal(this, t));
+      if (!this.wallBrace && this.plan.conscious && !this.plan.stiffFall && t >= this.nextWallProbe && t - this.fallT < 0.65) {
+        this.nextWallProbe = t + 0.10;
+        const wHit = DlWallBrace.probeWall(CH.vel.lengthSq() > 0.04 ? CH.vel : this.toppleDir(this.plan.toppleAz));
+        if (wHit) this.wallBrace = this.addBeh(new DlWallBrace(this, t, wHit.point, wHit.normal, wHit.isLowWall));
+      }
       if (!this.grab && t >= this.nextGrabProbe && t - this.fallT < 0.75) {
         this.nextGrabProbe = t + 0.12;
         this.tryStartGrab(t, CH.vel.lengthSq() > 0.04 ? CH.vel : this.toppleDir(this.plan.toppleAz));
       }
-      if (this.catchFall) this.catchFall.tick(t, dt, w);
+      if (this.highFall && this.highFall.active) { this.highFall.tick(t, dt, w); if (this.highFall.preparingToLand && this.catchFall) this.catchFall.tick(t, dt, w); }
+      else if (this.catchFall) this.catchFall.tick(t, dt, w);
       if (this.windmill) this.windmill.tick(t, dt, Math.max(w, 0.2));
       if (this.rds) this.rds.tick(t, dt, w);
       if (this.pedal) this.pedal.tick(t, dt, CH.airborne ? w : w * 0.3);
@@ -3519,6 +3826,9 @@ class NmPerformance {
     dlOpposeGravity(this.eff, w);
     if (this.rds && this.rds.active) this.rds.forces(t, dt, w);
     if (this.grab && this.grab.active) this.grab.forces(t, dt, w);
+    if (this.wallBrace && this.wallBrace.active) this.wallBrace.forces(t, dt, w);
+    if (this.highFall && this.highFall.active) this.highFall.forces(t, dt, w);
+    if (this.onFire && this.onFire.active) this.onFire.forces(t, dt, w);
     if (this.writhe && this.writhe.active) this.writhe.forces(t, dt, w);
     if (this.topple) {
       const x = t - this.topple.t0;
@@ -3749,7 +4059,18 @@ class Controller {
       // Real bullet momentum (p = m·v × multiplier, capped at 60 N·s).
       const c = this.ctx, p = Math.min(60, c.momentum * S.bullet * c.kickScale), dir = c.kickDir;
       const hitW = c.hitLocal.clone().applyQuaternion(segs[c.hitSeg].q).add(segs[c.hitSeg].pos).add(c.kickLever);
-      if (this.neural && this.neural.nm) this.neural.nm.onBullet(t, makeHit(c.hitSeg, hitW, dir, p));
+      if (this.neural && this.neural.nm) {
+        if (c.mechanism === 'Blast') {
+          const launchDir = dir.clone().add(V3(0, 0.75, 0)).normalize();
+          for (const sg of segs) {
+            const share = (p * 1.4) * (sg.mass / TOTAL_MASS);
+            sg.body.applyImpulse(new CANNON.Vec3(launchDir.x * share, launchDir.y * share, launchDir.z * share), new CANNON.Vec3(0, 0, 0));
+          }
+          this.neural.nm.onBullet(t, makeHit(c.hitSeg, hitW, dir, 4));
+        } else {
+          this.neural.nm.onBullet(t, makeHit(c.hitSeg, hitW, dir, p));
+        }
+      }
       else { const b = segs[c.hitSeg].body, rel = hitW.clone().sub(segs[c.hitSeg].pos); b.applyImpulse(new CANNON.Vec3(dir.x * p, dir.y * p, dir.z * p), new CANNON.Vec3(rel.x, rel.y, rel.z)); }
     }
     const pelvis = segs[SEG.Pelvis], grounded = t > 0.5 && pelvis.v.length() < 1;
@@ -3874,7 +4195,7 @@ function mechanismFor(segId, local, dir) {
   return 'Limb';
 }
 function shoot(segId, worldPoint, dir) {
-  const [pStr, calName, kickClass, penStr] = document.getElementById('caliber').value.split('|');
+  const [pStr, calName, kickClass, penStr, weaponTag] = document.getElementById('caliber').value.split('|');
   const momentum = parseFloat(pStr), pen = parseFloat(penStr) || 0;
   if (state === 'dead' && ctl) { ctl.onBullet(segId, worldPoint, dir, momentum, kickClass, pen); return; }
   if (state !== 'alive') return;
@@ -3889,14 +4210,23 @@ function shoot(segId, worldPoint, dir) {
   else if (Math.abs(local.x) > 0.05) woundSide = local.x > 0 ? -1 : 1;
   const legHit = [7, 8].includes(segId) ? -1 : [9, 10].includes(segId) ? 1 : 0;
   const ctx = {
-    pose: posture === 'duck' ? 'duck' : posture === 'prone' ? 'prone' : 'stand', velocity: runVel, kickClass, pen, direction: dir.clone().normalize(), hitSeg: segId, hitLocal: local,
+    pose: posture === 'duck' ? 'duck' : posture === 'prone' ? 'prone' : 'stand', velocity: runVel, kickClass, pen, weaponTag: weaponTag || 'rifle',
+    direction: dir.clone().normalize(), hitSeg: segId, hitLocal: local,
     woundSide, legHit, severity: clamp01(momentum / 8), momentum, caliber: calName, nmForce: document.getElementById('nmForce').value,
   };
-  ctx.mechanism = mechanismFor(segId, local, ctx.direction);
+  const forcedMech = document.getElementById('mechanism').value;
+  if (forcedMech !== 'auto') ctx.mechanism = forcedMech;
+  else if (weaponTag === 'blast') ctx.mechanism = 'Blast';
+  else if (weaponTag === 'fire') ctx.mechanism = 'Burn';
+  else if (weaponTag === 'bat' || weaponTag === 'knife') ctx.mechanism = 'Melee';
+  else ctx.mechanism = mechanismFor(segId, local, ctx.direction);
   for (const s of segs) { s.body.type = CANNON.Body.DYNAMIC; s.body.velocity.set(runVel.x, runVel.y, runVel.z); s.body.angularVelocity.set(0, 0, 0); s.body.wakeUp(); }
   const inert = document.getElementById('inert').checked;
   ctl = new Controller(ctx, inert);
   state = 'dead';
+  if (weaponTag === 'smg') {
+    for (let k = 1; k <= 3; k++) pendingShots.push({ seg: segId, delay: 0.09 * k, spread: 0.07 });
+  }
   woundMarker.position.copy(local.clone().add(V3(0, 0, 0))); segGroups[segId].add(woundMarker); woundMarker.visible = true;
   woundMarker.material.color = COL.wound;
   const n = ctl.neural;

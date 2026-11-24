@@ -36,6 +36,9 @@ namespace DeliriumTests
         public float MinPelvisY = 10f;
         public bool AnyGrabActivated, AnyGrabGripped, AnyGrabSnapped;
         public bool AnyFlinchActivated, AnyRollActivated, AnyWindmillActivated;
+        public bool AnyWallBrace, AnyWallSlump, AnyFallOverWall;
+        public bool AnyHighFall, AnyHighFallLand, AnyOnFire, AnyMeleeGuard;
+        public int PeakSteps;
         public bool AnyCatchFallHitFloor;
         public bool AnyWoundReach;
         public bool AnyNaN;
@@ -254,21 +257,6 @@ namespace DeliriumTests
                 RootAngVel += rb.AngImpulseAccum / Ibody;
             }
 
-            // Vertical leg support only when standing balanced with stiff legs (not while buckling!).
-            float supportFrac = 0f;
-            if (Perf.Phase == NmPhase.Balance && Perf.Balance != null && Perf.Balance.Active && !Perf.Balance.Failed)
-            {
-                float bL = Perf.Balance.LegBuckle[0], bR = Perf.Balance.LegBuckle[1];
-                float avgHold = 1f - 0.5f * (bL + bR);
-                float hTarget = 0.94f - Perf.Balance.Sink - 0.30f * (1f - avgHold);
-                if (RootPos.y <= hTarget + 0.05f)
-                {
-                    supportFrac = Math.Clamp(avgHold * Perf.Balance.Strength(t), 0f, 1f);
-                    float yErr = hTarget - RootPos.y;
-                    netForce += Vector3.up * (Body.TotalMass * (9.81f * supportFrac + Math.Clamp(yErr * 28f - RootVel.y * 8f, -15f, 18f) * supportFrac));
-                }
-            }
-
             RootVel += (netForce / Body.TotalMass) * dt;
             RootAngVel += (netTorque / Ibody) * dt;
             RootAngVel *= MathF.Exp(-1.2f * dt);
@@ -326,6 +314,20 @@ namespace DeliriumTests
             if (Perf.Windmill != null) AnyWindmillActivated = true;
             if (Perf.CatchFall != null && (Perf.CatchFall.ArmHitSurface[0] || Perf.CatchFall.ArmHitSurface[1]))
                 AnyCatchFallHitFloor = true;
+            if (Perf.WallBrace != null && Perf.WallBrace.Active)
+            {
+                AnyWallBrace = true;
+                if (Perf.WallBrace.Slumping) AnyWallSlump = true;
+                if (Perf.WallBrace.FallingOverWall) AnyFallOverWall = true;
+            }
+            if (Perf.HighFall != null && Perf.HighFall.Active)
+            {
+                AnyHighFall = true;
+                if (Perf.HighFall.PreparingToLand) AnyHighFallLand = true;
+            }
+            if (Perf.OnFire != null && Perf.OnFire.Active) AnyOnFire = true;
+            if (Perf.MeleeGuard != null && Perf.MeleeGuard.Active) AnyMeleeGuard = true;
+            if (Perf.Balance != null) PeakSteps = Math.Max(PeakSteps, Perf.Balance.Steps);
         }
     }
 }

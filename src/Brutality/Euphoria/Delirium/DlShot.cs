@@ -13,7 +13,7 @@ namespace Brutality.Euphoria
         public float NeckStiffness = DlCfg.ShotNeckStiffness;
         public float LoosenessAmount = 1f;
         public float GrabHoldTime = DlCfg.ShotGrabHoldTime;
-        public float TimeBeforeReach = DlCfg.ShotTimeBeforeReach;
+        public float TimeBeforeReach = 0.12f;
         public float SpinePainTime = DlCfg.ShotSpinePainTime;
         public float SpinePainMultiplier = 1f;
         public float SpinePainTwistMultiplier = 0.5f;
@@ -24,6 +24,7 @@ namespace Brutality.Euphoria
         public float LegStiffness = DlCfg.BalanceLegStiffness;
         public float FallTime = 1.2f;
         public bool ReachForWound = true, Fling = true, AddShockSpin, UseCatchFallOnFall = true, UseHeadLook = true;
+        public bool MeleeMode, BluntMelee;
     }
 
     /// <summary>
@@ -121,9 +122,9 @@ namespace Brutality.Euphoria
 
             // Choosing arms that reach for the wound (Delirium nmshot.rs:610-640): 1 or 2 hands depending on zone,
             // never the hit arm itself nor a destroyed arm. An axial trunk or thigh shot may engage
-            // both hands (the second delayed by 0.18 s).
+            // both hands (the second delayed by 0.18 s). Blunt melee skips wound reach to keep overhead guard clear.
             bool thighHit = hit.Part != null && (hit.Part.Id == Seg.LThigh || hit.Part.Id == Seg.RThigh);
-            if (P.ReachForWound && (hit.Reachable || thighHit) && Behind < 0.25f)
+            if (!P.BluntMelee && P.ReachForWound && (hit.Reachable || thighHit) && Behind < 0.25f)
             {
                 bool r7 = (hit.Side >= 0 || thighHit || hit.ArmSide > 0) && hit.ArmSide >= 0 && !LooseArms[0] && Nm.ElbowCap(_b.Body, -1) >= 0.25f;
                 bool r8 = (hit.Side <= 0 || thighHit || hit.ArmSide < 0) && hit.ArmSide <= 0 && !LooseArms[1] && Nm.ElbowCap(_b.Body, 1) >= 0.25f;
@@ -135,7 +136,7 @@ namespace Brutality.Euphoria
                 if (r7) { ReachArms[0] = true; _reachT[0] = 0f; ReachSide = -1; }
                 if (r8) { ReachArms[1] = true; _reachT[1] = r7 ? -0.18f : 0f; if (ReachSide == 0) ReachSide = 1; }
             }
-            if (P.Fling)
+            if (!P.BluntMelee && P.Fling)
             {
                 int side = ReachSide != 0 ? -ReachSide : (hit.Side != 0 ? hit.Side : (BMath.Chance(_rng, 0.5f) ? -1 : 1));
                 if (Nm.ElbowCap(_b.Body, side) >= 0.25f && !ReachArms[NmCharacter.Si(side)]) FlingSide = side;
@@ -207,16 +208,42 @@ namespace Brutality.Euphoria
 
         private void SpinePain(float u)
         {
-            // Spine pain (Delirium nmshot.rs:445-461): trunk bends toward the wound then returns.
+            // Spine pain (Delirium nmshot.rs:445-461): direction-aware trunk recoil, curl, and twist toward the wound.
             if (Wound == null || P.SpinePainTime <= 0f) return;
             float k = (P.SpinePainTime - _since) / P.SpinePainTime;
             if (k <= 0f) return;
-            float lean = P.SpinePainMultiplier * k;
-            if (Behind > 0f) lean *= 0.5f;
-            if (Wound != null && Wound.LegSide != 0) lean *= 0.65f;
-            float tw = Side * P.SpinePainTwistMultiplier * k * -0.35f;
-            Ch_SpineLean(lean, tw, u);
-            _ch.BlendToZero("us", Mathf.Clamp01(1f - lean));
+            if (k < 0.7f) _ch.BlendToZero("us", Mathf.Clamp01(0.7f - k));
+
+            float mult = P.SpinePainMultiplier;
+            if (Wound.LegSide != 0) mult *= 0.65f;
+            float flex;
+            float lat = Side * 0.18f * k * mult;
+            float tw = -Side * P.SpinePainTwistMultiplier * 0.85f * k;
+
+            bool guts = (Wound.Part != null && Wound.Part.Id == Seg.Pelvis) || _perf.Plan.ShotInGuts;
+            if (guts && Behind <= 0.25f)
+            {
+                flex = 0.62f * k * mult;
+                tw = -Side * P.SpinePainTwistMultiplier * 0.55f * k;
+            }
+            else if (Behind < -0.25f)
+            {
+                // Frontal hit: crisp backward chest kick during first 140 ms, then protective forward hunch.
+                float hunchW = BMath.SmoothStep(0.10f, 0.24f, _since);
+                flex = Mathf.Lerp(-0.18f, 0.44f, hunchW) * k * mult;
+            }
+            else if (Behind > 0.25f)
+            {
+                // Back hit: brief chest arch before knees give way.
+                flex = -0.24f * k * mult;
+                lat *= 0.5f;
+            }
+            else
+            {
+                flex = 0.25f * k * mult;
+            }
+
+            Ch_SpineLean(flex, lat, tw, u);
         }
 
         private void Stiff(float fall, float fallHold, float u, float dt)
@@ -288,15 +315,15 @@ namespace Brutality.Euphoria
             }
         }
 
-        private void Ch_SpineLean(float lean, float tw, float u)
+        private void Ch_SpineLean(float flex, float lat, float tw, float u)
         {
             int lu = (int)JointId.Lumbar;
             DlCfg.Range(lu, 0, out float lo0, out float hi0);
             DlCfg.Range(lu, 1, out float lo1, out float hi1);
             DlCfg.Range(lu, 2, out float lo2, out float hi2);
-            _ch.BlendDesired(lu, 0, 0.5f * (lo0 + hi0) + lean * 0.6f, u);
-            _ch.BlendDesired(lu, 1, 0.5f * (lo1 + hi1) + tw * 0.5f, u);
-            _ch.BlendDesired(lu, 2, 0.5f * (lo2 + hi2) + tw, u);
+            _ch.BlendDesired(lu, 0, Mathf.Clamp(0.5f * (lo0 + hi0) + flex, lo0, hi0), u);
+            _ch.BlendDesired(lu, 1, Mathf.Clamp(0.5f * (lo1 + hi1) + lat, lo1, hi1), u);
+            _ch.BlendDesired(lu, 2, Mathf.Clamp(0.5f * (lo2 + hi2) + tw, lo2, hi2), u);
         }
 
         /// <summary>Delirium's react_tick (nmshot.rs:727-773): sin/cos arm flinch from thorax velocity.</summary>
@@ -327,8 +354,8 @@ namespace Brutality.Euphoria
                 if (amp <= 0.02f) continue;
                 _ch.BlendDesired(sh, 0, _ch.Desired(sh).x + fk * amp * 0.85f, amp);
                 _ch.BlendDesired(sh, 1, _ch.Desired(sh).y + (0.45f + 0.3f * Mathf.Abs(f24)) * amp, amp);
-                _ch.BlendDesired(sh, 2, (f24 * 0.4f - 0.25f) * Motor.InternalRotSign(sd) * amp, amp);
-                _ch.BlendDesired(el, 0, Mathf.Clamp(_reactElbow + (fk + 1f) * 0.35f * amp, 0.15f, 2.2f), amp);
+                _ch.BlendDesired(sh, 2, Mathf.Clamp((f24 * 0.4f - 0.25f) * Motor.InternalRotSign(sd) * amp, -0.85f, 0.85f), amp);
+                _ch.BlendDesired(el, 0, Mathf.Clamp(_reactElbow + (fk + 1f) * 0.35f * amp, 0.20f, 2.25f), amp);
                 // Slight reflex pronation during the flinch.
                 _ch.BlendDesired(el, 2, 0.45f * Motor.InternalRotSign(sd) * amp, amp * 0.7f);
                 _ch.SetOpposeGravity(sh, 0f);
@@ -407,7 +434,7 @@ namespace Brutality.Euphoria
                           * (1f - BMath.SmoothStep(P.GrabHoldTime - 0.3f, P.GrabHoldTime, rt - P.TimeBeforeReach));
                 float w = env * u;
                 if (w <= 0.01f) continue;
-                ArmTo(sd, target, w, P.ArmStiffness, 1f);
+                ArmTo(sd, target, w, Mathf.Max(P.ArmStiffness, 12.5f), 1f);
                 // Forearm pronation (Shot::wrist): orients the palm against the wound.
                 float pron = DlPhys.ForearmPronationForNormal(_b.Body, sd, woundNormal);
                 _ch.BlendDesired((int)AnatomyData.Elbow(sd), 2, pron, w * 0.85f);
@@ -431,7 +458,7 @@ namespace Brutality.Euphoria
             int sh = (int)AnatomyData.Shoulder(sd), el = (int)AnatomyData.Elbow(sd);
             Vector3 d = BMath.SafeNormalize(Wound.Dir, _s.Fwd);
             float fwd = Mathf.Atan2(Vector3.Dot(d, _s.Fwd), Vector3.Dot(d, Vector3.up)) * Mathf.Rad2Deg;
-            float abd = Mathf.Clamp(90f + fwd, 35f, 130f);
+            float abd = Mathf.Clamp(90f + fwd, 30f, 110f);
             _ch.SetStiffness(AnatomyData.Shoulder(sd), P.ArmStiffness, 1f);
             _ch.SetStiffness(AnatomyData.Elbow(sd), P.ArmStiffness, 1f);
             _ch.BlendDesired(sh, 0, fwd * BMath.Deg, env);

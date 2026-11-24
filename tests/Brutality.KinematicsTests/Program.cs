@@ -454,7 +454,7 @@ internal static class Program
     {
         sb.AppendLine("## See It Yourself in the 3D Studio (`demo/test-bench.html`)");
         sb.AppendLine();
-        sb.AppendLine("The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `1.0.0`:");
+        sb.AppendLine("The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `1.1.0`:");
         sb.AppendLine();
         sb.AppendLine("1. **Wall grab + break (`DlGrab`)** — Choose the **`Close right wall (grab)`** scene, **`Standing`** posture, **`Auto`** behaviour (or **`Side collapse`**), then click the mannequin's left flank to throw it toward the right: the right arm reaches toward the wall, the forearm pronates palm toward the surface, a yellow anchor point appears on contact, then snaps when the load exceeds the threshold.");
         sb.AppendLine("2. **Crate / ledge grab (`GrabHelper`)** — Choose **`Crate / ledge ahead (grab)`**, **`Standing`** posture, and shoot the back or thorax to topple forward: probes detect the top edge of the crate in front of the body and lock a grip.");
@@ -466,8 +466,8 @@ internal static class Program
         sb.AppendLine();
         sb.AppendLine("| Formally proven out-of-game | Remaining to validate in-game (Unity / PhysX / SPT) |");
         sb.AppendLine("|---|---|");
-        sb.AppendLine("| All Delirium mathematical laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nm.rs`) executed directly on the plugin's real `.cs` files. | Calibration of magnitudes on real Tarkov skeletons (`PhysxProbe` for drive/limit directions at raid start). |");
-        sb.AppendLine("| 60 Hz closed-loop physics (`Shot`, `Balance`, `Grab`, `CatchFall`, `RollDownStairs`/`RollUp`, `Windmill`, `Writhe`, `Foetal`, `Flinch`). | Interactions on complex SPT map geometry (stairs, doors, furniture) and full carried equipment masses. |");
+        sb.AppendLine("| All Delirium mathematical laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nmbr`, `nmfow`, `nmhf`, `nm.rs`) executed directly on the plugin's real `.cs` files. | Calibration of magnitudes on real Tarkov skeletons (`PhysxProbe` for drive/limit directions at raid start). |");
+        sb.AppendLine("| 60 Hz closed-loop physics (`Shot`, `Balance`, `WallBrace`/`FallOverWall`, `HighFall`, `OnFire`, `MeleeGuard`, `Grab`, `CatchFall`, `RollDownStairs`/`RollUp`, `Windmill`, `Writhe`, `Foetal`, `Flinch`). | Interactions on complex SPT map geometry (stairs, doors, walls, low ledges, furniture) and full carried equipment masses. |");
         sb.AppendLine("| ISB conventions for all joints, arm/leg IK, `SolvePose` solver, thorax envelope, and validity of all BepInEx keys. | In-raid coexistence with third-party mods (`Smoothie`, `HollywoodFX`, `Fika`, `ReClassic`) and multi-body performance. |");
     }
 

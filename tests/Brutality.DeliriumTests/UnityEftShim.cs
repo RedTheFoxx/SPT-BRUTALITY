@@ -324,7 +324,7 @@ namespace Brutality.Core
 {
     internal enum DeathMechanism
     {
-        Cerebral, CervicalCord, NeckVascular, Thoracic, ThoracicCord, Abdominal, LumbarCord, Limb, Blast, Syncope, FallTrauma, Burn
+        Cerebral, CervicalCord, NeckVascular, Thoracic, ThoracicCord, Abdominal, LumbarCord, Limb, Blast, Syncope, FallTrauma, Burn, Melee
     }
 
     internal sealed class DeathContext
@@ -334,11 +334,14 @@ namespace Brutality.Core
         public Vector3 HitPoint;
         public Vector3 Direction = new Vector3(0f, 0f, -1f);
         public float ImpactMomentum = 3.2f;
+        public float ImpactEnergy = 1500f;
+        public int VolleyCount = 1;
         public float KickScale = 1f;
         public string KickClass = "intermediate";
         public EPlayerPose Pose = EPlayerPose.Stand;
         public Vector3 Velocity = Vector3.zero;
         public DeathMechanism Mechanism = DeathMechanism.Thoracic;
+        public int WoundSide;
         public System.Random Rng = new System.Random(42);
     }
 

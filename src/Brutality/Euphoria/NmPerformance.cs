@@ -10,6 +10,11 @@ namespace Brutality.Euphoria
 {
     internal enum NmPhase { Balance, Fall, Ground }
 
+    internal enum NmWeaponClass
+    {
+        Pistol, HeavyPistol, SmgBurst, Rifle, Sniper, Shotgun, Blast, Fire, Melee
+    }
+
     internal enum NmPlanKind
     {
         Auto, Stagger, FallToKnees, Collapse, Windmill, Relax, RollDownStairs,
@@ -29,12 +34,19 @@ namespace Brutality.Euphoria
         Pivot,
         /// <summary>Spin: torso twists, body spirals toward the ground.</summary>
         TwistDown,
+        /// <summary>Explosion / high fall: airborne orientation, flailing, and landing brace.</summary>
+        HighFall,
+        /// <summary>Burn / Molotov: panicked swatting stagger and ground stop-drop-roll.</summary>
+        OnFire,
+        /// <summary>Melee strike: knee duck, hunch, and overhead pronated guard.</summary>
+        MeleeGuard,
     }
 
-    /// <summary>Performance plan, chosen at death based on mechanism, posture, velocity, and shot direction.</summary>
+    /// <summary>Performance plan, chosen at death based on mechanism, weapon class, posture, velocity, and shot direction.</summary>
     internal sealed class NmPlan
     {
         public NmPlanKind Kind;
+        public NmWeaponClass WeaponClass;
         public bool Conscious, LegsDead, Reach, Fling, ShotFromBehind, ShotInGuts, WindmillBack = true, Snap, ShockSpin;
         /// <summary>The victim had momentum at the time of death: only a moving fall can roll.</summary>
         public bool Moving;
@@ -88,6 +100,11 @@ namespace Brutality.Euphoria
         public DlWindmill Windmill => _windmill;
         public DlGrab Grab => _grab;
         public DlFlinch Flinch => _flinch;
+        public DlWallBrace WallBrace => _wallBrace;
+        public DlHighFall HighFall => _highFall;
+        public DlOnFire OnFire => _onFire;
+        public DlMeleeGuard MeleeGuard => _meleeGuard;
+        public NmWeaponClass WeaponClass => Plan.WeaponClass;
         public DlWrithe Writhe => _writhe;
         public DlFoetal Foetal => _foetal;
         public DlInjuredOnGround InjuredOnGround => _iog;
@@ -101,10 +118,14 @@ namespace Brutality.Euphoria
         private DlPedal _pedal;
         private DlGrab _grab;
         private DlFlinch _flinch;
+        private DlWallBrace _wallBrace;
+        private DlHighFall _highFall;
+        private DlOnFire _onFire;
+        private DlMeleeGuard _meleeGuard;
         private DlInjuredOnGround _iog;
         private DlWrithe _writhe;
         private DlFoetal _foetal;
-        private float _leak = 1f, _lastBulletT = -1f, _nextGrabProbe;
+        private float _leak = 1f, _lastBulletT = -1f, _nextGrabProbe, _nextWallProbe;
         private bool _lastStandLogged;
         // shotSnap and setCharacterDamping
         private float _snapT0 = -1f, _injArmT0 = -1f, _injArmSign, _toppleT0 = -1f, _toppleGain;
@@ -126,7 +147,7 @@ namespace Brutality.Euphoria
             Eff = new DlCharacter(body);
             Impulses = new NmImpulseQueue(body, Ch);
             Plan = ChoosePlan();
-            Log(0f, "plan " + Plan.Kind + " (topple " + Mathf.RoundToInt(Plan.ToppleAzimuth * Mathf.Rad2Deg) + "°, force "
+            Log(0f, "plan " + Plan.Kind + " [" + Plan.WeaponClass + "] (topple " + Mathf.RoundToInt(Plan.ToppleAzimuth * Mathf.Rad2Deg) + "°, force "
                 + Plan.ToppleGain.ToString("0.0") + ")");
             Ch.Sense(0f);
 
@@ -136,10 +157,16 @@ namespace Brutality.Euphoria
                 Fling = Plan.Fling,
                 ReachForWound = Plan.Reach,
                 UseHeadLook = true,
+                TimeBeforeReach = 0.12f,
+                GrabHoldTime = 2.6f,
                 FallTime = Plan.Conscious ? 1.2f : 0.4f,
                 SpinePainTime = Plan.Conscious ? DlCfg.ShotSpinePainTime : 0.2f,
+                MeleeMode = Plan.WeaponClass == NmWeaponClass.Melee,
+                BluntMelee = Plan.WeaponClass == NmWeaponClass.Melee && Plan.Kind == NmPlanKind.MeleeGuard,
             };
             _shot = new DlShot(this, 0f, sp);
+            if (Plan.Kind == NmPlanKind.OnFire) _onFire = new DlOnFire(this, 0f);
+            if (Plan.Kind == NmPlanKind.MeleeGuard) _meleeGuard = new DlMeleeGuard(this, 0f, BMath.Range(Rng, 0.75f, 1.15f));
             Phase = NmPhase.Balance;
             if (ctx.Pose == EPlayerPose.Prone)
             {
@@ -160,6 +187,11 @@ namespace Brutality.Euphoria
         public float U(float t)
         {
             if (!Plan.Conscious) return Mathf.Max(0f, 1f - t / Mathf.Max(0.05f, Plan.RelaxTime));
+            if (Ctx.Mechanism == DeathMechanism.Blast || Ctx.Mechanism == DeathMechanism.FallTrauma)
+            {
+                if (GroundT >= 0f) return Mathf.Clamp01(1f - (t - GroundT) / 0.9f);
+                return t < 3.0f ? 1f : Mathf.Clamp01(1f - (t - 3.0f) / 0.5f);
+            }
             if (GroundT < 0f) return t < _neural.MusclesCap - 1f ? 1f : Mathf.Clamp01(_neural.MusclesCap - t);
             float end = Mathf.Max(_neural.AgonyEnd, GroundT > 0f ? GroundT + 0.5f : 0f);
             end = Mathf.Min(end, _neural.MusclesCap);
@@ -168,12 +200,29 @@ namespace Brutality.Euphoria
 
         // ------------------------------------------------------------------ plan
 
+        private static NmWeaponClass ClassifyWeapon(DeathContext c)
+        {
+            if (c.Mechanism == DeathMechanism.Blast) return NmWeaponClass.Blast;
+            if (c.Mechanism == DeathMechanism.Burn) return NmWeaponClass.Fire;
+            if (c.Mechanism == DeathMechanism.Melee) return NmWeaponClass.Melee;
+            string kc = (c.KickClass ?? string.Empty).ToLowerInvariant();
+            if (kc.Contains("buckshot") || kc.Contains("slug")) return NmWeaponClass.Shotgun;
+            if (kc.Contains("full power") && (c.ImpactEnergy > 2600f || c.ImpactMomentum > 9.5f)) return NmWeaponClass.Sniper;
+            if (kc.Contains("heavy caliber") || kc.Contains("heavy subsonic"))
+                return c.ImpactEnergy > 2000f ? NmWeaponClass.Rifle : NmWeaponClass.HeavyPistol;
+            if (kc.Contains("pistol"))
+                return c.VolleyCount >= 2 ? NmWeaponClass.SmgBurst : NmWeaponClass.Pistol;
+            if (kc.Contains("intermediate") || kc.Contains("full power"))
+                return c.VolleyCount >= 3 ? NmWeaponClass.SmgBurst : NmWeaponClass.Rifle;
+            return c.ImpactMomentum >= 3.0f ? NmWeaponClass.Rifle : NmWeaponClass.Pistol;
+        }
+
         private NmPlan ChoosePlan()
         {
             var c = Ctx;
             var rng = Rng;
             var m = c.Mechanism;
-            var plan = new NmPlan();
+            var plan = new NmPlan { WeaponClass = ClassifyWeapon(c) };
             float speed = NmCharacter.Flat(c.Velocity).magnitude;
             var th = Body[Seg.Thorax];
             Vector3 fwd = BMath.SafeNormalize(NmCharacter.Flat(th.F), Vector3.forward);
@@ -182,12 +231,14 @@ namespace Brutality.Euphoria
             if (hasDir) d.Normalize();
             bool torso = c.BodyPart == EBodyPart.Chest || c.BodyPart == EBodyPart.Stomach;
             bool fromBehind = hasDir && Vector3.Dot(d, fwd) > 0.4f;
-            plan.Conscious = m != DeathMechanism.Cerebral && m != DeathMechanism.CervicalCord && m != DeathMechanism.Blast && m != DeathMechanism.FallTrauma;
+            plan.Conscious = m != DeathMechanism.Cerebral && m != DeathMechanism.CervicalCord;
             plan.LegsDead = m == DeathMechanism.CervicalCord || m == DeathMechanism.ThoracicCord || m == DeathMechanism.LumbarCord;
             // Brain destroyed: tone drops in a few tens of ms — blackout then instant collapse.
             plan.RelaxTime = m == DeathMechanism.Cerebral ? BMath.Range(rng, 0.02f, 0.06f) : 0.08f;
-            plan.Reach = plan.Conscious && c.BodyPart != EBodyPart.Head && BMath.Chance(rng, 0.85f);
-            plan.Fling = plan.Conscious && BMath.Chance(rng, 0.55f + 0.2f * Mathf.Min(1f, c.KickScale - 1f));
+            plan.Reach = plan.Conscious && m != DeathMechanism.Blast && m != DeathMechanism.FallTrauma && m != DeathMechanism.Burn
+                && c.BodyPart != EBodyPart.Head && BMath.Chance(rng, 0.88f);
+            plan.Fling = plan.Conscious && m != DeathMechanism.Blast && m != DeathMechanism.FallTrauma
+                && BMath.Chance(rng, 0.55f + 0.2f * Mathf.Min(1f, c.KickScale - 1f));
             // The "shot from behind" reaction is physical, not a roll: it governs spine curl, blocked step,
             // and buckling knees, which must be consistent on every back shot.
             plan.ShotFromBehind = plan.Conscious && fromBehind && torso;
@@ -206,35 +257,46 @@ namespace Brutality.Euphoria
             var kind = ParseForced(Settings.EuphoriaForce.Value);
             if (kind == NmPlanKind.Auto)
             {
-                if (!plan.Conscious || plan.LegsDead) kind = NmPlanKind.Relax;
+                if (m == DeathMechanism.Blast || m == DeathMechanism.FallTrauma) kind = NmPlanKind.HighFall;
+                else if (m == DeathMechanism.Burn) kind = NmPlanKind.OnFire;
+                else if (m == DeathMechanism.Melee) kind = NmPlanKind.MeleeGuard;
+                else if (!plan.Conscious || plan.LegsDead) kind = NmPlanKind.Relax;
                 else if (speed > 2.4f) kind = NmPlanKind.RollDownStairs;
                 else if (speed > 1.8f) kind = NmPlanKind.Collapse;
                 else
                 {
-                    // Rolling was previously only reachable while running: on a standing death, the body still has shot
-                    // momentum and can roll. Delirium does not decide the message (the "shot" task chooses it): so this
-                    // is indeed a plan setting, not a physical law.
                     float v = Settings.GestureVariety.Value;
-                    // Base plans.
-                    float wS = 2.4f, wF = 1.7f, wC = 1.1f, wW = 0.75f * v, wR = 0.65f * v;
-                    // Added plans: falls cover all three anatomical planes and intermediate positions.
-                    // Seated collapse stays rare: the pelvis gives way on a gut shot, it shouldn't sit down every death.
-                    float wSit = 0.55f, wSide = 1.5f, wDive = 1.1f;
-                    // Board fall is a posturing fall: outside destroyed brain, it must remain exceptional.
-                    float wArch = (m == DeathMechanism.Cerebral ? 1.5f : 0.35f) * Mathf.Clamp(Settings.PosturingIntensity.Value, 0.4f, 2f);
-                    float wKnees = 1.2f, wSlide = 0.85f * v, wPivot = 1f, wTwist = 1f;
+                    float wS = 3.2f, wF = 1.9f, wC = 1.3f, wW = 1.0f * v, wR = 0.80f * v;
+                    float wSit = 0.45f, wSide = 1.6f, wDive = 1.0f;
+                    float wArch = (m == DeathMechanism.Cerebral ? 1.5f : 0.12f) * Mathf.Clamp(Settings.PosturingIntensity.Value, 0.4f, 2f);
+                    float wKnees = 1.1f, wSlide = 0.85f * v, wPivot = 1.1f, wTwist = 1.0f;
+
+                    switch (plan.WeaponClass)
+                    {
+                        case NmWeaponClass.Sniper:
+                            wF *= 2.2f; wC *= 2.0f; wS *= 0.25f; wW = 0f; wPivot *= 0.3f;
+                            break;
+                        case NmWeaponClass.Shotgun:
+                            wW *= 1.8f; wR *= 1.5f; wDive *= 1.3f; wS *= 1.2f;
+                            break;
+                        case NmWeaponClass.Pistol:
+                        case NmWeaponClass.SmgBurst:
+                            wS *= 1.35f; wSide *= 1.15f;
+                            break;
+                        case NmWeaponClass.HeavyPistol:
+                        case NmWeaponClass.Rifle:
+                            wS *= 1.15f; wPivot *= 1.25f; wTwist *= 1.25f;
+                            break;
+                    }
+
                     if (m == DeathMechanism.Abdominal) { wF *= 1.5f; wSit *= 1.8f; }
                     if (m == DeathMechanism.Syncope) { wS = 0.4f; wF *= 1.4f; wW = 0f; wR *= 0.5f; wPivot *= 0.6f; wSit *= 1.4f; }
                     if (c.Pose == EPlayerPose.Duck) { wF *= 2f; wS *= 0.4f; wW *= 0.4f; wR *= 1.4f; wKnees *= 1.5f; wSit *= 1.6f; }
                     if (legHit != 0) { wC *= 2f; wS *= 0.7f; wR *= 0.4f; wSide *= 1.8f; wSit *= 0.7f; }
-                    if (hasDir && Vector3.Dot(d, fwd) < -0.4f) { wW *= 2f; wR *= 1.4f; wArch *= 1.6f; }
+                    if (hasDir && Vector3.Dot(d, fwd) < -0.4f) { wW *= 2f; wR *= 1.4f; wArch *= 1.4f; }
                     if (hasDir && Vector3.Dot(d, fwd) > 0.4f) { wDive *= 1.5f; wKnees *= 1.4f; wSlide *= 1.3f; }
-                    // Heavy projectiles topple and roll more readily ("rigid body" push).
                     if (c.KickScale > 1.2f) { wR *= 1.5f; wDive *= 1.2f; wPivot *= 1.2f; }
-                    // A moving body pivots more readily than collapsing in place.
                     if (plan.Moving) { wPivot *= 1.6f; wTwist *= 1.5f; wSlide *= 1.3f; }
-                    // A shot in the back does not make a standing body roll: the fall is a topple
-                    // onto the knees, not a somersault. Rolling remains possible if the target was already running.
                     if (plan.ShotFromBehind && !plan.Moving) wR = 0f;
 
                     var kinds = new[]
@@ -247,8 +309,6 @@ namespace Brutality.Euphoria
                     float sum = 0f;
                     for (int i = 0; i < weights.Length; i++)
                     {
-                        // Death memory: a recently seen plan weighs much less, and a fall in the same
-                        // direction as the previous death even less (otherwise all bodies topple the same way).
                         weights[i] = Mathf.Max(0f, weights[i] * VarietyDirector.PlanMultiplier((int)kinds[i])
                             * VarietyDirector.SectorMultiplier(BaseAzimuth(kinds[i], pushAz, side)));
                         sum += weights[i];
@@ -297,15 +357,30 @@ namespace Brutality.Euphoria
                     plan.Balance.LeanAsForce = BMath.Chance(rng, 0.55f);
                 }
             }
-            float kindScale = kind == NmPlanKind.Relax ? 0.25f
+            float kindScale = kind == NmPlanKind.Relax ? 0.40f
                 : kind == NmPlanKind.FallToKnees || kind == NmPlanKind.Collapse || kind == NmPlanKind.SitBack
-                  || kind == NmPlanKind.HandsKnees || kind == NmPlanKind.KneeSlide ? 0.45f : 1f;
-            plan.RbVel = kindScale * Mathf.Clamp(0.25f + 0.12f * Mathf.Max(1f, c.ImpactMomentum), 0.3f, 1.4f) * c.KickScale * Settings.FallDrive.Value;
-            if (kind == NmPlanKind.Windmill) plan.RbVel = Mathf.Max(plan.RbVel, 0.9f * Settings.FallDrive.Value);
-            string kc = c.KickClass ?? string.Empty;
+                  || kind == NmPlanKind.HandsKnees || kind == NmPlanKind.KneeSlide ? 0.65f : 1f;
+            float baseRbVel;
+            switch (plan.WeaponClass)
+            {
+                case NmWeaponClass.Pistol: baseRbVel = BMath.Range(rng, 0.95f, 1.25f); break;
+                case NmWeaponClass.HeavyPistol: baseRbVel = BMath.Range(rng, 1.15f, 1.50f); break;
+                case NmWeaponClass.SmgBurst: baseRbVel = BMath.Range(rng, 0.90f, 1.20f); break;
+                case NmWeaponClass.Rifle: baseRbVel = BMath.Range(rng, 1.15f, 1.60f); break;
+                case NmWeaponClass.Sniper: baseRbVel = BMath.Range(rng, 0.75f, 1.15f); break;
+                case NmWeaponClass.Shotgun: baseRbVel = BMath.Range(rng, 1.45f, 2.00f); break;
+                case NmWeaponClass.Melee: baseRbVel = BMath.Range(rng, 0.70f, 1.10f); break;
+                case NmWeaponClass.Fire: baseRbVel = BMath.Range(rng, 0.45f, 0.75f); break;
+                default: baseRbVel = 0.5f; break;
+            }
+            plan.RbVel = kindScale * baseRbVel * Mathf.Clamp(0.85f + 0.08f * c.KickScale, 0.7f, 1.4f) * Settings.FallDrive.Value;
+            if (kind == NmPlanKind.Windmill) plan.RbVel = Mathf.Max(plan.RbVel, 1.05f * Settings.FallDrive.Value);
+            string kc = (c.KickClass ?? string.Empty).ToLowerInvariant();
             bool heavy = kc.Contains("buckshot") || kc.Contains("slug") || kc.Contains("heavy");
-            plan.Snap = c.KickScale > 1.35f || heavy;
-            plan.ShockSpin = heavy && torso;
+            plan.Snap = c.KickScale > 1.3f || heavy || plan.WeaponClass == NmWeaponClass.Sniper
+                || plan.WeaponClass == NmWeaponClass.Rifle || plan.WeaponClass == NmWeaponClass.HeavyPistol;
+            plan.ShockSpin = (heavy || plan.WeaponClass == NmWeaponClass.HeavyPistol
+                || (plan.WeaponClass == NmWeaponClass.Rifle && c.WoundSide != 0)) && torso;
             VarietyDirector.RecordPlan((int)kind, plan.ToppleAzimuth);
             return plan;
         }
@@ -360,10 +435,10 @@ namespace Brutality.Euphoria
                 case NmPlanKind.Stagger:
                     plan.Balance = new DlBalanceOptions
                     {
-                        Stagger = true, MaxSteps = rng.Next(2, 6), MaxTime = R(2.6f, 3.6f), PerStep = R(1.2f, 2.1f),
+                        Stagger = true, MaxSteps = rng.Next(3, 6), MaxTime = R(2.6f, 3.8f), PerStep = R(1.1f, 1.8f),
                         BuckleMode = legHit != 0 ? 1 : (BMath.Chance(rng, 0.35f) ? 1 : 0),
                         BuckleLeg = legHit != 0 ? legHit : side,
-                        BuckleDelay = R(0.28f, 0.75f),
+                        BuckleDelay = legHit != 0 ? R(0.28f, 0.55f) : R(0.65f, 1.35f),
                     };
                     plan.ToppleAzimuth = pushAz + jitter;
                     plan.ToppleGain = R(1.6f, 2.8f);
@@ -407,7 +482,7 @@ namespace Brutality.Euphoria
                 case NmPlanKind.Collapse:
                     plan.Balance = new DlBalanceOptions
                     {
-                        MaxSteps = rng.Next(1, 3), MaxTime = R(0.6f, 1.4f),
+                        MaxSteps = rng.Next(1, 3), MaxTime = R(0.9f, 1.7f),
                         BuckleMode = rng.Next(1, 4), // 1 leg, 2 legs together, or 2 legs staggered
                         BuckleLeg = legHit != 0 ? legHit : side,
                         BuckleDelay = R(0.05f, 0.18f),
@@ -486,6 +561,30 @@ namespace Brutality.Euphoria
                     plan.ToppleAzimuth = (BMath.Chance(rng, 0.5f) ? -1f : 1f) * (Mathf.PI * 0.5f) + R(-0.5f, 0.5f);
                     plan.ToppleGain = R(3.2f, 4.8f);
                     break;
+
+                case NmPlanKind.HighFall:
+                    plan.Balance = null;
+                    plan.ToppleGain = 0f;
+                    plan.Catch = true;
+                    break;
+
+                case NmPlanKind.OnFire:
+                    plan.Balance = new DlBalanceOptions
+                    {
+                        Stagger = true, MaxSteps = rng.Next(3, 6), MaxTime = R(2.4f, 3.6f), PerStep = 1.2f,
+                    };
+                    plan.ToppleAzimuth = pushAz + R(-0.8f, 0.8f);
+                    plan.ToppleGain = R(1.8f, 3.0f);
+                    break;
+
+                case NmPlanKind.MeleeGuard:
+                    plan.Balance = new DlBalanceOptions
+                    {
+                        Stagger = true, MaxSteps = rng.Next(1, 4), MaxTime = R(1.1f, 1.9f), PerStep = 1.6f, Sink0 = 0.12f,
+                    };
+                    plan.ToppleAzimuth = pushAz + R(-0.6f, 0.6f);
+                    plan.ToppleGain = R(2.4f, 3.8f);
+                    break;
             }
 
             if (duck && plan.Balance != null && plan.Balance.Sink0 < 0.25f) plan.Balance.Sink0 = 0.2f;
@@ -511,6 +610,9 @@ namespace Brutality.Euphoria
                 case "Knee slide": return NmPlanKind.KneeSlide;
                 case "Pivot": return NmPlanKind.Pivot;
                 case "Spin": return NmPlanKind.TwistDown;
+                case "High fall": return NmPlanKind.HighFall;
+                case "On fire": return NmPlanKind.OnFire;
+                case "Melee guard": return NmPlanKind.MeleeGuard;
                 default: return NmPlanKind.Auto;
             }
         }
@@ -626,11 +728,19 @@ namespace Brutality.Euphoria
             Vector3 dir = ToppleDir(Plan.ToppleAzimuth);
             StartTopple(t + Plan.ToppleDelay, dir, Plan.ToppleGain);
 
+            if (Plan.Kind == NmPlanKind.HighFall)
+            {
+                _highFall = new DlHighFall(this, t);
+                if (Plan.Catch) _catchFall = new DlCatchFall(this, t);
+                return;
+            }
+
             Vector3 vH = NmCharacter.Flat(Ch.Vel);
             bool back = Vector3.Dot(dir, BMath.SafeNormalize(NmCharacter.Flat(Ch.Fwd), Vector3.forward)) < -0.35f;
-            // A standing fall that topples does not become a roll: momentum at death is required.
-            // A standing fall that topples does not become a roll: momentum is required (and a dive stays a catchFall).
-            if (Plan.Kind == NmPlanKind.RollDownStairs || (Plan.Kind != NmPlanKind.Dive && Plan.Moving && vH.magnitude > 1.6f))
+            float slope = GroundSlope(vH.sqrMagnitude > 0.04f ? vH.normalized : dir);
+            // Standing knockbacks with high horizontal velocity, rapid spin, or steep stairs/slope can roll naturally.
+            if (Plan.Kind == NmPlanKind.RollDownStairs || (Plan.Conscious && !Plan.StiffFall && Plan.Kind != NmPlanKind.Dive
+                && (vH.magnitude > 1.35f || Body[Seg.Thorax].W.magnitude > 2.6f || slope > 0.22f)))
             {
                 Vector3 rollDir = vH.sqrMagnitude > 0.04f ? vH.normalized : dir;
                 _rds = new DlRollDownStairs(this, t, rollDir);
@@ -643,6 +753,18 @@ namespace Brutality.Euphoria
                 // A conscious body catches itself; an already-dead body falls limp (catchFall only writes at U≈0).
                 if (Plan.Conscious && !Plan.LegsDead && Plan.Catch) _catchFall = new DlCatchFall(this, t);
             }
+        }
+
+        private float GroundSlope(Vector3 dirHint)
+        {
+            Vector3 d = NmCharacter.Flat(dirHint);
+            if (d.sqrMagnitude < 1e-4f) return 0f;
+            d.Normalize();
+            Vector3 o0 = new Vector3(Ch.Com.x, Ch.Com.y + 0.3f, Ch.Com.z);
+            Vector3 o1 = o0 + d * 0.35f;
+            if (DlPhys.Cast(o0, Vector3.down, 2.5f, out Vector3 p0, out _) && DlPhys.Cast(o1, Vector3.down, 2.5f, out Vector3 p1, out _))
+                return Mathf.Abs(p1.y - p0.y) / 0.35f;
+            return 0f;
         }
 
         private void TryStartGrab(float t, Vector3 fallHint)
@@ -687,11 +809,15 @@ namespace Brutality.Euphoria
             _windmill?.Stop(t);
             _balance?.Stop(t);
             _pedal?.Stop(t);
+            _highFall?.Stop(t);
+            _meleeGuard?.Stop(t);
+            _wallBrace?.Stop(t);
             // Roll: Delirium keeps rollDownStairs active as long as the body is spinning, instead of stopping at impact.
-            if (_rds == null && Plan.Conscious)
+            if (_rds == null && Plan.Conscious && !Plan.StiffFall)
             {
                 Vector3 vH = NmCharacter.Flat(Ch.Vel);
-                bool tumble = Plan.Moving && (vH.magnitude > 1.4f || Body[Seg.Thorax].W.magnitude > 3f);
+                float slope = GroundSlope(vH.sqrMagnitude > 0.01f ? vH.normalized : Ch.Fwd);
+                bool tumble = vH.magnitude > 1.35f || Body[Seg.Thorax].W.magnitude > 2.6f || slope > 0.22f;
                 if (tumble)
                 {
                     _rds = new DlRollDownStairs(this, t, vH.sqrMagnitude > 0.01f ? vH.normalized : Ch.Fwd, 2.4f);
@@ -699,13 +825,14 @@ namespace Brutality.Euphoria
                 }
             }
             var m = Ctx.Mechanism;
-            if (Plan.Conscious)
+            bool blastOrFall = m == DeathMechanism.Blast || m == DeathMechanism.FallTrauma;
+            if (Plan.Conscious && !blastOrFall)
             {
                 _iog = new DlInjuredOnGround(this, t);
-                _writhe = new DlWrithe(this, t, (m == DeathMechanism.Burn ? 1.2f : m == DeathMechanism.Abdominal ? 0.6f : 0.75f)
+                _writhe = new DlWrithe(this, t, (m == DeathMechanism.Burn ? 1.1f : m == DeathMechanism.Abdominal ? 0.6f : 0.75f)
                 * Settings.SpasmVigor.Value * BMath.Range(Rng, 0.8f, 1.25f));
                 if (m == DeathMechanism.Abdominal || m == DeathMechanism.Burn
-                    || BMath.Chance(Rng, 0.15f + 0.3f * Mathf.Clamp01(Settings.GestureVariety.Value)))
+                    || BMath.Chance(Rng, 0.15f + 0.25f * Mathf.Clamp01(Settings.GestureVariety.Value)))
                     _foetal = new DlFoetal(this, t);
             }
             _toppleT0 = -1f;
@@ -745,6 +872,15 @@ namespace Brutality.Euphoria
                     if (_balance.Failed) StartFall(t, _balance.Why.Length > 0 ? _balance.Why : "imbalance");
                 }
                 if (Phase == NmPhase.Balance && Plan.Kind == NmPlanKind.Windmill && t > 0.08f) StartWindmill(t);
+                // Probe vertical walls / low walls for brace, slump, or fall-over-wall.
+                if (Phase == NmPhase.Balance && _wallBrace == null && Plan.Conscious && !Plan.StiffFall && t >= _nextWallProbe
+                    && (_balance != null && (_balance.Steps > 0 || Ch.Vel.magnitude > 0.45f || Ch.Hip2HeadUp < 0.97f)))
+                {
+                    _nextWallProbe = t + 0.10f;
+                    Vector3 hint = Ch.Vel.sqrMagnitude > 0.04f ? Ch.Vel : ToppleDir(Plan.ToppleAzimuth);
+                    if (DlWallBrace.ProbeWall(Dl, Ch, hint, out Vector3 wPt, out Vector3 wNrm, out bool isLow))
+                        _wallBrace = new DlWallBrace(this, t, wPt, wNrm, isLow);
+                }
                 // Probe scenery during stagger/buckling or as soon as torso leans to grab a nearby wall or crate.
                 if (Phase == NmPhase.Balance && t >= _nextGrabProbe && (_balance != null && (_balance.Steps > 0 || _balance.LegBuckle[0] > 0.2f || _balance.LegBuckle[1] > 0.2f || Ch.Vel.magnitude > 0.7f || Ch.Hip2HeadUp < 0.96f)))
                 {
@@ -755,8 +891,15 @@ namespace Brutality.Euphoria
 
             if (Phase != NmPhase.Ground) _shot.Tick(t, dt, w);
 
+            if (_meleeGuard != null && _meleeGuard.Active && Phase != NmPhase.Ground)
+                _meleeGuard.Tick(t, dt, w);
+            if (_onFire != null && _onFire.Active)
+                _onFire.Tick(t, dt, w);
             if (_flinch != null && _flinch.Active && Phase != NmPhase.Ground)
                 _flinch.Tick(t, dt, w);
+
+            if (_wallBrace != null && _wallBrace.Active && Phase != NmPhase.Ground)
+                _wallBrace.Tick(t, dt, w);
 
             // armsWindmill can start during Balance (Windmill plan) and continues during Fall.
             if (Phase == NmPhase.Balance && _windmill != null && _windmill.Active)
@@ -765,15 +908,30 @@ namespace Brutality.Euphoria
             if (Phase == NmPhase.Fall)
             {
                 float backV = -Vector3.Dot(NmCharacter.Flat(Ch.Vel), Ch.Fwd);
-                if (_windmill == null && _rds == null && Plan.Conscious && Plan.WindmillBack && backV > 0.5f) StartWindmill(t);
-                if (Ch.Airborne && _pedal == null && t - FallT > 0.25f && Plan.Conscious) _pedal = new DlPedal(this, t);
+                if (_windmill == null && _rds == null && _highFall == null && Plan.Conscious && Plan.WindmillBack && backV > 0.5f) StartWindmill(t);
+                if (Ch.Airborne && _pedal == null && _highFall == null && t - FallT > 0.25f && Plan.Conscious) _pedal = new DlPedal(this, t);
+                if (_wallBrace == null && Plan.Conscious && !Plan.StiffFall && t >= _nextWallProbe && t - FallT < 0.65f)
+                {
+                    _nextWallProbe = t + 0.10f;
+                    Vector3 hint = Ch.Vel.sqrMagnitude > 0.04f ? Ch.Vel : ToppleDir(Plan.ToppleAzimuth);
+                    if (DlWallBrace.ProbeWall(Dl, Ch, hint, out Vector3 wPt, out Vector3 wNrm, out bool isLow))
+                        _wallBrace = new DlWallBrace(this, t, wPt, wNrm, isLow);
+                }
                 if (_grab == null && t >= _nextGrabProbe && t - FallT < 0.75f)
                 {
                     _nextGrabProbe = t + 0.12f;
                     TryStartGrab(t, Ch.Vel.sqrMagnitude > 0.04f ? Ch.Vel : ToppleDir(Plan.ToppleAzimuth));
                 }
 
-                _catchFall?.Tick(t, dt, w);
+                if (_highFall != null && _highFall.Active)
+                {
+                    _highFall.Tick(t, dt, w);
+                    if (_highFall.PreparingToLand) _catchFall?.Tick(t, dt, w);
+                }
+                else
+                {
+                    _catchFall?.Tick(t, dt, w);
+                }
                 _windmill?.Tick(t, dt, Mathf.Max(w, 0.2f));
                 _rds?.Tick(t, dt, w);
                 _pedal?.Tick(t, dt, Ch.Airborne ? w : w * 0.3f);
@@ -834,6 +992,9 @@ namespace Brutality.Euphoria
             DlPhys.OpposeGravity(Eff, Body, w);
             if (_rds != null && _rds.Active) _rds.Forces(t, dt, w);
             if (_grab != null && _grab.Active) _grab.Forces(t, dt, w);
+            if (_wallBrace != null && _wallBrace.Active) _wallBrace.Forces(t, dt, w);
+            if (_highFall != null && _highFall.Active) _highFall.Forces(t, dt, w);
+            if (_onFire != null && _onFire.Active) _onFire.Forces(t, dt, w);
             if (_writhe != null && _writhe.Active) _writhe.Forces(t, dt, w);
             if (_toppleT0 >= 0f)
             {

@@ -81,6 +81,15 @@ namespace Brutality.Euphoria
         public const float FlinchBodyStiffness = 11f;
         public const float FlinchDamping = 1f;
 
+        // balancerCollisionsReaction / wall brace & fallOverWall / highFall / onFire / meleeGuard (1.1.0).
+        public const float BraceBodyStiffness = 11f;
+        public const float BraceArmStiffness = 13f;
+        public const float BraceSearchDist = 1.05f;
+        public const float HighFallBodyStiffness = 11f;
+        public const float HighFallCatchTime = 0.45f;
+        public const float OnFireBodyStiffness = 11f;
+        public const float MeleeGuardStiffness = 12f;
+
         // Shared physics.
         public const float CaptureHeightLead = 0.1f;   // capture point horizon (Pratt 2006)
         public const float StepHeight = 0.1f;

@@ -23,6 +23,7 @@ namespace Brutality.Core
         Syncope,         // hemorrhage, exhaustion, toxins: progressive syncope
         FallTrauma,      // fatal fall
         Burn,            // burns
+        Melee,           // blunt or edged melee strike
     }
 
     internal sealed class DeathContext
@@ -49,6 +50,7 @@ namespace Brutality.Core
 
         public List<WoundRecord> LethalVolley = new List<WoundRecord>(); // wounds from the final moments (impulses)
         public List<WoundRecord> AllWounds = new List<WoundRecord>();
+        public int VolleyCount => LethalVolley != null && LethalVolley.Count > 0 ? LethalVolley.Count : 1;
 
         public float[] PartHealth = new float[7];      // remaining health fraction per body part
         public bool[] PartDestroyed = new bool[7];
@@ -250,6 +252,8 @@ namespace Brutality.Core
                 return DeathMechanism.FallTrauma;
             if (Has(t, EDamageType.Flame | EDamageType.HotGases))
                 return DeathMechanism.Burn;
+            if (Has(t, EDamageType.Melee))
+                return DeathMechanism.Melee;
             if (Has(t, EDamageType.LightBleeding | EDamageType.HeavyBleeding | EDamageType.Dehydration | EDamageType.Exhaustion
                        | EDamageType.RadExposure | EDamageType.Poison | EDamageType.LethalToxin | EDamageType.Stimulator
                        | EDamageType.Medicine | EDamageType.Existence | EDamageType.Environment))

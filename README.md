@@ -18,7 +18,7 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 
 - **Passive Biomechanics (PhysX)** — Per-segment masses and inertias (de Leva 1996) plus carried gear (armor, rig, backpack, helmet). EFT joints are swapped for `ConfigurableJoint`s calibrated to ISB anatomical frames and soft exponential limits, with biarticular coupling and ground friction.
 - **Hill-Type Muscle Drives** — Torque-angle-velocity actuators with 15 ms / 50 ms activation dynamics, driven as implicit PhysX acceleration drives for jitter-free stability. Destroyed limbs go limp; spinal cord hits cause localized paralysis.
-- **Euphoria © Falls & Agony** — A port of [Delirium](https://github.com/PVCPC/delirium-physics) (NaturalMotion Euphoria © behaviors such as `staggerFall`, `shotFallToKnees`, `armsWindmill`, `grab`, and `rollDownStairs`) paired with injury-mechanism timelines (brain, spinal, vascular, thoracic, blast, etc.), anti-repetition memory, and real ballistic momentum (`p = m·v`).
+- **Euphoria © Falls & Agony** — A port of [Delirium](https://github.com/PVCPC/delirium-physics) (NaturalMotion Euphoria © behaviors such as `staggerFall`, `shotFallToKnees`, `balancerCollisionsReaction`, `highFall`, `onFire`, `armsWindmill`, `grab`, and `rollDownStairs`) paired with weapon-calibrated hit physics (`NmWeaponClass`), injury-mechanism timelines (brain, spinal, vascular, thoracic, blast, melee, etc.), anti-repetition memory, and real ballistic momentum (`p = m·v`).
 
 ---
 
@@ -26,12 +26,12 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 
 100% **client-side** (no server mod required). With **Fika**, install on the host and ideally on clients.
 
-- **Manual (Release):** Extract `SPT-BRUTALITY-1.0.0.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
+- **Manual (Release):** Extract `SPT-BRUTALITY-1.1.0.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
 - **Build from source:**
   ```bash
   dotnet build src/Brutality/Brutality.csproj -c Release -p:Install=true
   ```
-  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-1.0.0.zip`.)*
+  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-1.1.0.zip`.)*
 
 **Configuration:** `BepInEx/config/com.brutality.ragdoll.cfg` — editable in-game via `F12` (ConfigurationManager).
 
@@ -55,7 +55,7 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 |---|---|
 | [`docs/SCIENCE.md`](docs/SCIENCE.md) | Mapping from the [scientific corpus](Scientific%20Corpus%20%E2%80%94%20Biomechanics%20for%20an%20Ultra-Realistic%20Ragdoll.md) to the C# implementation |
 | [`docs/EUPHORIA.md`](docs/EUPHORIA.md) | Delirium / Euphoria © behavior port architecture |
-| [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Formal proof sheet (**77 / 77** off-game checks, CI-verified) |
+| [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Formal proof sheet (**85 / 85** off-game checks, CI-verified) |
 | [`demo/test-bench.html`](demo/test-bench.html) | Interactive 3D demo studio |
 
 Run the standalone off-game test benches (no game DLLs required):

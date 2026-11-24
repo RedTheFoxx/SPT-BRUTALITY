@@ -112,6 +112,14 @@ namespace DeliriumTests
             Test_Writhe_AsymmetryAndRollOverForces();
             Test_Foetal_AsymmetryAndPronation();
             Test_Flinch_FrontalBurstGuard();
+            Test_Balance_GroundedStaggerAndRecoilDisplacement();
+            Test_WallBrace_BraceAndSlumpAgainstWall();
+            Test_WallBrace_FallOverLowWall();
+            Test_HighFall_BlastAndLandingAnticipation();
+            Test_OnFire_PanicStaggerAndGroundRoll();
+            Test_MeleeGuard_CrouchAndOverheadPronation();
+            Test_WeaponClass_CaliberDifferentiation();
+            Test_Roll_StandingMomentumWithoutMovingFlag();
 
             _currentLevel = 3;
             Console.WriteLine("\n=== LEVEL 3: STATISTICAL & KINEMATIC DIVERSITY AUDIT (60 DEATHS) ===");
@@ -630,7 +638,7 @@ namespace DeliriumTests
             var wr = sim.Perf.Writhe;
             float hipDiff = MathF.Abs(sim.Perf.Eff.Desired((int)JointId.LHip).x - sim.Perf.Eff.Desired((int)JointId.RHip).x);
             float peakRollTq = 0f;
-            for (int s = 50; s < 160; s++)
+            for (int s = 50; s < 260; s++)
             {
                 float t = s * 0.016f;
                 wr?.Tick(t, 0.016f, 0.9f, 1f);
@@ -673,6 +681,188 @@ namespace DeliriumTests
                 sim.AnyFlinchActivated && sim.PeakPronationRad > 0.35f,
                 $"(flinch={sim.AnyFlinchActivated}, peakPron={sim.PeakPronationRad / BMath.Deg:0.0}°)",
                 "nmfl (UpperBodyFlinch)", "DlGrab.cs (DlFlinch)");
+        }
+
+        private static void Test_Balance_GroundedStaggerAndRecoilDisplacement()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Stagger";
+            var sim = new SimRagdoll(MakeCtx(301, dir: new Vector3(0f, 0f, -1f), kick: 1.5f, kickClass: "intermediate"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel = new Vector3(0f, 0f, -1.25f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            sim.Perf.OnBullet(0f, NmHit.Make(sim.Body, sim.Body[Seg.Thorax], sim.Body[Seg.Thorax].Com + new Vector3(0f, 0f, 0.12f), new Vector3(0f, 0f, -1f), 5.5f));
+            sim.Perf.OnBullet(0.18f, NmHit.Make(sim.Body, sim.Body[Seg.Thorax], sim.Body[Seg.Thorax].Com + new Vector3(0.04f, 0.02f, 0.12f), new Vector3(0f, 0f, -1f), 5.5f));
+            Vector3 p0 = sim.Body[Seg.Pelvis].Com;
+            float peakHorizDisp = 0f;
+            for (int s = 0; s < 95; s++)
+            {
+                sim.Step(s * 0.016f, 0.016f);
+                Vector3 dp = sim.Body[Seg.Pelvis].Com - p0;
+                peakHorizDisp = MathF.Max(peakHorizDisp, MathF.Sqrt(dp.x * dp.x + dp.z * dp.z));
+            }
+            Check("nmdbm::Balance: grounded leg weight support sustains >= 2 stagger steps under rifle recoil",
+                sim.PeakSteps >= 2 && peakHorizDisp > 0.25f && !sim.AnyNaN,
+                $"(steps={sim.PeakSteps}, horizDisp={peakHorizDisp:0.00} m)",
+                "nmdbm (staggerFall)", "DlBalance.cs");
+        }
+
+        private static void Test_WallBrace_BraceAndSlumpAgainstWall()
+        {
+            Physics.ResetWorld(0f);
+            Physics.Boxes.Add(new StaticBox(new Vector3(0f, 1.2f, -0.75f), new Vector3(4f, 2.4f, 0.20f)));
+            Settings.EuphoriaForce.Value = "Stagger";
+            var sim = new SimRagdoll(MakeCtx(302, dir: new Vector3(0f, 0f, -1f), kick: 1.3f, kickClass: "shotgun"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel += new Vector3(0f, 0f, -2.0f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            float peakKneeRed = 0f;
+            for (int s = 0; s < 120; s++)
+            {
+                sim.Step(s * 0.016f, 0.016f);
+                if (sim.Perf.Balance != null)
+                    peakKneeRed = MathF.Max(peakKneeRed, sim.Perf.Balance.ExternalKneeStiffReduction);
+            }
+            Check("nmbr::BalancerCollisionsReaction: wall brace + slump softening behind character",
+                sim.AnyWallBrace && sim.AnyWallSlump && peakKneeRed > 1.0f && !sim.AnyNaN,
+                $"(brace={sim.AnyWallBrace}, slump={sim.AnyWallSlump}, kneeRed={peakKneeRed:0.0})",
+                "nmbr (Brace)", "DlExtraBehaviours.cs (DlWallBrace)");
+        }
+
+        private static void Test_WallBrace_FallOverLowWall()
+        {
+            Physics.ResetWorld(0f);
+            Physics.Boxes.Add(new StaticBox(new Vector3(0f, 0.60f, -0.68f), new Vector3(4f, 1.20f, 0.22f)));
+            Settings.EuphoriaForce.Value = "Stagger";
+            var sim = new SimRagdoll(MakeCtx(303, dir: new Vector3(0f, 0f, -1f), kick: 1.2f, kickClass: "rifle"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel += new Vector3(0f, 0f, -2.2f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            for (int s = 0; s < 80; s++) sim.Step(s * 0.016f, 0.016f);
+            Check("nmfow::FallOverWall: low obstacle at waist height with clear air above triggers tip-over",
+                sim.AnyFallOverWall && !sim.AnyNaN,
+                $"(fallOverWall={sim.AnyFallOverWall}, wallBrace={sim.AnyWallBrace})",
+                "nmfow (FallOverWall)", "DlExtraBehaviours.cs (DlWallBrace)");
+        }
+
+        private static void Test_HighFall_BlastAndLandingAnticipation()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "High fall";
+            var sim = new SimRagdoll(MakeCtx(304, DeathMechanism.Blast, EBodyPart.Chest, EBodyPartColliderType.RibcageUp,
+                dir: new Vector3(0f, 0.45f, -1f).normalized, vel: new Vector3(0f, 5.2f, -2.0f), kick: 2.0f, kickClass: "blast"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel = new Vector3(0f, 5.2f, -2.0f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            for (int s = 0; s < 140; s++) sim.Step(s * 0.016f, 0.016f);
+            Check("nmhf::HighFall: airborne orientation + time-to-impact landing brace on downward descent",
+                sim.AnyHighFall && sim.AnyHighFallLand && !sim.AnyNaN,
+                $"(highFall={sim.AnyHighFall}, preparingToLand={sim.AnyHighFallLand})",
+                "nmhf (HighFall)", "DlExtraBehaviours.cs (DlHighFall)");
+        }
+
+        private static void Test_OnFire_PanicStaggerAndGroundRoll()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Auto";
+            var sim = new SimRagdoll(MakeCtx(305, DeathMechanism.Burn, EBodyPart.Chest, EBodyPartColliderType.RibcageUp));
+            float peakGroundTq = 0f;
+            for (int s = 0; s < 180; s++)
+            {
+                sim.Step(s * 0.016f, 0.016f);
+                if (sim.Perf.Phase == NmPhase.Ground && sim.Perf.OnFire != null)
+                {
+                    foreach (var sg in sim.Body.Segs) sg.Rb.ClearAccum();
+                    sim.Perf.OnFire.Forces(s * 0.016f, 0.016f, 1f);
+                    peakGroundTq = MathF.Max(peakGroundTq, sim.Body[Seg.Thorax].Rb.TorqueAccum.magnitude);
+                }
+            }
+            Check("onfire::OnFire: Molotov stagger swatting + ground stop-drop-roll torque",
+                sim.AnyOnFire && peakGroundTq > 5f && !sim.AnyNaN,
+                $"(onFire={sim.AnyOnFire}, peakGroundRollTq={peakGroundTq:0.0} N·m)",
+                "onfire (OnFire)", "DlExtraBehaviours.cs (DlOnFire)");
+        }
+
+        private static void Test_MeleeGuard_CrouchAndOverheadPronation()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Auto";
+            var sim = new SimRagdoll(MakeCtx(306, DeathMechanism.Melee, EBodyPart.Head, EBodyPartColliderType.HeadCommon));
+            for (int s = 0; s < 40; s++) sim.Step(s * 0.016f, 0.016f);
+            float sink = sim.Perf.Balance?.Sink ?? 0f;
+            Check("meleetask::MeleeGuard: defensive knee duck + overhead pronated forearm guard",
+                sim.AnyMeleeGuard && sim.PeakPronationRad > 0.40f && sink > 0.05f && !sim.AnyNaN,
+                $"(meleeGuard={sim.AnyMeleeGuard}, peakPron={sim.PeakPronationRad / BMath.Deg:0.0}°, sink={sink:0.00} m)",
+                "meleetask (Melee)", "DlExtraBehaviours.cs (DlMeleeGuard)");
+        }
+
+        private static void Test_WeaponClass_CaliberDifferentiation()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Stagger";
+            var pistolCtx = MakeCtx(307, DeathMechanism.Thoracic, kick: 0.7f, kickClass: "pistol");
+            pistolCtx.ImpactEnergy = 450f;
+            pistolCtx.ImpactMomentum = 1.6f;
+            var pistol = new SimRagdoll(pistolCtx);
+
+            Physics.ResetWorld(0f);
+            var smgCtx = MakeCtx(307, DeathMechanism.Thoracic, kick: 0.9f, kickClass: "pistol");
+            smgCtx.VolleyCount = 4;
+            smgCtx.ImpactEnergy = 500f;
+            var smg = new SimRagdoll(smgCtx);
+
+            Physics.ResetWorld(0f);
+            var sniperCtx = MakeCtx(307, DeathMechanism.Thoracic, kick: 2.1f, kickClass: "full power");
+            sniperCtx.ImpactEnergy = 4200f;
+            sniperCtx.ImpactMomentum = 11.0f;
+            var sniper = new SimRagdoll(sniperCtx);
+
+            Physics.ResetWorld(0f);
+            var shotgunCtx = MakeCtx(307, DeathMechanism.Thoracic, kick: 1.8f, kickClass: "buckshot");
+            shotgunCtx.ImpactEnergy = 2800f;
+            shotgunCtx.ImpactMomentum = 10.5f;
+            var shotgun = new SimRagdoll(shotgunCtx);
+            static float MeasurePeakV(SimRagdoll s, float mom)
+            {
+                s.Perf.OnBullet(0f, NmHit.Make(s.Body, s.Body[Seg.Thorax], s.Body[Seg.Thorax].Com + new Vector3(0f, 0f, 0.12f), new Vector3(0f, 0f, -1f), mom));
+                float peak = 0f;
+                for (int i = 0; i < 20; i++)
+                {
+                    s.Step(i * 0.016f, 0.016f);
+                    float vh = MathF.Sqrt(s.RootVel.x * s.RootVel.x + s.RootVel.z * s.RootVel.z);
+                    peak = MathF.Max(peak, vh);
+                }
+                return peak;
+            }
+
+            float pistolPeakV = MeasurePeakV(pistol, 1.6f);
+            float sniperPeakV = MeasurePeakV(sniper, 11.0f);
+            float shotgunPeakV = MeasurePeakV(shotgun, 10.5f);
+            Settings.EuphoriaForce.Value = "Auto";
+
+            Check("weapons.gif::ClassifyWeapon: distinct Pistol / SmgBurst / Sniper / Shotgun classes + scaled recoil",
+                pistol.Perf.WeaponClass == NmWeaponClass.Pistol &&
+                smg.Perf.WeaponClass == NmWeaponClass.SmgBurst &&
+                sniper.Perf.WeaponClass == NmWeaponClass.Sniper &&
+                shotgun.Perf.WeaponClass == NmWeaponClass.Shotgun &&
+                sniperPeakV > pistolPeakV && shotgunPeakV > pistolPeakV,
+                $"(pistol={pistol.Perf.WeaponClass} {pistolPeakV:0.00}m/s, smg={smg.Perf.WeaponClass}, sniper={sniper.Perf.WeaponClass} {sniperPeakV:0.00}m/s, shotgun={shotgun.Perf.WeaponClass} {shotgunPeakV:0.00}m/s)",
+                "shottask.rs", "NmPerformance.cs (ClassifyWeapon)");
+        }
+
+        private static void Test_Roll_StandingMomentumWithoutMovingFlag()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Stagger";
+            var sim = new SimRagdoll(MakeCtx(308, dir: new Vector3(0f, 0f, -1f), vel: Vector3.zero, kick: 1.4f, kickClass: "buckshot"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel = new Vector3(0f, 0f, -3.4f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            for (int s = 0; s < 120; s++) sim.Step(s * 0.016f, 0.016f);
+            Check("nmrds::RollDownStairs: high horizontal knockback velocity triggers roll without Plan.Moving",
+                !sim.Perf.Plan.Moving && sim.AnyRollActivated && sim.PeakRollAngVel > 1.5f && !sim.AnyNaN,
+                $"(moving={sim.Perf.Plan.Moving}, roll={sim.AnyRollActivated}, peakω={sim.PeakRollAngVel:0.0} rad/s)",
+                "nmrds (RollDownStairs)", "NmPerformance.cs (Update)");
         }
 
         // ------------------------------------------------------------------ LEVEL 3
@@ -821,7 +1011,7 @@ namespace DeliriumTests
             string pluginPath = Path.Combine(repoRoot, "src", "Brutality", "Plugin.cs");
             if (!File.Exists(pluginPath)) return "1.0.0";
             string text = File.ReadAllText(pluginPath);
-            var m = Regex.Match(text, @"PluginVersion\s*=\s*""([^""]+)""");
+            var m = Regex.Match(text, @"(?:Plugin)?Version\s*=\s*""([^""]+)""");
             return m.Success ? m.Groups[1].Value : "1.0.0";
         }
 
@@ -912,7 +1102,7 @@ namespace DeliriumTests
             sb.AppendLine("| Suite | Scope | Result | Status |");
             sb.AppendLine("|---|---|---:|---|");
             sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-                $"| `tests/Brutality.DeliriumTests` | Delirium laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nmcf`, `nmgr`, `nmrds`, `nmfl`), 60 Hz simulation & 60-death diversity | **{_pass} / {_records.Count}** | `{dlStatus}` |"));
+                $"| `tests/Brutality.DeliriumTests` | Delirium laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nmcf`, `nmgr`, `nmrds`, `nmfl`, `nmbr`, `nmfow`, `nmhf`, `onfire`), 60 Hz simulation & 60-death diversity | **{_pass} / {_records.Count}** | `{dlStatus}` |"));
             sb.AppendLine("<!-- KINEMATICS_SUMMARY_ROW -->");
             sb.AppendLine("<!-- TOTAL_SUMMARY_ROW -->");
             sb.AppendLine();

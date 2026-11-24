@@ -73,8 +73,8 @@ namespace Brutality.Neural
             Name = "Postural tone";
             _u0 = u0;
             _armSag = armSag;
-            _sagStart = BMath.Range(rng, 0.03f, 0.18f);
-            _sagDur = BMath.Range(rng, 0.3f, 0.65f);
+            _sagStart = BMath.Range(rng, 0.01f, 0.08f);
+            _sagDur = BMath.Range(rng, 0.18f, 0.38f);
             _hangShoulder = new Vector3(BMath.Range(rng, 2f, 18f), BMath.Range(rng, 6f, 16f), 0f) * BMath.Deg;
             _hangElbow = new Vector3(BMath.Range(rng, 10f, 30f), 0f, 0f) * BMath.Deg;
             Start = 0f;
@@ -108,7 +108,7 @@ namespace Brutality.Neural
             // once the chest is down on the ground, it fades quickly so the arms do not freeze in a firing pose.
             if (_fallenAt < 0f && Vector3.Dot(ns.Body[Seg.Thorax].U, Vector3.up) < 0.5f)
                 _fallenAt = t;
-            float fallFade = _fallenAt >= 0f ? Mathf.Exp(-(t - _fallenAt) / 0.25f) : 1f;
+            float fallFade = _fallenAt >= 0f ? Mathf.Exp(-(t - _fallenAt) / 0.14f) : 1f;
             if (fallFade < 0.015f) return;
             foreach (var j in AllJoints)
             {

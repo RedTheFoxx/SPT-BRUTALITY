@@ -55,7 +55,7 @@ jobs:
           echo "version=$csproj_ver" >> "$GITHUB_OUTPUT"
           echo "guid=$plugin_guid" >> "$GITHUB_OUTPUT"
 
-      - name: Run Delirium & Kinematics formal proofs (77 tests)
+      - name: Run Delirium & Kinematics formal proofs (85 tests)
         run: |
           dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
           dotnet run --project tests/Brutality.KinematicsTests -c Release -- --append-report docs/VERIFICATION.md

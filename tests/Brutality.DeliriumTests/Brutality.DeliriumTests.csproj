@@ -23,6 +23,7 @@
     <Compile Include="../../src/Brutality/Euphoria/Delirium/DlShot.cs" />
     <Compile Include="../../src/Brutality/Euphoria/Delirium/DlBehaviours.cs" />
     <Compile Include="../../src/Brutality/Euphoria/Delirium/DlGrab.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlExtraBehaviours.cs" />
     <Compile Include="../../src/Brutality/Euphoria/NmPerformance.cs" />
   </ItemGroup>
 </Project>

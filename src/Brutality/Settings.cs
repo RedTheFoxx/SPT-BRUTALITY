@@ -146,7 +146,7 @@ namespace Brutality
                 new ConfigDescription("For testing: forces the Euphoria fall plan on subsequent standing deaths.",
                     new AcceptableValueList<string>("Auto", "Stagger", "Fall to knees", "Balance then collapse", "Windmill",
                         "Slack collapse", "Roll", "Seated collapse", "Side collapse", "Dive", "Board fall",
-                        "All fours", "Knee slide", "Pivot", "Spin")));
+                        "All fours", "Knee slide", "Pivot", "Spin", "High fall", "On fire", "Melee guard")));
         }
     }
 }

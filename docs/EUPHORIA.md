@@ -5,7 +5,7 @@ The "Euphoria" engine is a **port of Delirium**, the open-source reverse-enginee
 Since version 0.2.0, it is the **sole animation engine** of the plugin: the legacy "Brutality" mode (procedural fall choreographies) was removed. Brutality's agony, cerebral posturing, breathing, and reflexes remain active and blend with Delirium behaviors in the same motor buffer.
 
 ## Sources
-- **[PVCPC/delirium-physics](https://github.com/PVCPC/delirium-physics)** (Rust, GPL-3.0): reimplementation of Euphoria from the GTA IV binary. The port follows its architecture (`nmrs` = skeleton and effectors, `nmdbm` = dynamic balance, `nmbb` = upper-body balancer, `nmshot` = `shot` behavior, `nmcf`, `nmrds`, `nmbw`, `nmbf`, `nmiog`) and its numerical laws (setpoint cone, `blend_to_zero`, `set_stiffness`, `oppose_gravity`, capture point, arm counterbalance, gesture envelopes).
+- **[PVCPC/delirium-physics](https://github.com/PVCPC/delirium-physics)** (Rust, GPL-3.0): reimplementation of Euphoria from the GTA IV binary. The port follows its architecture (`nmrs` = skeleton and effectors, `nmdbm` = dynamic balance, `nmbb` = upper-body balancer, `nmshot` = `shot` behavior, `nmcf`, `nmrds`, `nmbw`, `nmbf`, `nmiog`, `nmbr`, `nmfow`, `nmhf`, `onfire`, `meleetask`) and its numerical laws (setpoint cone, `blend_to_zero`, `set_stiffness`, `oppose_gravity`, capture point, arm counterbalance, gesture envelopes).
 - **GTA V `behaviours.xml`**: Delirium's numerical values are read from the GTA IV binary (`kv!` macro) and are not redistributable. The port therefore preserves the **laws** and uses the values published by NaturalMotion (`NmParams.cs`, via [alexguirre/GTA-V-Euphoria-Behaviours-Parser](https://github.com/alexguirre/GTA-V-Euphoria-Behaviours-Parser)). Places where Delirium chooses its own constant are marked with a `Delirium:` comment.
 - Post-mortem idiomuscular contraction (Zsako phenomenon): Madea (ed.), *Estimation of the Time Since Death*, 3rd ed., CRC 2016, chapter on supravital reactions. (Brutality program, outside Delirium.)
 
@@ -16,8 +16,9 @@ Since version 0.2.0, it is the **sole animation engine** of the plugin: the lega
 | `Euphoria/Delirium/DlBalance.cs` | `bodyBalance` / `staggerFall` / `shotFallToKnees`: upper-body law, arm counterbalance, balance manager (capture point, steps, pelvis, leg IK), support and righting forces. |
 | `Euphoria/Delirium/DlShot.cs` | `shot` behavior state machine: looseness, reaction, spine pain, reach for wound, flung arm, leg give-way, look-at, shock spin. |
 | `Euphoria/Delirium/DlBehaviours.cs` | `catchFall`, `rollDownStairs`, `bodyRollUp`, `armsWindmill`, `pedalLegs`, `bodyWrithe`, `bodyFoetal`, `injuredOnGround`. |
+| `Euphoria/Delirium/DlExtraBehaviours.cs` | `DlWallBrace` (`balancerCollisionsReaction` + `FallOverWall`), `DlHighFall` (`highFall`), `DlOnFire` (`onFire`), `DlMeleeGuard` (melee crouch & overhead forearm guard). |
 | `Euphoria/Delirium/DlGrab.cs` | `grab` + `GrabHelper` (8-direction environment probes, break-force physical grip, palm pronation, release after breakaway) and `upperBodyFlinch` (`nmfl`). |
-| `Euphoria/NmPerformance.cs` | orchestrator: death plan, phase sequencing (`Balance → Shot → Flinch/Fall → Grab → Ground`), ballistic impulses, snap, angular damping, `setCharacterHealth` (residual liveliness), logging. |
+| `Euphoria/NmPerformance.cs` | orchestrator: death plan, weapon calibration (`NmWeaponClass`), phase sequencing (`Balance → Shot → Flinch/WallBrace/Fall → Grab → Ground`), ballistic impulses, snap, angular damping, `setCharacterHealth` (residual liveliness), logging. |
 
 ## Effector Units
 - Delirium: `set_stiffness(s, d)` stores `strength = s²` and `damping = 2·s·d`; its engine derives `stiffness = √strength` (natural frequency ω) and `damping ratio = damping / (2·stiffness)`. Brutality writes these exact two quantities into `MotorCommandBuffer.AddEffector`, so **ω = s and ζ = d with no conversion**.
@@ -34,22 +35,23 @@ Since version 0.2.0, it is the **sole animation engine** of the plugin: the lega
 | `shotSnap`, `shotShockSpin`, `setCharacterDamping` | `NmPerformance.Forces`, `DlShot.Forces` |
 | `catchFall`, `rollDownStairs`, `bodyRollUp`, `armsWindmill`, `pedalLegs` | `DlBehaviours` |
 | `grab`, `upperBodyFlinch` | `DlGrab` (`DlGrab` + `GrabHelper` + `DlFlinch`) |
-| `injuredOnGround`, `bodyWrithe`, `bodyFoetal` | `DlBehaviours`, coexisting with Brutality agony |
+| `injuredOnGround`, `bodyWrithe`, `bodyFoetal` | `DlBehaviours`, coexisting with restrained Brutality agony (single-event cap, zero `JointLock` override) |
+| `balancerCollisionsReaction`, `fallOverWall` | `DlExtraBehaviours` (`DlWallBrace`: arm brace, slump leg softening, low-wall tip-over) |
+| `highFall`, `onFire`, `melee` | `DlExtraBehaviours` (`DlHighFall`, `DlOnFire`, `DlMeleeGuard`) |
 | `setCharacterHealth` | `NmPerformance.U(t)`: liveliness fades with health (the body goes limp) |
 
-## Formal Proofs and Delirium Fidelity (1.0.0)
+## Formal Proofs and Delirium Fidelity (1.1.0)
 The `tests/Brutality.DeliriumTests` suite compiles and runs the actual C# plugin sources directly in an off-game 3D simulation at 60 Hz:
 - **Execution order (`nm.rs`)**: `Balance` runs before `Shot` so it does not overwrite reaching for the wound or giving way at the knees.
 - **Effector laws (`nmrs`)**: `set_stiffness(s, d)` (`strength = s²`, `damping = 2·s·d`, `ω = √strength`, `ζ = damping / (2·ω)`), `set_relaxation` with invariant `ζ`, cone `1 + 25 / (strength + 256)`, masks and `lock`/`unlock`, and DOF 2 pronation emission on elbows.
-- **Real physics (`nmdbm`, `nmshot`, `nmgr`)**: bounded `oppose_gravity` projected onto hinge axes (exact action + reaction), `Shot::wrist` / `ForearmPronationForNormal`, `Shot::pull` hand ↔ wound action/reaction, `shockSpin` in N·m proportional to lever arm, `Grab` on walls/ledges with zero false positives on flat ground, and unilateral (1-leg), synchronous (2-leg), and staggered (2-stage) leg give-ways.
+- **Real physics (`nmdbm`, `nmshot`, `nmgr`, `nmbr`, `nmfow`, `nmhf`, `onfire`)**: bounded `oppose_gravity` projected onto hinge axes (exact action + reaction), grounded leg support & capture stepping under recoil, `Shot::wrist` / `ForearmPronationForNormal`, `Shot::pull` hand ↔ wound action/reaction, direction-aware spine pain & weapon-class calibration (`NmWeaponClass`), `shockSpin` in N·m proportional to lever arm, `Grab` & `WallBrace` / `FallOverWall` on walls and low ledges with zero false positives on flat ground, `HighFall` / `OnFire` / `MeleeGuard`, standing momentum ground rolls, and unilateral (1-leg), synchronous (2-leg), and staggered (2-stage) leg give-ways.
 
-The complete table of **77 assertions** (31 Delirium + 46 Kinematics/ISB/BepInEx), verifiable SHA-256 digests, and reproducible scenarios in `demo/test-bench.html` are collected in [`docs/VERIFICATION.md`](VERIFICATION.md).
+The complete table of **85 assertions** (39 Delirium + 46 Kinematics/ISB/BepInEx), verifiable SHA-256 digests, and reproducible scenarios in `demo/test-bench.html` are collected in [`docs/VERIFICATION.md`](VERIFICATION.md).
 
 ## What Is Not Ported, and Why
 - **SDK, playroom, file readers** (XML/messages): irrelevant outside Delirium's tool.
-- **`getup`, `ledge` (climbing), `walk`/`run`, portals, skate**: assume a living agent getting back up or moving around; an SPT death ragdoll never uses them (`grab` is ported, however, to grab walls, crates, and ledges during the fall).
+- **`getup`, `ledge` (climbing), `walk`/`run`, portals, skate**: assume a living agent getting back up or moving around; an SPT death ragdoll never uses them (`grab` and `balancerCollisionsReaction` / `fallOverWall` are ported, however, to grab, brace against, or fall over walls, crates, and ledges during the fall).
 - **Clavicles and wrists**: absent from the EFT ragdoll (hands are merged with the forearm). The `uc` mask targets shoulders; `uw` is empty.
-- **`balancerCollisionsReaction`** (sliding along a wall): not ported; environment contact remains handled by PhysX.
 - **Ankle and foot joints**: the foot is not simulated; pelvis tilt that Delirium sends to the ankle goes to the spine so it does not fight leg inverse kinematics.
 
 ## Plan Selection and Rolling

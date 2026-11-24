@@ -79,22 +79,17 @@ namespace Brutality.Neural
 
             if (!_light && reflex > 0.01f)
             {
-                // Posturing / fencing response (brain lesions).
-                float roll = (float)rng.NextDouble();
-                float pz = Mathf.Min(1f, _ns.Posturing);
-                float pCor = _profile.DecorticateProb * pz;
-                if (roll < pCor)
-                    Add(new Posturing(BMath.Range(rng, 0.05f, 0.12f), BMath.Range(rng, 0.6f, 1.5f), Mathf.Clamp01(0.55f * reflex), rng));
-                else if (roll < pCor + _profile.FencingProb)
-                    Add(new Fencing(BMath.Chance(rng, 0.5f) ? 1 : -1, BMath.Range(rng, 0.05f, 0.15f), BMath.Range(rng, 1.5f, 4f), Mathf.Clamp01(0.7f * reflex)));
-
-                // Localized muscle locks.
-                if (_profile.LockProb > 0f)
+                // Posturing / fencing response only on cerebral lesions; no JointLock when Euphoria
+                // drives the body so frozen gun-holding poses never fight procedural reactions.
+                if (ctx.Mechanism == DeathMechanism.Cerebral && _ns.Posturing > 0.01f)
                 {
-                    TryLock(JointId.LElbow, 1.2f); TryLock(JointId.RElbow, 1.2f);
-                    TryLock(JointId.LKnee, 0.8f); TryLock(JointId.RKnee, 0.8f);
-                    TryLock(JointId.Neck, 0.6f);
-                    TryLock(JointId.LShoulder, 0.6f); TryLock(JointId.RShoulder, 0.6f);
+                    float roll = (float)rng.NextDouble();
+                    float pz = Mathf.Min(1f, _ns.Posturing) * 0.5f;
+                    float pCor = _profile.DecorticateProb * pz;
+                    if (roll < pCor)
+                        Add(new Posturing(BMath.Range(rng, 0.05f, 0.12f), BMath.Range(rng, 0.6f, 1.5f), Mathf.Clamp01(0.55f * reflex), rng));
+                    else if (roll < pCor + _profile.FencingProb * pz)
+                        Add(new Fencing(BMath.Chance(rng, 0.5f) ? 1 : -1, BMath.Range(rng, 0.05f, 0.15f), BMath.Range(rng, 1.5f, 4f), Mathf.Clamp01(0.7f * reflex)));
                 }
             }
 
@@ -108,6 +103,11 @@ namespace Brutality.Neural
             // (too far, or corpse cap reached) has neither performance nor agony: passive tissues only.
             _agonyI0 = _light ? 0f : BMath.Range(rng, _profile.AgonyI0) * Settings.AgonyIntensity.Value;
             _agonyDur = _agonyI0 > 0f ? BMath.Range(rng, _profile.AgonyDuration) : 0f;
+            if (ctx.Mechanism == DeathMechanism.Blast || ctx.Mechanism == DeathMechanism.FallTrauma)
+            {
+                _agonyI0 = Mathf.Min(_agonyI0, 0.22f);
+                _agonyDur = Mathf.Min(_agonyDur, 1.5f);
+            }
             AgonyStart = float.PositiveInfinity;
             AgonyEnd = _musclesCap;
             // Lightweight simulation: muscles release immediately (no residual tone to maintain).
@@ -422,9 +422,10 @@ namespace Brutality.Neural
                 active++;
                 busy |= p.Groups;
             }
-            if (active >= 2) return;
-            // Euphoria behaviors already occupy the body: agony stays more restrained than in standalone choreography.
-            float rate = _profile.EventRate * _vigor * _sig.Tempo * Mathf.Clamp01(I) * (active == 0 ? 1f : 0.6f);
+            if (active >= 1) return;
+            // Euphoria behaviors (DlInjuredOnGround, DlWrithe) already occupy the body: cap to 1 subtle Brutality
+            // gesture at a time so agony stays natural without chaotic overlapping spasms.
+            float rate = _profile.EventRate * _vigor * _sig.Tempo * Mathf.Clamp01(I) * 0.55f;
             if (!BMath.Chance(_ctx.Rng, rate * dt)) return;
 
             var ev = PickEvent(busy);

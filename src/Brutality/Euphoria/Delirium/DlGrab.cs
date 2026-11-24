@@ -394,7 +394,7 @@ namespace Brutality.Euphoria
             float bearing = Mathf.Atan2(Vector3.Dot(toThreat, th.R), Vector3.Dot(toThreat, th.F));
             bool fromBehind = Mathf.Abs(bearing) > 1.7f;
 
-            Ch.SetStiffness("ub", DlCfg.FlinchBodyStiffness * env, DlCfg.FlinchDamping);
+            Ch.SetStiffness("uk", DlCfg.FlinchBodyStiffness * env, DlCfg.FlinchDamping);
             // Slight defensive trunk flexion/twist.
             Ch.BlendDesired((int)JointId.Lumbar, 0, fromBehind ? -0.15f : 0.28f, 0.65f * env);
             Ch.BlendDesired((int)JointId.Lumbar, 2, Mathf.Clamp(-bearing * 0.35f, -0.45f, 0.45f), 0.6f * env);
@@ -403,7 +403,7 @@ namespace Brutality.Euphoria
             // Forearms raised in front of face / upper chest in pronation (palms facing outward/threat).
             for (int i = 0; i < 2; i++)
             {
-                if (Ch.Busy[i]) continue;
+                if (Ch.Busy[i] || (Perf.Shot != null && Perf.Shot.LooseArms[i])) continue;
                 int sd = i == 0 ? -1 : 1;
                 if (Nm.ElbowCap(B.Body, sd) < 0.25f) continue;
                 float n = (DlPhys.Noise01(_age * 2f, _seed, i * 3.1f) - 0.5f) * 0.08f;

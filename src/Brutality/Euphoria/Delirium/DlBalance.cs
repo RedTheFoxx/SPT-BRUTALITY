@@ -68,6 +68,15 @@ namespace Brutality.Euphoria
         public readonly float[] LegBuckle = { 0f, 0f };
         /// <summary>Additional pelvis lean requested by shot.collapse (Delirium: dbm_acc).</summary>
         public float AccBias;
+        /// <summary>Cumulative leg stiffness reduction from wall contact / slump (balancerCollisionsReaction).</summary>
+        public float ExternalKneeStiffReduction { get; private set; }
+        /// <summary>True while DlWallBrace is actively cushioning against a wall.</summary>
+        public bool WallBracing { get; set; }
+
+        public void ReduceLegStiffness(float delta)
+        {
+            ExternalKneeStiffReduction = Mathf.Min(Mathf.Max(0f, LowerK - 3.5f), ExternalKneeStiffReduction + Mathf.Max(0f, delta));
+        }
 
         private readonly DlBody _b;
         private readonly DlCharacter _ch;
@@ -128,7 +137,8 @@ namespace Brutality.Euphoria
 
         public float Strength(float t)
         {
-            float k01 = Mathf.Clamp01((LowerK - 4f) / (DlCfg.BalanceLegStiffness - 4f)) * _perf.U(t);
+            float effK = Mathf.Max(3.5f, LowerK - ExternalKneeStiffReduction);
+            float k01 = Mathf.Clamp01((effK - 4f) / (DlCfg.BalanceLegStiffness - 4f)) * _perf.U(t);
             if (!Failed) return k01;
             return k01 * (1f - Mathf.Clamp01((t - FailT) / 0.18f));
         }
@@ -170,10 +180,10 @@ namespace Brutality.Euphoria
             }
             float lean = Mathf.Sqrt(Mathf.Max(0f, 1f - _s.Hip2HeadUp * _s.Hip2HeadUp));
             bool lastStand = _perf.LastStandUntil > t;
-            if (!O.FallToKnees && lean > (lastStand ? 0.85f : DlCfg.BalanceAbortThreshold)) { Fail(t, "lean"); return; }
+            if (!O.FallToKnees && lean > (lastStand ? 0.85f : (O.Stagger ? 0.68f : DlCfg.BalanceAbortThreshold))) { Fail(t, "lean"); return; }
             if (!O.FallToKnees && _s.Com.y - _s.FootMinY < DlCfg.GiveUpHeight) { Fail(t, "height"); return; }
             if (t - _start > MaxTime) { Fail(t, "max duration"); return; }
-            if (O.Stagger && LowerK <= 8.01f) { Fail(t, "legs"); return; }
+            if (O.Stagger && (LowerK - ExternalKneeStiffReduction) <= 8.01f && !WallBracing) { Fail(t, "legs"); return; }
 
             // Base limb stiffnesses (Delirium nmbb.rs:159-167: only elbows take 0.6 × bodyStiffness,
             // shoulders keep bodyStiffness).
@@ -286,7 +296,7 @@ namespace Brutality.Euphoria
             Vector3 comH = DlBody.Horiz(_s.Com), velH = DlBody.Horiz(_s.Vel);
 
             // Capture point: the foot must land where the center of mass will arrive during the step.
-            float pred = O.Stagger ? 0.1f : 0f;
+            float pred = O.Stagger ? 0.14f : 0.04f;
             Vector3 apex = comH + velH * (1f / w0 + pred);
             // Lateral fall: capture point is offset toward the lean side, body loses support.
             if (O.LeanSide != 0) apex += _s.Right * (O.LeanSide * 0.24f);
@@ -350,7 +360,7 @@ namespace Brutality.Euphoria
                 Vector3 ac = c - a;
                 float u01 = Mathf.Clamp01(Vector3.Dot(apex - a, ac) / Mathf.Max(1e-6f, ac.sqrMagnitude));
                 float dist = Vector3.Distance(apex, a + ac * u01);
-                if (dist > 0.08f || ac.magnitude > 0.23f + 0.45f)
+                if (dist > 0.065f || ac.magnitude > 0.23f + 0.45f)
                 {
                     if (Steps >= MaxSteps) { Fail(t, "max steps"); return; }
                     float lat = Vector3.Dot(apex - comH, _s.Right);
@@ -360,7 +370,7 @@ namespace Brutality.Euphoria
                     if (O.InjuredLeg == sw && BMath.Chance(_rng, 0.5f)) sw = -sw;
                     _swing = sw;
                     _stepT = 0f;
-                    _stepDur = BMath.Range(_rng, 0.26f, 0.34f) + (1f - Mathf.Clamp01(Strength(_now))) * 0.08f;
+                    _stepDur = BMath.Range(_rng, 0.24f, 0.32f) + (1f - Mathf.Clamp01(Strength(_now))) * 0.08f;
                     _swingFrom[NmCharacter.Si(sw)] = _s.Ankle[NmCharacter.Si(sw)];
                     _planted[NmCharacter.Si(sw)] = false;
                 }
@@ -441,13 +451,14 @@ namespace Brutality.Euphoria
             // ragdoll, it goes to the spine alone so it doesn't fight leg inverse kinematics.
             _ch.SetDesired((int)JointId.Lumbar, 0, _ch.Desired((int)JointId.Lumbar).x + _p56 * 0.5f);
             // Do not overwrite the stiffness of buckling legs (LegBuckle / KneeScale).
+            float effLowerK = Mathf.Max(3.5f, LowerK - ExternalKneeStiffReduction);
             for (int sd = -1; sd <= 1; sd += 2)
             {
                 int k = NmCharacter.Si(sd);
                 float buckle = LegBuckle[k];
                 float wk = (O.InjuredLeg == sd ? 0.7f : 1f) * Mathf.Lerp(1f, 0.35f, buckle);
-                float knk = LowerK * wk * KneeScale[k] * Mathf.Lerp(1f, 0.22f, buckle);
-                _ch.SetStiffness(AnatomyData.Hip(sd), LowerK * wk, 1f);
+                float knk = effLowerK * wk * KneeScale[k] * Mathf.Lerp(1f, 0.22f, buckle);
+                _ch.SetStiffness(AnatomyData.Hip(sd), effLowerK * wk, 1f);
                 _ch.SetStiffness(AnatomyData.Knee(sd), Mathf.Max(1.8f, knk), 1f);
             }
 
@@ -542,15 +553,16 @@ namespace Brutality.Euphoria
             if (!Nm.LegIK(body, sd, thigh.Pos, ankle, _s.Right, Vector3.up, _s.Fwd, out float f, out float ab, out float kn))
                 return;
             int k = NmCharacter.Si(sd);
+            float effLowerK = Mathf.Max(3.5f, LowerK - ExternalKneeStiffReduction);
             float wk = (O.InjuredLeg == sd ? 0.7f : 1f) * Mathf.Lerp(1f, 0.35f, buckle);
-            float knk = LowerK * wk * KneeScale[k] * Mathf.Lerp(1f, 0.22f, buckle);
-            _ch.SetStiffness(jm, LowerK * wk, 1f);
+            float knk = effLowerK * wk * KneeScale[k] * Mathf.Lerp(1f, 0.22f, buckle);
+            _ch.SetStiffness(jm, effLowerK * wk, 1f);
             _ch.SetStiffness(km, Mathf.Max(1.8f, knk), 1f);
             // When the leg buckles, the knee closes sharply and the hip flexes under the weight.
             float extraKneeDeg = buckle * 52f;
             float extraHipDeg = buckle * 20f;
             _ch.SetDesired((int)jm, 0, (f + extraHipDeg) * BMath.Deg);
-            _ch.SetDesired((int)jm, 1, ab * BMath.Deg);
+            _ch.SetDesired((int)jm, 1, Mathf.Clamp(ab, -18f, 32f) * BMath.Deg);
             _ch.SetDesired((int)km, 0, Mathf.Max(kn + extraKneeDeg, 5f) * BMath.Deg);
             // Foot orientation: ankle follows movement direction (yaw) and local slope.
             Vector3 dir = DlBody.Horiz(_s.Vel);
@@ -642,6 +654,26 @@ namespace Brutality.Euphoria
                 pelvis.Rb.AddForce(Vector3.ClampMagnitude(fLean * s, 0.28f * M * g), ForceMode.Force);
             }
 
+            // Grounded vertical leg support (Delirium stayUpright / foot_support): strictly contact-gated
+            // so dying characters bear their own weight through stance legs instead of collapsing in 0.25 s,
+            // while never levitating once feet leave the floor or knees buckle.
+            if (!Failed && !O.Sit && (_s.Contact[0] || _s.Contact[1]))
+            {
+                float avgHold = Mathf.Clamp01(1f - bAvg);
+                float cUp = Mathf.Clamp01(Vector3.Dot(pelvis.U, Vector3.up));
+                float hTarget = _y0 - Sink - 0.28f * (1f - avgHold);
+                if (pelvis.Com.y <= hTarget + 0.04f)
+                {
+                    float footScale = (_s.Contact[0] && _s.Contact[1]) ? 1f : 0.78f;
+                    float supportFrac = Mathf.Clamp01(avgHold * s * cUp * cUp * footScale);
+                    float yErr = hTarget - pelvis.Com.y;
+                    float upAccel = g * supportFrac + Mathf.Clamp(yErr * 22f - pelvis.V.y * 7.5f, -12f, 16f) * supportFrac;
+                    float fUp = Mathf.Max(0f, M * upAccel);
+                    pelvis.Rb.AddForce(Vector3.up * (fUp * 0.62f), ForceMode.Force);
+                    thorax.Rb.AddForce(Vector3.up * (fUp * 0.38f), ForceMode.Force);
+                }
+            }
+
             // Horizontal stabilization (Delirium nmdbm::stabilise) + bounded brake, only when a foot is in contact.
             if (_s.Contact[0] || _s.Contact[1])
             {
@@ -651,7 +683,8 @@ namespace Brutality.Euphoria
                 float c4 = cUp * cUp * cUp * cUp;
                 float stabK = (1f - 0.7f * bAvg) * s * c4;
                 Vector3 vH = NmCharacter.Flat(_s.Vel);
-                Vector3 fStab = -DlBody.Horiz(dCom + vH * 0.12f) * (24f * stabK) - vH * (35f * s);
+                float brake = O.Stagger ? 10f : 18f;
+                Vector3 fStab = -DlBody.Horiz(dCom + vH * 0.12f) * (14f * stabK) - vH * (brake * s);
                 Vector3 fH = Vector3.ClampMagnitude(fStab, 0.16f * M * g * s);
                 pelvis.Rb.AddForce(fH * 0.7f, ForceMode.Force);
                 thorax.Rb.AddForce(fH * 0.3f, ForceMode.Force);
@@ -664,18 +697,19 @@ namespace Brutality.Euphoria
             foreach (var id in new[] { Seg.Pelvis, Seg.Thorax, Seg.Head, Seg.LUpperArm, Seg.RUpperArm, Seg.LForearm, Seg.RForearm })
                 Iub += body[id].Mass * (body[id].Com - pelvis.Com).sqrMagnitude;
             float ls = _perf.LastStandUntil > t ? 1.6f : 1f;
-            Upright(thorax, upT, Iub * 0.25f * s * ls, dt);
-            Upright(pelvis, Vector3.Slerp(Vector3.up, upT, 0.5f), Iub * 0.2f * s * ls, dt);
+            float upHold = 1f - 0.50f * bAvg;
+            Upright(thorax, upT, Iub * 0.40f * s * ls * upHold, dt, 135f);
+            Upright(pelvis, Vector3.Slerp(Vector3.up, upT, 0.5f), Iub * 0.28f * s * ls * upHold, dt, 110f);
         }
 
-        private static void Upright(Segment sg, Vector3 target, float gain, float dt)
+        private static void Upright(Segment sg, Vector3 target, float gain, float dt, float maxTorque = 90f)
         {
             Vector3 err = Vector3.Cross(sg.U, target);
             Vector3 wH = sg.W - Vector3.Project(sg.W, Vector3.up);
             float iSeg = Mathf.Max(0.05f, (sg.InertiaDiag.x + sg.InertiaDiag.y + sg.InertiaDiag.z) / 3f);
             float kp = Mathf.Min(60f * gain, dt > 1e-4f ? 0.3f * iSeg / (dt * dt) : 60f * gain);
             float kd = Mathf.Min(14f * gain, dt > 1e-4f ? 0.9f * iSeg / dt : 14f * gain);
-            Vector3 tq = Vector3.ClampMagnitude(kp * err - kd * wH, 90f);
+            Vector3 tq = Vector3.ClampMagnitude(kp * err - kd * wH, maxTorque);
             sg.Rb.AddTorque(tq, ForceMode.Force);
         }
     }
