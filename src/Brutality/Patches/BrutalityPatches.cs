@@ -87,6 +87,13 @@ namespace Brutality.Patches
                 var m = AccessTools.Method(typeof(PlayerRigidbodySleepHierarchy), nameof(PlayerRigidbodySleepHierarchy.TryPutToSleep));
                 h.Patch(m, prefix: new HarmonyMethod(typeof(BrutalityPatches), nameof(SleepPrefix)) { priority = Priority.First });
             });
+
+            Try("CorpseRagdoll.AttachWeapon", () =>
+            {
+                var m = AccessTools.Method(typeof(CorpseRagdoll), nameof(CorpseRagdoll.AttachWeapon));
+                if (m != null)
+                    h.Patch(m, postfix: new HarmonyMethod(typeof(BrutalityPatches), nameof(AttachWeaponPostfix)) { priority = Priority.Low });
+            });
         }
 
         private static void Try(string name, Action a)
@@ -254,6 +261,19 @@ namespace Brutality.Patches
                 return false;
             }
             return true;
+        }
+
+        private static void AttachWeaponPostfix(CorpseRagdoll __instance)
+        {
+            if (!Settings.Enabled.Value || !Settings.DropCorpseWeapon.Value || __instance == null) return;
+            try
+            {
+                BrutalityRagdoll.ForRagdoll(__instance)?.DetachWeapon();
+            }
+            catch (Exception e)
+            {
+                Plugin.LogDebug("weapon detach: " + e.Message);
+            }
         }
     }
 }

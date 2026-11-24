@@ -92,7 +92,7 @@ namespace Brutality.Euphoria
 
         // Shared physics.
         public const float CaptureHeightLead = 0.1f;   // capture point horizon (Pratt 2006)
-        public const float StepHeight = 0.1f;
+        public const float StepHeight = 0.22f;
         public const float StepClamp = 1f;
         public const float GiveUpHeight = 0.5f;
         public const float BalanceAbortThreshold = 0.6f;

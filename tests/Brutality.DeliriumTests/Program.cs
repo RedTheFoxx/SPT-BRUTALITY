@@ -113,6 +113,7 @@ namespace DeliriumTests
             Test_Foetal_AsymmetryAndPronation();
             Test_Flinch_FrontalBurstGuard();
             Test_Balance_GroundedStaggerAndRecoilDisplacement();
+            Test_Balance_BackwardStaggerLegFlexionAndNoLevitation();
             Test_WallBrace_BraceAndSlumpAgainstWall();
             Test_WallBrace_FallOverLowWall();
             Test_HighFall_BlastAndLandingAnticipation();
@@ -707,6 +708,38 @@ namespace DeliriumTests
                 "nmdbm (staggerFall)", "DlBalance.cs");
         }
 
+        private static void Test_Balance_BackwardStaggerLegFlexionAndNoLevitation()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Stagger";
+            var sim = new SimRagdoll(MakeCtx(309, dir: new Vector3(0f, 0f, -1f), kick: 1.3f, kickClass: "intermediate"));
+            Settings.EuphoriaForce.Value = "Auto";
+            sim.RootVel = new Vector3(0f, 0f, -1.35f);
+            foreach (var sg in sim.Body.Segs) sg.Rb.velocity = sim.RootVel;
+            sim.Perf.OnBullet(0f, NmHit.Make(sim.Body, sim.Body[Seg.Thorax], sim.Body[Seg.Thorax].Com + new Vector3(0f, 0f, 0.12f), new Vector3(0f, 0f, -1f), 4.5f));
+            float maxUpRatio = 0f;
+            float mg = sim.Body.TotalMass * 9.81f;
+            float minKneeKAfterSteps = 99f;
+            for (int s = 0; s < 100; s++)
+            {
+                sim.Step(s * 0.016f, 0.016f);
+                float upF = MathF.Max(0f, sim.Body[Seg.Pelvis].Rb.ForceAccum.y + sim.Body[Seg.Thorax].Rb.ForceAccum.y);
+                maxUpRatio = MathF.Max(maxUpRatio, upF / mg);
+                if (sim.Perf.Balance != null && sim.Perf.Balance.Active && !sim.Perf.Balance.Failed && sim.Perf.Balance.Steps >= 2)
+                {
+                    float wL = MathF.Sqrt(sim.Perf.Eff.Strength((int)JointId.LKnee));
+                    float wR = MathF.Sqrt(sim.Perf.Eff.Strength((int)JointId.RKnee));
+                    minKneeKAfterSteps = MathF.Min(minKneeKAfterSteps, MathF.Min(wL, wR));
+                }
+            }
+            float peakL = sim.PeakLeftKneeFlex / BMath.Deg;
+            float peakR = sim.PeakRightKneeFlex / BMath.Deg;
+            Check("nmdbm::Stagger (backward): knees bend during swing/stance (not locked straight), LowerK decays without Shot overwrite, bounded vertical support",
+                sim.PeakSteps >= 2 && peakL > 28f && peakR > 28f && maxUpRatio <= 1.06f && minKneeKAfterSteps < 12.2f && !sim.AnyNaN,
+                $"(steps={sim.PeakSteps}, kneeL={peakL:0.0}°, kneeR={peakR:0.0}°, maxUp={maxUpRatio:0.00}·mg, minKneeω={minKneeKAfterSteps:0.0})",
+                "nmdbm (staggerFall)", "DlBalance.cs + DlShot.cs");
+        }
+
         private static void Test_WallBrace_BraceAndSlumpAgainstWall()
         {
             Physics.ResetWorld(0f);
@@ -767,7 +800,7 @@ namespace DeliriumTests
             Settings.EuphoriaForce.Value = "Auto";
             var sim = new SimRagdoll(MakeCtx(305, DeathMechanism.Burn, EBodyPart.Chest, EBodyPartColliderType.RibcageUp));
             float peakGroundTq = 0f;
-            for (int s = 0; s < 180; s++)
+            for (int s = 0; s < 240; s++)
             {
                 sim.Step(s * 0.016f, 0.016f);
                 if (sim.Perf.Phase == NmPhase.Ground && sim.Perf.OnFire != null)

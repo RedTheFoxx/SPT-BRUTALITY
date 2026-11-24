@@ -59,6 +59,7 @@ namespace Brutality.Core
         private NmImpulseQueue _impulses;
         private bool _permanent, _dormant, _stopInvoked, _frozenByCap, _restApplied;
         private bool _dropSoundPlayed;
+        private bool _weaponDetached;
         private float _dropPeak;
         private float _wakeUntil;
         private readonly List<PendingHit> _hits = new List<PendingHit>(4);
@@ -72,6 +73,17 @@ namespace Brutality.Core
         {
             if (rb == null) return null;
             return RbOwners.TryGetValue(rb, out var owner) && owner != null ? owner : null;
+        }
+
+        public static BrutalityRagdoll ForRagdoll(CorpseRagdoll ragdoll)
+        {
+            if (ragdoll == null) return null;
+            for (int i = 0; i < Active.Count; i++)
+            {
+                var r = Active[i];
+                if (r != null && !r._released && ReferenceEquals(r._ragdoll, ragdoll)) return r;
+            }
+            return null;
         }
 
         // ------------------------------------------------------------------ initialization
@@ -142,6 +154,8 @@ namespace Brutality.Core
 
             foreach (var s in _body.Segs) RbOwners[s.Rb] = this;
             Active.Add(this);
+            if (_ragdoll._weaponJoint != null || _ragdoll._weaponRigidbody != null)
+                DetachWeapon();
 
             Plugin.Log.LogInfo(string.Format(
                 "Brutality: {0} died — {1}, zone {2}/{3}, {4}, {5:0} J, {6:0.0} N·s, mass {7:0} kg (+{8:0.0} kg gear), pose {9}{10}",
@@ -166,6 +180,51 @@ namespace Brutality.Core
             catch { }
             var cam = Camera.main;
             return cam != null ? Vector3.Distance(cam.transform.position, p) : 0f;
+        }
+
+        /// <summary>
+        /// Detaches EFT's corpse weapon joint (FixedJoint / SpringJoint) so the weapon drops freely to the ground
+        /// instead of vibrating against the dynamic Brutality ragdoll. Keeps <c>_weaponRigidbody</c> intact so
+        /// looting (<c>Corpse.RemoveLootItem</c> → <c>ClearWeapon</c>) and corpse cleanup work normally.
+        /// </summary>
+        public void DetachWeapon()
+        {
+            if (_released || _ragdoll == null || !Settings.DropCorpseWeapon.Value) return;
+            if (_weaponDetached && _ragdoll._weaponJoint == null) return;
+            if (_ragdoll._weaponJoint != null)
+            {
+                UnityEngine.Object.Destroy(_ragdoll._weaponJoint);
+                _ragdoll._weaponJoint = null;
+            }
+            var wrb = _ragdoll._weaponRigidbody;
+            if (wrb == null) return;
+            _weaponDetached = true;
+            wrb.drag = Mathf.Max(wrb.drag, 0.12f);
+            wrb.angularDrag = Mathf.Max(wrb.angularDrag, 0.5f);
+            wrb.maxDepenetrationVelocity = Mathf.Min(wrb.maxDepenetrationVelocity > 0f ? wrb.maxDepenetrationVelocity : 2f, 2f);
+            if (!wrb.isKinematic) wrb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            if (_body != null)
+            {
+                var rFore = _body[Seg.RForearm];
+                Vector3 releaseVel = rFore != null ? rFore.V * 0.45f : wrb.velocity * 0.5f;
+                var thorax = _body[Seg.Thorax];
+                Vector3 outward = thorax != null
+                    ? BMath.SafeNormalize(NmCharacter.Flat(wrb.position - thorax.Com), thorax.R)
+                    : Vector3.right;
+                wrb.velocity = Vector3.ClampMagnitude(releaseVel + outward * 0.35f, 3.5f);
+                var wCols = wrb.GetComponentsInChildren<Collider>(true);
+                foreach (var wc in wCols)
+                {
+                    if (wc == null || wc.isTrigger) continue;
+                    foreach (var seg in _body.Segs)
+                    {
+                        if (seg == null) continue;
+                        foreach (var sc in seg.Colliders)
+                            if (sc != null) Physics.IgnoreCollision(wc, sc, true);
+                    }
+                }
+            }
+            Plugin.LogDebug("  corpse weapon detached to drop freely to the ground");
         }
 
         // ------------------------------------------------------------------ stopping

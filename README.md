@@ -26,12 +26,12 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 
 100% **client-side** (no server mod required). With **Fika**, install on the host and ideally on clients.
 
-- **Manual (Release):** Extract `SPT-BRUTALITY-1.1.0.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
+- **Manual (Release):** Extract `SPT-BRUTALITY-1.1.1.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
 - **Build from source:**
   ```bash
   dotnet build src/Brutality/Brutality.csproj -c Release -p:Install=true
   ```
-  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-1.1.0.zip`.)*
+  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-1.1.1.zip`.)*
 
 **Configuration:** `BepInEx/config/com.brutality.ragdoll.cfg` — editable in-game via `F12` (ConfigurationManager).
 
@@ -55,7 +55,7 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 |---|---|
 | [`docs/SCIENCE.md`](docs/SCIENCE.md) | Mapping from the [scientific corpus](Scientific%20Corpus%20%E2%80%94%20Biomechanics%20for%20an%20Ultra-Realistic%20Ragdoll.md) to the C# implementation |
 | [`docs/EUPHORIA.md`](docs/EUPHORIA.md) | Delirium / Euphoria © behavior port architecture |
-| [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Formal proof sheet (**85 / 85** off-game checks, CI-verified) |
+| [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Formal proof sheet (**88 / 88** off-game checks, CI-verified) |
 | [`demo/test-bench.html`](demo/test-bench.html) | Interactive 3D demo studio |
 
 Run the standalone off-game test benches (no game DLLs required):

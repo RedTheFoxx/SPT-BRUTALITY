@@ -248,6 +248,7 @@ namespace Brutality.Euphoria
 
         private void Stiff(float fall, float fallHold, float u, float dt)
         {
+            bool balanceOwnsLegs = _perf.Balance != null && _perf.Balance.Active && !_perf.Balance.Failed;
             float og = (fall + 1f) * 0.5f;
             for (int k = 0; k < 2; k++)
             {
@@ -257,8 +258,11 @@ namespace Brutality.Euphoria
                     _ch.SetOpposeGravity((int)AnatomyData.Shoulder(sd), og);
                     _ch.SetOpposeGravity((int)AnatomyData.Elbow(sd), og);
                 }
-                _ch.SetOpposeGravity((int)AnatomyData.Hip(sd), og);
-                _ch.SetOpposeGravity((int)AnatomyData.Knee(sd), og);
+                if (!balanceOwnsLegs)
+                {
+                    _ch.SetOpposeGravity((int)AnatomyData.Hip(sd), og);
+                    _ch.SetOpposeGravity((int)AnatomyData.Knee(sd), og);
+                }
             }
             // The spine is not gravity-compensated: that would cancel trunk gravity and prevent falling.
             _ch.SetOpposeGravity((int)JointId.Lumbar, 0f);
@@ -272,16 +276,21 @@ namespace Brutality.Euphoria
             if (!_ch.Busy[0]) _ch.SetStiffness("ul", P.ArmStiffness * og * u, 1f * loose, Mathf.Max(DlCfg.ShotArmLooseness, ms * 0.5f));
             if (!_ch.Busy[1]) _ch.SetStiffness("ur", P.ArmStiffness * og * u, 1f * loose, Mathf.Max(DlCfg.ShotArmLooseness, ms * 0.5f));
             _ch.SetStiffness("un", P.NeckStiffness * og * u, 0.5f * loose, ms * 0.5f);
-            // A shot in the back does not stiffen the legs: that was what made the body topple as a rigid block.
-            float legHold = Wound != null && Wound.Torso && Behind > 0.2f ? fallHold * 0.25f : fallHold;
-            for (int k = 0; k < 2; k++)
+            // When the dynamic balancer is active, it owns leg stiffness (step decay, buckling, injured leg,
+            // wall slump); overwriting hips/knees here would keep legs rigidly locked during stagger.
+            if (!balanceOwnsLegs)
             {
-                if (CollapseLegs[k]) continue; // do not overwrite a buckling leg
-                int sd = k == 0 ? -1 : 1;
-                _ch.SetStiffness(AnatomyData.Hip(sd), Mathf.Lerp(4f, P.LegStiffness, legHold), (legHold + 1f) * 0.5f);
-                _ch.SetStiffness(AnatomyData.Knee(sd), Mathf.Lerp(4f, P.LegStiffness, legHold), (legHold + 1f) * 0.5f);
-                _ch.SetOpposeGravity((int)AnatomyData.Hip(sd), legHold);
-                _ch.SetOpposeGravity((int)AnatomyData.Knee(sd), legHold);
+                // A shot in the back does not stiffen the legs: that was what made the body topple as a rigid block.
+                float legHold = Wound != null && Wound.Torso && Behind > 0.2f ? fallHold * 0.25f : fallHold;
+                for (int k = 0; k < 2; k++)
+                {
+                    if (CollapseLegs[k]) continue; // do not overwrite a buckling leg
+                    int sd = k == 0 ? -1 : 1;
+                    _ch.SetStiffness(AnatomyData.Hip(sd), Mathf.Lerp(4f, P.LegStiffness, legHold), (legHold + 1f) * 0.5f);
+                    _ch.SetStiffness(AnatomyData.Knee(sd), Mathf.Lerp(4f, P.LegStiffness, legHold), (legHold + 1f) * 0.5f);
+                    _ch.SetOpposeGravity((int)AnatomyData.Hip(sd), legHold);
+                    _ch.SetOpposeGravity((int)AnatomyData.Knee(sd), legHold);
+                }
             }
 
             // Knees lighten on impact (Delirium: muscle_stiffness = fall·2 + 0.5 when fall < 0.5).

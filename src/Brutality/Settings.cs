@@ -16,6 +16,7 @@ namespace Brutality
         public static ConfigEntry<float> FullSimulationDistance;
         public static ConfigEntry<bool> PermanentSimulation;
         public static ConfigEntry<int> MaxPermanentCorpses;
+        public static ConfigEntry<bool> DropCorpseWeapon;
 
         // 2. Body
         public static ConfigEntry<float> BodyMassKg;
@@ -64,6 +65,8 @@ namespace Brutality
                 "Does not apply to observed bodies on a Fika client (final pose remains the host's).");
             MaxPermanentCorpses = cfg.Bind(g, "Max permanently simulated corpses", 40,
                 new ConfigDescription("Beyond this limit, the oldest corpses are frozen as in vanilla.", new AcceptableValueRange<int>(5, 150)));
+            DropCorpseWeapon = cfg.Bind(g, "Drop corpse weapon to ground", true,
+                "Detaches the weapon joint on Brutality-managed corpses so the weapon falls freely to the ground instead of vibrating against the ragdoll.");
             AffectOwnCorpse = cfg.Bind(g, "Apply to your own corpse", true,
                 "Your own death also uses the Brutality simulation.");
             AffectObservedCorpses = cfg.Bind(g, "Apply to observed corpses (Fika client)", true,

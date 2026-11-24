@@ -183,6 +183,7 @@ namespace Brutality.Euphoria
             if (!O.FallToKnees && lean > (lastStand ? 0.85f : (O.Stagger ? 0.68f : DlCfg.BalanceAbortThreshold))) { Fail(t, "lean"); return; }
             if (!O.FallToKnees && _s.Com.y - _s.FootMinY < DlCfg.GiveUpHeight) { Fail(t, "height"); return; }
             if (t - _start > MaxTime) { Fail(t, "max duration"); return; }
+            if (!O.FallToKnees && t - _start > 0.22f && DlBody.Horiz(_s.Vel).magnitude > 2.8f) { Fail(t, "velocity"); return; }
             if (O.Stagger && (LowerK - ExternalKneeStiffReduction) <= 8.01f && !WallBracing) { Fail(t, "legs"); return; }
 
             // Base limb stiffnesses (Delirium nmbb.rs:159-167: only elbows take 0.6 × bodyStiffness,
@@ -366,7 +367,7 @@ namespace Brutality.Euphoria
                     float lat = Vector3.Dot(apex - comH, _s.Right);
                     int sw = Mathf.Abs(lat) > 0.06f ? (lat > 0f ? 1 : -1)
                         : (Vector3.Distance(a, apex) > Vector3.Distance(c, apex) ? -1 : 1);
-                    if (sw == _lastSwing && Mathf.Abs(lat) < 0.12f) sw = -sw;
+                    if (sw == _lastSwing && Mathf.Abs(lat) < 0.22f) sw = -sw;
                     if (O.InjuredLeg == sw && BMath.Chance(_rng, 0.5f)) sw = -sw;
                     _swing = sw;
                     _stepT = 0f;
@@ -388,36 +389,47 @@ namespace Brutality.Euphoria
                 int k = NmCharacter.Si(sd);
                 var thigh = body[sd < 0 ? Seg.LThigh : Seg.RThigh];
                 Vector3 target;
+                float swingArc = 0f;
                 if (sd == _swing)
                 {
                     _stepT += dt;
                     float ph = Mathf.Clamp01(_stepT / _stepDur);
-                    Vector3 stance = DlBody.Horiz(_s.Ankle[NmCharacter.Si(-sd)]);
+                    swingArc = Mathf.Sin(Mathf.PI * ph);
                     Vector3 tgt = apex + _s.Right * (sd * _footWidth);
                     tgt = ClampReach(sd, tgt, _stepClamp);
                     Vector3 from = _swingFrom[k];
                     target = Vector3.Lerp(from, tgt, BMath.SmoothStep(0f, 1f, ph));
-                    float lift = DlCfg.StepHeight * Mathf.Sin(Mathf.PI * ph);
-                    target.y = _s.FootMinY + 0.05f + lift;
-                    if (ph >= 1f || (ph > 0.7f && _s.Contact[k]))
+                    float lift = DlCfg.StepHeight * swingArc;
+                    target.y = _s.GroundY + 0.06f + lift;
+                    if (ph >= 1f || (ph > 0.72f && _s.Contact[k]))
                     {
                         Steps++;
                         _lastSwing = sd;
                         _swing = 0;
                         _planted[k] = true;
-                        _ankle[k] = target;
+                        _ankle[k] = _s.Ankle[k];
                         _perf.Log(t, "step " + Steps + (sd < 0 ? " (L)" : " (R)"));
-                        if (O.Stagger && Steps >= 2) LowerK = Mathf.Max(8f - 0.02f, LowerK - O.PerStep);
+                        if (O.Stagger)
+                        {
+                            Sink = Mathf.Min(0.24f, Sink + 0.035f);
+                            if (Steps >= 2) LowerK = Mathf.Max(8f - 0.02f, LowerK - O.PerStep);
+                        }
                     }
                 }
                 else
                 {
-                    // Stance leg: ankle planted, pelvis held at height, foot oriented forward.
-                    target = _ankle[k];
-                    target.y = _s.Ankle[k].y;
+                    // Stance leg: re-anchor within comfortable leg reach if the body slid so the stance
+                    // knee never locks straight at full extension.
+                    Vector3 hipHPos = DlBody.Horiz(thigh.Pos);
+                    Vector3 ancH = DlBody.Horiz(_ankle[k]);
+                    Vector3 dAnc = ancH - hipHPos;
+                    float maxStance = _legLength * 0.48f;
+                    if (dAnc.magnitude > maxStance)
+                        ancH = hipHPos + dAnc.normalized * maxStance;
+                    target = new Vector3(ancH.x, _s.GroundY + 0.06f, ancH.z);
                     _ankle[k] = target;
                 }
-                LegTo(sd, target, hipH, dt, LegBuckle[k]);
+                LegTo(sd, target, hipH, dt, LegBuckle[k], swingArc);
             }
 
             // Lateral imbalance sharing between both hips and spine (Delirium: over-range sharing).
@@ -462,9 +474,10 @@ namespace Brutality.Euphoria
                 _ch.SetStiffness(AnatomyData.Knee(sd), Mathf.Max(1.8f, knk), 1f);
             }
 
-            // staggerFall: lean in walking direction (leanInDirection) and spine flexion with speed.
+            // staggerFall: lean in walking direction (leanInDirection), gradual knee sag, and spine flexion with speed.
             if (O.Stagger)
             {
+                Sink = Mathf.Min(0.22f, Sink + 0.04f * dt);
                 float vf = Vector3.Dot(velH, _s.Fwd);
                 float max = vf >= 0f ? 0.10f : 0.30f;
                 _lean = Mathf.Min(max, _lean + dt);
@@ -517,8 +530,11 @@ namespace Brutality.Euphoria
             Vector3 h = _b.JointPos((JointId)hip);
             Vector3 d = target - h;
             float legLen = _legLength * 0.95f;
-            float maxH = legLen * clamp * 0.85f;
             Vector3 dh = DlBody.Horiz(d);
+            // Hip extension is anatomically much tighter than flexion (-20° vs +125°): clamp backward
+            // step targets tighter so backward stagger steps bend the knee instead of locking straight.
+            float fwdProj = Vector3.Dot(dh, _s.Fwd);
+            float maxH = fwdProj < 0f ? legLen * clamp * 0.42f : legLen * clamp * 0.72f;
             if (dh.magnitude > maxH) dh = dh.normalized * maxH;
             float maxV = 0.12f;
             Vector3 dv = Vector3.up * Mathf.Clamp(d.y, -legLen, maxV);
@@ -543,14 +559,14 @@ namespace Brutality.Euphoria
             return Mathf.Max(0f, e - 1f) / (e + 1e-4f) * (d.y - mid1);
         }
 
-        private void LegTo(int sd, Vector3 ankle, float hipH, float dt, float buckle)
+        private void LegTo(int sd, Vector3 ankle, float hipH, float dt, float buckle, float swingArc = 0f)
         {
             var body = _b.Body;
+            var pelvis = body[Seg.Pelvis];
             var thigh = body[sd < 0 ? Seg.LThigh : Seg.RThigh];
-            var calf = body[sd < 0 ? Seg.LCalf : Seg.RCalf];
             var jm = AnatomyData.Hip(sd);
             var km = AnatomyData.Knee(sd);
-            if (!Nm.LegIK(body, sd, thigh.Pos, ankle, _s.Right, Vector3.up, _s.Fwd, out float f, out float ab, out float kn))
+            if (!Nm.LegIK(body, sd, thigh.Pos, ankle, pelvis.R, pelvis.U, pelvis.F, out float f, out float ab, out float kn))
                 return;
             int k = NmCharacter.Si(sd);
             float effLowerK = Mathf.Max(3.5f, LowerK - ExternalKneeStiffReduction);
@@ -559,11 +575,14 @@ namespace Brutality.Euphoria
             _ch.SetStiffness(jm, effLowerK * wk, 1f);
             _ch.SetStiffness(km, Mathf.Max(1.8f, knk), 1f);
             // When the leg buckles, the knee closes sharply and the hip flexes under the weight.
-            float extraKneeDeg = buckle * 52f;
-            float extraHipDeg = buckle * 20f;
+            // During a swing step, add explicit knee/hip clearance flexion so the foot actually lifts
+            // and bends instead of dragging straight across the ground.
+            float extraKneeDeg = buckle * 52f + swingArc * 38f;
+            float extraHipDeg = buckle * 20f + swingArc * 16f;
+            float minKneeDeg = O.Stagger ? 16f : 10f;
             _ch.SetDesired((int)jm, 0, (f + extraHipDeg) * BMath.Deg);
             _ch.SetDesired((int)jm, 1, Mathf.Clamp(ab, -18f, 32f) * BMath.Deg);
-            _ch.SetDesired((int)km, 0, Mathf.Max(kn + extraKneeDeg, 5f) * BMath.Deg);
+            _ch.SetDesired((int)km, 0, Mathf.Max(kn + extraKneeDeg, minKneeDeg) * BMath.Deg);
             // Foot orientation: ankle follows movement direction (yaw) and local slope.
             Vector3 dir = DlBody.Horiz(_s.Vel);
             float yaw = 0f;
@@ -655,26 +674,30 @@ namespace Brutality.Euphoria
             }
 
             // Grounded vertical leg support (Delirium stayUpright / foot_support): strictly contact-gated
-            // so dying characters bear their own weight through stance legs instead of collapsing in 0.25 s,
-            // while never levitating once feet leave the floor or knees buckle.
+            // and capped below full body weight so the stance feet always maintain real ground normal force
+            // and friction (preventing hovercraft sliding), while never levitating when knees buckle.
             if (!Failed && !O.Sit && (_s.Contact[0] || _s.Contact[1]))
             {
                 float avgHold = Mathf.Clamp01(1f - bAvg);
                 float cUp = Mathf.Clamp01(Vector3.Dot(pelvis.U, Vector3.up));
                 float hTarget = _y0 - Sink - 0.28f * (1f - avgHold);
-                if (pelvis.Com.y <= hTarget + 0.04f)
+                if (pelvis.Com.y <= hTarget + 0.08f)
                 {
                     float footScale = (_s.Contact[0] && _s.Contact[1]) ? 1f : 0.78f;
                     float supportFrac = Mathf.Clamp01(avgHold * s * cUp * cUp * footScale);
                     float yErr = hTarget - pelvis.Com.y;
-                    float upAccel = g * supportFrac + Mathf.Clamp(yErr * 22f - pelvis.V.y * 7.5f, -12f, 16f) * supportFrac;
-                    float fUp = Mathf.Max(0f, M * upAccel);
+                    // Bounded vertical support (capped at 1.03 g, never launching upward). During stagger,
+                    // keep baseline slightly below 1 g (0.96 g) so stance feet remain loaded on the floor
+                    // with real friction instead of levitating.
+                    float baseG = O.Stagger ? 0.96f * g : g;
+                    float upAccel = (baseG + Mathf.Clamp(yErr * 22f - pelvis.V.y * 7.5f, -10f, 3.0f)) * supportFrac;
+                    float fUp = Mathf.Clamp(M * upAccel, 0f, 1.03f * M * g);
                     pelvis.Rb.AddForce(Vector3.up * (fUp * 0.62f), ForceMode.Force);
                     thorax.Rb.AddForce(Vector3.up * (fUp * 0.38f), ForceMode.Force);
                 }
             }
 
-            // Horizontal stabilization (Delirium nmdbm::stabilise) + bounded brake, only when a foot is in contact.
+            // Horizontal stabilization (Delirium nmdbm::stabilise) + mass-scaled foot braking, only in contact.
             if (_s.Contact[0] || _s.Contact[1])
             {
                 Vector3 midFoot = 0.5f * (_s.Ankle[0] + _s.Ankle[1]);
@@ -683,8 +706,8 @@ namespace Brutality.Euphoria
                 float c4 = cUp * cUp * cUp * cUp;
                 float stabK = (1f - 0.7f * bAvg) * s * c4;
                 Vector3 vH = NmCharacter.Flat(_s.Vel);
-                float brake = O.Stagger ? 10f : 18f;
-                Vector3 fStab = -DlBody.Horiz(dCom + vH * 0.12f) * (14f * stabK) - vH * (brake * s);
+                float brakeRate = O.Stagger ? 0.16f : 0.22f;
+                Vector3 fStab = -DlBody.Horiz(dCom + vH * 0.12f) * (M * 0.18f * stabK) - vH * (M * brakeRate * s);
                 Vector3 fH = Vector3.ClampMagnitude(fStab, 0.16f * M * g * s);
                 pelvis.Rb.AddForce(fH * 0.7f, ForceMode.Force);
                 thorax.Rb.AddForce(fH * 0.3f, ForceMode.Force);
