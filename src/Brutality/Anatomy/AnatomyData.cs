@@ -175,9 +175,11 @@ namespace Brutality.Anatomy
                 Kind = JointKind.Neck,
                 Dofs = new[]
                 {
-                    new DofSpec(-60f, 50f, 10f, 6f, 10f, 1.5f, 0.35f, 30f, 50f, 10f),
-                    new DofSpec(-45f, 45f, 0f, 5f, 10f, 1.2f, 0.30f, 35f, 35f, 10f),
-                    new DofSpec(-80f, 80f, 0f, 4f, 10f, 0.8f, 0.25f, 20f, 20f, 10f),
+                    // Single rigid Head bone pivoted at skull base in EFT: keep extension realistic so the head
+                    // cannot fold backward onto the upper back or stare straight up when lying on the ground.
+                    new DofSpec(-28f, 42f, 8f, 10f, 12f, 2.5f, 0.50f, 30f, 50f, 10f),
+                    new DofSpec(-30f, 30f, 0f, 8f, 12f, 2.0f, 0.45f, 35f, 35f, 10f),
+                    new DofSpec(-55f, 55f, 0f, 7f, 11f, 1.5f, 0.40f, 20f, 20f, 10f),
                 }
             };
             specs[(int)JointKind.Hip] = new JointSpec
@@ -205,9 +207,11 @@ namespace Brutality.Anatomy
                 Kind = JointKind.Shoulder,
                 Dofs = new[]
                 {
-                    new DofSpec(-55f, 180f, 15f, 8f, 9f, 1.0f, 0.6f, 80f, 85f, 16f),
-                    new DofSpec(-28f, 90f, 10f, 8f, 9f, 1.0f, 0.6f, 75f, 90f, 16f),
-                    new DofSpec(-80f, 80f, 0f, 6f, 9f, 0.6f, 0.4f, 45f, 45f, 16f),
+                    // No clavicle joint in EFT: keep flexion below 180° PhysX twist wrap-around and abduction below
+                    // the ±90° sagittal gimbal-lock pole, with bounded humeral twist.
+                    new DofSpec(-40f, 155f, 15f, 10f, 10f, 1.5f, 0.6f, 80f, 85f, 16f),
+                    new DofSpec(-22f, 78f, 10f, 10f, 10f, 1.5f, 0.6f, 75f, 90f, 16f),
+                    new DofSpec(-48f, 48f, 0f, 9f, 10f, 1.0f, 0.5f, 45f, 45f, 16f),
                 }
             };
             specs[(int)JointKind.Elbow] = new JointSpec

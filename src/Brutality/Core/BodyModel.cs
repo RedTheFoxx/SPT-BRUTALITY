@@ -61,6 +61,7 @@ namespace Brutality.Core
         public DrivenJoint Driven;     // driven anatomical PhysX joint (null if conversion failed)
 
         public Vector3 Phi, Phi0, PhiDot;
+        public float SagWeight = 1f;
         public bool HasPrevPhi;
         public readonly float[] Activation = new float[3];
         public readonly float[] Capacity = { 1f, 1f, 1f };
@@ -275,7 +276,7 @@ namespace Brutality.Core
                 headTop = neck + tu * 0.22f;
             Vector3 headFwd = tf;
             var eyes = FindColliderOfType(player, EBodyPartColliderType.Eyes);
-            if (eyes != null) headFwd = eyes.bounds.center - neck;
+            if (eyes != null && eyes.enabled && eyes.gameObject.activeInHierarchy) headFwd = eyes.bounds.center - neck;
             // R = U × F (Unity convention: Cross(up, forward) = right).
             BMath.OrthoFrame(headTop - neck, Vector3.Cross(headTop - neck, headFwd), headFwd, out var hr, out var hu, out var hf);
             SetFrame(this[Seg.Head], hr, hu, hf, 0.22f);
@@ -436,7 +437,7 @@ namespace Brutality.Core
                     frame.TwistOffset = JointKinematics.AbsoluteTwist(qP, sp.RL, qC, sc.RL, sc.UL);
                 jm.Frame = frame;
 
-                jm.Phi = Evaluate(jm, qP, qC, out _);
+                jm.Phi = Evaluate(jm, qP, qC, out jm.SagWeight);
                 jm.Phi0 = jm.Phi;
 
                 jm.UnityJoint = sc.T.GetComponent<Joint>();
@@ -570,12 +571,16 @@ namespace Brutality.Core
                 var sp = Segs[jm.P];
                 var sc = Segs[jm.C];
                 Vector3 prev = jm.Phi;
-                Vector3 phi = Evaluate(jm, sp.Q, sc.Q, out _);
+                Vector3 phi = Evaluate(jm, sp.Q, sc.Q, out float sagWeight);
                 jm.Phi = phi;
+                jm.SagWeight = sagWeight;
                 if (jm.HasPrevPhi && invDt > 0f)
                 {
                     // Unwrapped flexion: direct difference; abduction / twist: difference modulo 2π.
                     float vx = Mathf.Clamp((phi.x - prev.x) * invDt, -25f, 25f);
+                    // Near ±90° abduction, sagittal flexion Atan2(z, -y) is ill-conditioned: damp pole spikes.
+                    if (jm.Kind == JointKind.Shoulder || jm.Kind == JointKind.Hip)
+                        vx *= BMath.SmoothStep(0.08f, 0.35f, sagWeight);
                     float vy = Mathf.Clamp(BMath.WrapPi(phi.y - prev.y) * invDt, -25f, 25f);
                     float vz = Mathf.Clamp(BMath.WrapPi(phi.z - prev.z) * invDt, -25f, 25f);
                     jm.PhiDot = new Vector3(vx, vy, vz);

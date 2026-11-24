@@ -418,6 +418,20 @@ internal static class Program
                 $"(dSide={dSide * 100f:0.1}cm, dFront={dFront * 100f:0.1}cm)");
         }
 
+        {
+            var neckSpec = AnatomyData.Specs[(int)JointKind.Neck];
+            var shSpec = AnatomyData.Specs[(int)JointKind.Shoulder];
+            Check("neck ROM: bounded extension, lateral tilt, and twist",
+                neckSpec.Dofs[0].MinDeg >= -30f && neckSpec.Dofs[0].MaxDeg <= 45f
+                && neckSpec.Dofs[1].MaxDeg <= 32f && neckSpec.Dofs[2].MaxDeg <= 60f,
+                $"(flex [{neckSpec.Dofs[0].MinDeg},{neckSpec.Dofs[0].MaxDeg}], lat ±{neckSpec.Dofs[1].MaxDeg}, twist ±{neckSpec.Dofs[2].MaxDeg})");
+            Check("shoulder ROM: clear of 180° wrap, 90° abduction pole, and bounded twist",
+                shSpec.Dofs[0].MinDeg >= -45f && shSpec.Dofs[0].MaxDeg <= 160f
+                && shSpec.Dofs[1].MinDeg >= -22f && shSpec.Dofs[1].MaxDeg <= 80f
+                && shSpec.Dofs[2].MaxDeg <= 50f,
+                $"(flex [{shSpec.Dofs[0].MinDeg},{shSpec.Dofs[0].MaxDeg}], abd [{shSpec.Dofs[1].MinDeg},{shSpec.Dofs[1].MaxDeg}], twist ±{shSpec.Dofs[2].MaxDeg})");
+        }
+
         _domain = "BepInEx Configuration";
         CheckConfigKeys();
 

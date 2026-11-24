@@ -100,7 +100,7 @@ namespace Brutality.Neural
                 float p = BMath.SmoothStep(0f, _inhale, x);
                 float u = 0.75f * k;
                 ns.Buffer.Add((int)JointId.Lumbar, 0, _lum.x - 14f * p * D, u, 0.6f);
-                ns.Buffer.Add((int)JointId.Neck, 0, _neck.x - 22f * p * D, u, 0.6f);
+                ns.Buffer.Add((int)JointId.Neck, 0, _neck.x - 14f * p * D, u, 0.6f);
                 ns.Buffer.Add((int)JointId.LShoulder, 1, _shL.y + 10f * p * D, u * 0.7f, 0.5f);
                 ns.Buffer.Add((int)JointId.RShoulder, 1, _shR.y + 10f * p * D, u * 0.7f, 0.5f);
                 ns.Buffer.Add((int)JointId.LShoulder, 0, _shL.x + 6f * p * D, u * 0.7f, 0.5f);
@@ -161,7 +161,7 @@ namespace Brutality.Neural
                 ns.Rigidity = Mathf.Max(ns.Rigidity, u);
                 float v = 3f * Shake(local, 7f, 0f);
                 Pose(ns, JointId.Lumbar, -22f, NoChange, NoChange, u, 1f);
-                Pose(ns, JointId.Neck, -38f + v, NoChange, NoChange, u, 1f);
+                Pose(ns, JointId.Neck, -24f + v, NoChange, NoChange, u, 1f);
                 for (int s = -1; s <= 1; s += 2)
                 {
                     Pose(ns, AnatomyData.Shoulder(s), 50f, 45f, NoChange, u, 1f);
@@ -211,8 +211,8 @@ namespace Brutality.Neural
             }
             else
             {
-                _flex = BMath.Range(rng, 130f, 165f); _abd = BMath.Range(rng, 15f, 35f); _elbow = BMath.Range(rng, 8f, 28f);
-                _neckFlex = BMath.Range(rng, -25f, -10f);
+                _flex = BMath.Range(rng, 118f, 145f); _abd = BMath.Range(rng, 15f, 35f); _elbow = BMath.Range(rng, 8f, 28f);
+                _neckFlex = BMath.Range(rng, -22f, -10f);
             }
             _seed = BMath.Range(rng, 0f, 100f);
             Start = start; Duration = duration;
@@ -270,7 +270,7 @@ namespace Brutality.Neural
                 if (s == lead)
                 {
                     float r = BMath.SmoothStep(0f, 0.5f, p) * (1f - BMath.SmoothStep(0.5f, 1f, p));
-                    flex = Mathf.Lerp(60f, 155f, r); abd = Mathf.Lerp(40f, 25f, r); elbow = Mathf.Lerp(105f, 25f, r);
+                    flex = Mathf.Lerp(55f, 140f, r); abd = Mathf.Lerp(40f, 25f, r); elbow = Mathf.Lerp(105f, 25f, r);
                 }
                 else
                 {
@@ -290,7 +290,7 @@ namespace Brutality.Neural
                     Pose(ns, AnatomyData.Knee(s), 12f, NoChange, NoChange, u * 0.5f, 0.6f);
                 }
             }
-            Pose(ns, JointId.Neck, -25f, NoChange, NoChange, u * 0.7f, 0.7f);
+            Pose(ns, JointId.Neck, -20f, NoChange, NoChange, u * 0.7f, 0.7f);
             Pose(ns, JointId.Lumbar, -8f, 8f * lead, NoChange, u * 0.6f, 0.7f);
         }
     }
@@ -330,8 +330,8 @@ namespace Brutality.Neural
                 Pose(ns, AnatomyData.Shoulder(s), Mathf.Lerp(35f, 80f, p), Mathf.Lerp(45f, 30f, p), NoChange, u, 0.9f);
                 Pose(ns, AnatomyData.Elbow(s), elbow, NoChange, NoChange, u, 0.95f);
             }
-            Pose(ns, JointId.Lumbar, Mathf.Lerp(0f, -25f, p), NoChange, NoChange, u * 0.8f, 0.8f);
-            Pose(ns, JointId.Neck, Mathf.Lerp(-15f, -40f, p), NoChange, NoChange, u * 0.7f, 0.7f);
+            Pose(ns, JointId.Lumbar, Mathf.Lerp(0f, -22f, p), NoChange, NoChange, u * 0.8f, 0.8f);
+            Pose(ns, JointId.Neck, Mathf.Lerp(-12f, -24f, p), NoChange, NoChange, u * 0.7f, 0.7f);
         }
     }
 
@@ -376,9 +376,9 @@ namespace Brutality.Neural
         public HeadLift(float supine, float sideUp, float start, float duration, float u, System.Random rng)
         {
             Name = "Head lift";
-            if (Mathf.Abs(sideUp) > Mathf.Abs(supine)) { _flex = BMath.Range(rng, 0f, 15f); _lat = 28f * Mathf.Sign(sideUp); }
-            else if (supine > 0f) { _flex = BMath.Range(rng, 35f, 50f); _lat = 0f; }
-            else { _flex = BMath.Range(rng, -50f, -35f); _lat = 0f; }
+            if (Mathf.Abs(sideUp) > Mathf.Abs(supine)) { _flex = BMath.Range(rng, 0f, 12f); _lat = 22f * Mathf.Sign(sideUp); }
+            else if (supine > 0f) { _flex = BMath.Range(rng, 26f, 38f); _lat = 0f; }
+            else { _flex = BMath.Range(rng, -25f, -16f); _lat = 0f; }
             Start = start; Duration = duration; Attack = Mathf.Min(0.5f, 0.45f * duration); Release = 0.07f;
             _u = u;
             IsAgonyEvent = true;

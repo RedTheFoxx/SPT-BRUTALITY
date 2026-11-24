@@ -290,7 +290,7 @@ namespace Brutality.Neural
         {
             float u = _u * k;
             Pose(ns, JointId.Lumbar, -25f, NoChange, NoChange, u, 0.85f);
-            Pose(ns, JointId.Neck, -45f, NoChange, NoChange, u, 0.85f);
+            Pose(ns, JointId.Neck, -26f, NoChange, NoChange, u, 0.85f);
             for (int s = -1; s <= 1; s += 2)
             {
                 Pose(ns, AnatomyData.Hip(s), -15f, NoChange, NoChange, u, 0.85f);
@@ -436,8 +436,8 @@ namespace Brutality.Neural
             _targetB = new Vector3[sides.Length];
             for (int i = 0; i < sides.Length; i++)
             {
-                _targetA[i] = new Vector3(BMath.Range(rng, 60f, 160f), BMath.Range(rng, -10f, 70f), BMath.Range(rng, 5f, 70f));
-                _targetB[i] = new Vector3(BMath.Range(rng, 30f, 130f), BMath.Range(rng, -20f, 50f), BMath.Range(rng, 20f, 110f));
+                _targetA[i] = new Vector3(BMath.Range(rng, 55f, 142f), BMath.Range(rng, -10f, 62f), BMath.Range(rng, 5f, 70f));
+                _targetB[i] = new Vector3(BMath.Range(rng, 30f, 130f), BMath.Range(rng, -18f, 50f), BMath.Range(rng, 20f, 110f));
                 Groups |= sides[i] < 0 ? MotorGroup.LArm : MotorGroup.RArm;
             }
         }
@@ -499,9 +499,9 @@ namespace Brutality.Neural
             Name = "Head turn";
             Start = start; Duration = duration; Attack = 0.2f; Release = 0.3f;
             _u = u; IsAgonyEvent = true;
-            _twist = BMath.Range(rng, -55f, 55f);
+            _twist = BMath.Range(rng, -45f, 45f);
             _lat = BMath.Range(rng, -20f, 20f);
-            _flex = BMath.Range(rng, -30f, 30f);
+            _flex = BMath.Range(rng, -22f, 28f);
             Groups = MotorGroup.Neck;
         }
 
@@ -617,7 +617,7 @@ namespace Brutality.Neural
             if (_extensor)
             {
                 Pose(ns, JointId.Lumbar, -25f, NoChange, NoChange, u, 1f);
-                Pose(ns, JointId.Neck, -40f, NoChange, NoChange, u, 1f);
+                Pose(ns, JointId.Neck, -25f, NoChange, NoChange, u, 1f);
                 for (int s = -1; s <= 1; s += 2)
                 {
                     Pose(ns, AnatomyData.Shoulder(s), 70f, 40f, NoChange, u, 1f);
@@ -773,7 +773,7 @@ namespace Brutality.Neural
             float env = Mathf.Sin(Mathf.PI * x / _burst);
             float u = 0.7f * Mathf.Sqrt(Mathf.Max(0f, ns.Agony)) * env * k;
             Offset(ns, JointId.Lumbar, 0, Phi(ns, JointId.Lumbar).x, -12f, u, 0.75f);
-            Offset(ns, JointId.Neck, 0, Phi(ns, JointId.Neck).x, -18f, u, 0.75f);
+            Offset(ns, JointId.Neck, 0, Phi(ns, JointId.Neck).x, -12f, u, 0.75f);
             for (int s = -1; s <= 1; s += 2)
                 Offset(ns, AnatomyData.Shoulder(s), 1, Phi(ns, AnatomyData.Shoulder(s)).y, 6f, u * 0.5f, 0.5f);
         }
@@ -980,12 +980,12 @@ namespace Brutality.Neural
             float tremor = _amp * Shake(ns.Time, _freq, _phase);
             for (int s = -1; s <= 1; s += 2)
             {
-                float tilt = 1f + (s < 0 ? _asym : -_asym) * 0.15f;
-                Pose(ns, AnatomyData.Shoulder(s), 156f * tilt + tremor, 8f, NoChange, u, 0.7f);
+                float tilt = 1f + (s < 0 ? _asym : -_asym) * 0.10f;
+                Pose(ns, AnatomyData.Shoulder(s), 136f * tilt + tremor, 8f, NoChange, u, 0.7f);
                 Pose(ns, AnatomyData.Elbow(s), 18f - tremor, NoChange, NoChange, u, 0.7f);
             }
             Pose(ns, JointId.Lumbar, -8f, NoChange, NoChange, u * 0.35f, 0.55f);
-            Pose(ns, JointId.Neck, -12f, NoChange, NoChange, u * 0.4f, 0.5f);
+            Pose(ns, JointId.Neck, -10f, NoChange, NoChange, u * 0.4f, 0.5f);
         }
     }
 
@@ -1131,7 +1131,7 @@ namespace Brutality.Neural
         {
             Name = "Neck arch";
             _u = u;
-            _amp = BMath.Range(rng, 32f, 48f);
+            _amp = BMath.Range(rng, 18f, 26f);
             _freq = BMath.Range(rng, 4f, 7f);
             _phase = BMath.Range(rng, 0f, BMath.TwoPi);
             Start = start; Duration = duration;

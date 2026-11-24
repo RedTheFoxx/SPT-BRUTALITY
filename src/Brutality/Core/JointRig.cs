@@ -71,18 +71,20 @@ namespace Brutality.Core
             float highRel = Mathf.Max(spec.Dofs[0].MaxDeg - f0, 3f);
             lowRel = Mathf.Max(lowRel, -175f);
             highRel = Mathf.Min(highRel, 175f);
-            bool invX = PhysxProbe.LimitXInverted ?? false;
+            // Unity's PhysX ConfigurableJoint X limits are negated by default (verified by PhysxProbe).
+            bool invX = PhysxProbe.LimitXInverted ?? true;
             float lowX = invX ? -highRel : lowRel;
             float highX = invX ? -lowRel : highRel;
 
-            // Y/Z limits (PhysX cone, symmetric): cover the range around the death pose.
+            // Y/Z limits (PhysX cone, symmetric): cover the range around the death pose without inflating
+            // neck or shoulder cones beyond their physiological half-width.
             bool isHinge = jm.Kind == JointKind.Knee || jm.Kind == JointKind.Elbow;
             float HalfAround(int d)
             {
                 float p = (d == 1 ? phi0.y : phi0.z) / BMath.Deg;
                 float min = spec.Dofs[d].MinDeg, max = spec.Dofs[d].MaxDeg;
                 float half = Mathf.Max(max - p, p - min);
-                float margin = jm.Kind == JointKind.Shoulder && d == 1 ? 5f : 15f;
+                float margin = (jm.Kind == JointKind.Shoulder || jm.Kind == JointKind.Neck) ? 0f : 10f;
                 return Mathf.Clamp(Mathf.Min(half, 0.5f * (max - min) + margin), 5f, 170f);
             }
             float halfY = HalfAround(1);
@@ -125,16 +127,19 @@ namespace Brutality.Core
 
                 // Progressive limits: stiffness derived from exponential passive torque, capped to effective inertia
                 // to avoid excessive stiffness on small segments (forearm, shin) and critically damped.
+                // Ball-and-socket joints share angularYZLimitSpring across swing (Y) and twist (Z), so use
+                // transverse inertia there to prevent shoulder abduction limits from collapsing under trunk weight.
                 float ps = Settings.PassiveStiffness.Value;
                 float iTransEff = Mathf.Max(0.01f, sc.InertiaDiag.x * massScale);
                 float iLongEff = Mathf.Max(0.005f, sc.InertiaDiag.y * massScale);
+                float iYzEff = isHinge ? iLongEff : iTransEff;
                 float kx = Mathf.Min(6f * spec.Dofs[0].PassiveA * spec.Dofs[0].PassiveB * ps, 6400f * iTransEff);
                 float kyzRaw = isHinge
                     ? 6f * spec.Dofs[2].PassiveA * spec.Dofs[2].PassiveB * ps
                     : 6f * Mathf.Max(spec.Dofs[1].PassiveA * spec.Dofs[1].PassiveB, spec.Dofs[2].PassiveA * spec.Dofs[2].PassiveB) * ps;
-                float kyz = Mathf.Min(kyzRaw, 6400f * iLongEff);
+                float kyz = Mathf.Min(kyzRaw, 6400f * iYzEff);
                 float cx = Mathf.Max(0.06f * kx, 1.8f * Mathf.Sqrt(kx * iTransEff));
-                float cyz = Mathf.Max(0.06f * kyz, 1.8f * Mathf.Sqrt(kyz * iLongEff));
+                float cyz = Mathf.Max(0.06f * kyz, 1.8f * Mathf.Sqrt(kyz * iYzEff));
                 cj.angularXLimitSpring = new SoftJointLimitSpring { spring = kx, damper = cx };
                 cj.angularYZLimitSpring = new SoftJointLimitSpring { spring = kyz, damper = cyz };
 

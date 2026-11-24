@@ -139,12 +139,13 @@ namespace Brutality.Core
                     else
                     {
                         float goal;
+                        float loRad = spec.MinDeg * BMath.Deg, hiRad = spec.MaxDeg * BMath.Deg;
                         if (d == 0)
                             goal = Mathf.Clamp(tm, dj.Flex0Rad + dj.LowRelRad, dj.Flex0Rad + dj.HighRelRad);
                         else if (jm.Kind == JointKind.Shoulder && d == 1)
-                            goal = Mathf.Max(tm, JointKinematics.MinShoulderAbductionRad(target.x));
+                            goal = Mathf.Clamp(tm, JointKinematics.MinShoulderAbductionRad(target.x), hiRad);
                         else
-                            goal = jm.Ref[d] + BMath.WrapPi(tm - jm.Ref[d]);
+                            goal = Mathf.Clamp(jm.Ref[d] + BMath.WrapPi(tm - jm.Ref[d]), loRad, hiRad);
                         float wr = mc.RefOmega;
                         BMath.StepCriticallyDamped(ref jm.Ref[d], ref jm.RefV[d], goal, wr, dt, vlim);
                     }
@@ -152,21 +153,26 @@ namespace Brutality.Core
                     float muscleTarget = a > 1e-3f ? (d == 0 ? jm.Ref[d] : phi + BMath.WrapPi(jm.Ref[d] - phi)) : phi;
                     if (jm.Kind == JointKind.Shoulder && d == 1)
                         muscleTarget = Mathf.Max(muscleTarget, JointKinematics.MinShoulderAbductionRad(target.x));
-                    float kSum = kMus + kPas + kBia + kBar;
+                    // Shoulder/Hip axial twist is measured relative to the death pose (RelRest), not neutral anatomy:
+                    // when twist is uncommanded, hold current twist instead of pulling back toward a gun-holding pose.
+                    float kPasDof = (d == 2 && (jm.Kind == JointKind.Shoulder || jm.Kind == JointKind.Hip) && !activeDof[2]) ? 0f : kPas;
+                    float kSum = kMus + kPasDof + kBia + kBar;
                     float cMus = hasMuscle * 2f * mc.Zeta * wn * Mathf.Sqrt(a);
                     if (kSum > 1e-4f)
                     {
                         // Phase lead equivalent to cMus * (RefV - PhiDot) without relying on targetAngularVelocity:
                         // kMus*(ref - phi) + cMus*(refV - phiDot) == kMus*((ref + cMus/kMus * refV) - phi) - cMus*phiDot.
                         float velLead = a > 1e-3f ? Mathf.Clamp(cMus * jm.RefV[d] / kSum, -0.45f, 0.45f) : 0f;
-                        target[d] = (kMus * muscleTarget + kPas * neutral + kBia * BiasTarget[jm.Index] + kBar * barTarget) / kSum + velLead;
+                        target[d] = (kMus * muscleTarget + kPasDof * neutral + kBia * BiasTarget[jm.Index] + kBar * barTarget) / kSum + velLead;
                     }
                     else
                     {
                         target[d] = phi;
                     }
-                    // Clamp target flexion within ±175° around StartRel (prevents >180° PhysX twist wrap-around).
+                    // Clamp target flexion within ±175° around StartRel (prevents >180° PhysX twist wrap-around)
+                    // and keep Y/Z within anatomical ROM.
                     if (d == 0) target[d] = Mathf.Clamp(target[d], dj.Flex0Rad + dj.LowRelRad, dj.Flex0Rad + dj.HighRelRad);
+                    else target[d] = Mathf.Clamp(target[d], spec.MinDeg * BMath.Deg, spec.MaxDeg * BMath.Deg);
                     if (jm.Kind == JointKind.Shoulder && d == 1)
                         target[d] = Mathf.Max(target[d], Mathf.Max(minShoulderAbd, JointKinematics.MinShoulderAbductionRad(target.x)));
 
@@ -174,7 +180,7 @@ namespace Brutality.Core
                     kp[d] = inertia * kSum;
                     // Passive/biarticular/barrier damping: critical on active springs, light during relaxation.
                     float cBase = Mathf.Lerp(FlaccidC, PassiveC, tone);
-                    float cPassive = Mathf.Max(cBase, 1.6f * Mathf.Sqrt(kPas + kBia)) * dampingScale;
+                    float cPassive = Mathf.Max(cBase, 1.6f * Mathf.Sqrt(kPasDof + kBia)) * dampingScale;
                     float cBar = kBar > 0f ? 2f * Mathf.Sqrt(kBar) : 0f;
                     kd[d] = inertia * (cMus + cPassive + cBar);
 
@@ -201,6 +207,16 @@ namespace Brutality.Core
                     }
                 }
 
+                // Near ±90° abduction on ball-and-socket limbs, sagittal flexion Atan2(z, -y) approaches gimbal lock:
+                // hold flexion near its current angle and attenuate flexion spring so SolvePose cannot spin the arm.
+                if ((jm.Kind == JointKind.Shoulder || jm.Kind == JointKind.Hip) && jm.SagWeight < 0.35f)
+                {
+                    float sagW = BMath.SmoothStep(0.08f, 0.35f, jm.SagWeight);
+                    target.x = Mathf.Lerp(jm.Phi.x, target.x, sagW);
+                    kp.x *= sagW;
+                    fmax.x *= 0.2f + 0.8f * sagW;
+                }
+
                 // angularYZDrive shares a single spring (Max(kp.y, kp.z)) across Y and Z: if only one of the two
                 // axes is active (muscle or thoracic barrier), leave the uncommanded axis at its current posture (phi)
                 // so it is not artificially locked to its death pose (neutral = 0).
@@ -209,8 +225,8 @@ namespace Brutality.Core
                 if (activeY && !activeZ) target.z = jm.Phi.z;
                 else if (activeZ && !activeY) target.y = jm.Phi.y;
 
-                Quaternion start = dj.HasSolve ? dj.LastSolve : qRel;
-                Quaternion q = JointKinematics.SolvePose(jm.Frame, start, target, 6, out _);
+                Quaternion start = dj.HasSolve && Quaternion.Angle(dj.LastSolve, qRel) < 90f ? dj.LastSolve : qRel;
+                Quaternion q = JointKinematics.SolvePose(jm.Frame, start, target, 10, out _);
                 dj.LastSolve = q;
                 dj.HasSolve = true;
 
