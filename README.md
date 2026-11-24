@@ -64,3 +64,14 @@ Run the standalone off-game test benches (no game DLLs required):
 dotnet run --project tests/Brutality.KinematicsTests
 dotnet run --project tests/Brutality.DeliriumTests
 ```
+
+---
+
+## License & Trademarks
+
+- **Code & Original Assets:** Everything original in this repository is licensed under the [MIT License](LICENSE).
+- **Trademarks:**
+  - **Euphoria** is a trademark and property of **Rockstar Games** (originally developed by NaturalMotion).
+  - **Escape from Tarkov** / **Tarkov** is a trademark and property of **Battlestate Games**.
+  - Any other trademarks, logos, or brand names appearing in this project (such as NVIDIA PhysX, Unity, BepInEx, SPT, etc.) are the property of their respective owners.
+- This project is an independent mod and is not affiliated with, endorsed by, or sponsored by Rockstar Games or Battlestate Games.
