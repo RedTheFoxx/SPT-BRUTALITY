@@ -8,21 +8,21 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Mécanisme lésionnel dominant : il conditionne la chronologie neuromusculaire de la mort.</summary>
+    /// <summary>Dominant injury mechanism: determines the neuromuscular timeline of death.</summary>
     internal enum DeathMechanism
     {
-        Cerebral,        // destruction encéphalique : extinction quasi instantanée du tonus
-        CervicalCord,    // section médullaire cervicale : tétraplégie flasque immédiate
-        NeckVascular,    // carotide / jugulaire / trachée : perte de conscience différée, agonie intense
-        Thoracic,        // cœur / poumons / gros vaisseaux : effondrement + myoclonies anoxiques
-        ThoracicCord,    // atteinte médullaire thoracique : paraplégie flasque + thorax
-        Abdominal,       // abdomen / bassin : défense, flexion, reptation
-        LumbarCord,      // atteinte médullaire lombaire : membres inférieurs flasques
-        Limb,            // membre (hémorragie) : effondrement côté lésé
-        Blast,           // souffle d'explosion
-        Syncope,         // hémorragie, épuisement, toxiques : syncope progressive
-        FallTrauma,      // chute mortelle
-        Burn,            // brûlures
+        Cerebral,        // brain destruction: near-instantaneous loss of tone
+        CervicalCord,    // cervical spinal cord transection: immediate flaccid quadriplegia
+        NeckVascular,    // carotid / jugular / trachea: delayed loss of consciousness, intense agony
+        Thoracic,        // heart / lungs / great vessels: collapse + anoxic myoclonus
+        ThoracicCord,    // thoracic spinal cord injury: flaccid paraplegia + thorax
+        Abdominal,       // abdomen / pelvis: guarding, flexion, crawling
+        LumbarCord,      // lumbar spinal cord injury: flaccid lower limbs
+        Limb,            // limb (hemorrhage): collapse on injured side
+        Blast,           // explosion blast
+        Syncope,         // hemorrhage, exhaustion, toxins: progressive syncope
+        FallTrauma,      // fatal fall
+        Burn,            // burns
     }
 
     internal sealed class DeathContext
@@ -44,13 +44,13 @@ namespace Brutality.Core
         public float ImpactSpeed;
         public float ImpactEnergy;   // J
         public float ImpactMomentum; // N·s
-        public float KickScale = 1f; // variation de poussée du coup fatal, tirée dans l'intervalle de sa munition
+        public float KickScale = 1f; // fatal-hit push variation, drawn within its ammo's range
         public string KickClass = "";
 
-        public List<WoundRecord> LethalVolley = new List<WoundRecord>(); // blessures des derniers instants (impulsions)
+        public List<WoundRecord> LethalVolley = new List<WoundRecord>(); // wounds from the final moments (impulses)
         public List<WoundRecord> AllWounds = new List<WoundRecord>();
 
-        public float[] PartHealth = new float[7];      // fraction de vie restante par partie du corps
+        public float[] PartHealth = new float[7];      // remaining health fraction per body part
         public bool[] PartDestroyed = new bool[7];
 
         public EPlayerPose Pose = EPlayerPose.Stand;
@@ -63,8 +63,8 @@ namespace Brutality.Core
         public float BodyMassKg;
 
         public DeathMechanism Mechanism;
-        public float Severity;  // 0.15..3, d'après l'énergie déposée
-        public int WoundSide;   // -1 gauche, +1 droite, 0 axial / inconnu
+        public float Severity;  // 0.15..3, based on deposited energy
+        public int WoundSide;   // -1 left, +1 right, 0 axial / unknown
         public System.Random Rng;
 
         private static readonly AccessTools.FieldRef<Player, DamageInfo> LastDamageInfoRef =
@@ -94,7 +94,7 @@ namespace Brutality.Core
             ctx.HitCollider = info.HitCollider;
             ctx.ColliderType = info.BodyPartColliderType;
 
-            // Historique des blessures.
+            // Wound history.
             var ledger = WoundRegistry.Get(player);
             if (ledger != null)
             {
@@ -105,7 +105,7 @@ namespace Brutality.Core
             WoundRecord last = ctx.AllWounds.Count > 0 ? ctx.AllWounds[ctx.AllWounds.Count - 1] : null;
             if (last != null && ctx.DeathTime - last.Time < 0.2f && last.ColliderType != EBodyPartColliderType.None)
             {
-                // La blessure enregistrée à l'instant de la mort porte le collider réellement touché.
+                // The wound recorded at the moment of death carries the actual hit collider.
                 ctx.ColliderType = last.ColliderType;
                 ctx.BodyPart = last.BodyPart;
             }
@@ -135,7 +135,7 @@ namespace Brutality.Core
                 ctx.AllWounds.Add(rec);
             }
 
-            // Balistique.
+            // Ballistics.
             ctx.Ammo = AmmoDatabase.Get(info.SourceId ?? last?.AmmoId);
             if (ctx.Ammo != null)
             {
@@ -147,7 +147,7 @@ namespace Brutality.Core
             }
             else
             {
-                // Pas de gabarit (mêlée, éclat, environnement) : estimation depuis les dégâts.
+                // No template (melee, shrapnel, environment): estimate from damage.
                 ctx.ImpactEnergy = Mathf.Clamp(ctx.Damage * 18f, 50f, 4000f);
                 ctx.ImpactMomentum = Mathf.Clamp(ctx.Damage * 0.04f, 0.5f, 10f);
             }
@@ -156,7 +156,7 @@ namespace Brutality.Core
             ctx.KickScale = kick.Draw(ctx.Rng);
             ctx.KickClass = kick.Class;
 
-            // État de santé par partie du corps (membres détruits = flasques).
+            // Health state per body part (destroyed limbs = flaccid).
             try
             {
                 var hc = player.HealthController;
@@ -172,8 +172,8 @@ namespace Brutality.Core
             {
                 for (int i = 0; i < 7; i++) ctx.PartHealth[i] = 1f;
             }
-            // Garde-fou : certains contrôleurs de santé (joueurs observés) remettent toutes les parties à zéro
-            // à la mort. Une telle lecture n'est pas exploitable : on considère alors les membres intacts.
+            // Safeguard: some health controllers (observed players) reset all parts to zero
+            // on death. Such a reading is unusable: treat limbs as intact instead.
             int destroyed = 0;
             for (int i = 0; i < 7; i++) if (ctx.PartDestroyed[i]) destroyed++;
             if (destroyed >= 5)
@@ -198,7 +198,7 @@ namespace Brutality.Core
             float mean = Settings.BodyMassKg.Value;
             ctx.BodyMassKg = Mathf.Clamp(BMath.Gaussian(ctx.Rng, mean, mean * Settings.BodyMassVariation.Value), mean * 0.7f, mean * 1.35f);
 
-            // Collider de tête incohérent avec la partie du corps touchée (DamageInfo d'un tir précédent) : ignoré.
+            // Head collider inconsistent with hit body part (DamageInfo from a previous shot): ignored.
             if (IsHeadCollider(ctx.ColliderType) && ctx.BodyPart != EBodyPart.Head && ctx.BodyPart != EBodyPart.Common)
                 ctx.ColliderType = EBodyPartColliderType.None;
             ctx.Mechanism = Classify(ctx);
@@ -223,7 +223,7 @@ namespace Brutality.Core
             }
             catch (Exception e)
             {
-                Plugin.LogDebug("Equipement illisible : " + e.Message);
+                Plugin.LogDebug("Unreadable equipment: " + e.Message);
             }
         }
 

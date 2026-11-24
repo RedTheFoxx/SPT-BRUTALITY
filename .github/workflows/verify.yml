@@ -1,6 +1,6 @@
-# Exécute les deux suites de preuves formelles Brutality à chaque push/PR
-# Aucune DLL propriétaire EFT/SPT n'est nécessaire : la CI compile et exécute directement les vraies sources C# du plugin.
-name: Preuves formelles Brutality
+# Runs both Brutality formal proof suites on every push/PR
+# No proprietary EFT/SPT DLLs are needed: CI compiles and runs the actual C# plugin sources directly.
+name: Brutality Formal Proofs
 
 on:
   push:
@@ -12,24 +12,24 @@ jobs:
     name: Delirium & Kinematics (77 tests)
     runs-on: ubuntu-latest
     steps:
-      - name: Récupérer le dépôt
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Installer .NET 10
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Exécuter les preuves Delirium (31 tests)
+      - name: Run Delirium proofs (31 tests)
         run: dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
 
-      - name: Exécuter les preuves Cinématique & Anatomie (46 tests)
+      - name: Run Kinematics & Anatomy proofs (46 tests)
         run: dotnet run --project tests/Brutality.KinematicsTests -c Release -- --append-report docs/VERIFICATION.md
 
-      - name: Publier la fiche de preuves dans le résumé du workflow
+      - name: Publish proof report in workflow summary
         run: cat docs/VERIFICATION.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Archiver docs/VERIFICATION.md (artefact)
+      - name: Upload docs/VERIFICATION.md artifact
         uses: actions/upload-artifact@v4
         with:
           name: brutality-verification-report

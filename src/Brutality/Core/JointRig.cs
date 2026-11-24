@@ -5,28 +5,28 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Articulation PhysX pilotée : ConfigurableJoint anatomique + repère de pilotage.</summary>
+    /// <summary>Driven PhysX joint: anatomical ConfigurableJoint + control frame.</summary>
     internal sealed class DrivenJoint
     {
         public ConfigurableJoint Joint;
-        public Quaternion StartRel;      // rotation relative parent→enfant au moment de la configuration (pose centrale)
-        public Vector3 Anchor;           // ancrage du joint (local enfant)
-        public Vector3 Axis, Secondary, Third; // repère orthonormé du joint (local enfant : X flex, Y abd, Z torsion)
-        public float Flex0Rad;           // flexion de référence à la configuration (rad)
-        public float LowRelRad;          // borne inférieure relative à Flex0Rad (rad, >= -175°)
-        public float HighRelRad;         // borne supérieure relative à Flex0Rad (rad, <= +175°)
-        public Quaternion LastSolve;     // dernière pose cible résolue (départ à chaud du solveur)
+        public Quaternion StartRel;      // parent→child relative rotation at setup time (neutral pose)
+        public Vector3 Anchor;           // joint anchor (child local)
+        public Vector3 Axis, Secondary, Third; // joint orthonormal frame (child local: X flex, Y abd, Z twist)
+        public float Flex0Rad;           // reference flexion at setup (rad)
+        public float LowRelRad;          // lower bound relative to Flex0Rad (rad, >= -175°)
+        public float HighRelRad;         // upper bound relative to Flex0Rad (rad, <= +175°)
+        public Quaternion LastSolve;     // last solved target pose (solver warm-start)
         public bool HasSolve;
     }
 
     /// <summary>
-    /// Remplace les CharacterJoint d'EFT par des ConfigurableJoint anatomiques.
-    /// La pose de référence du joint est la pose de la mort. L'axe X est la direction qui augmente la flexion
-    /// (gradient angulaire), l'axe Y celle de l'abduction / inclinaison. La butée X reproduit exactement
-    /// l'amplitude de flexion (asymétrique), dans le sens mesuré par la sonde PhysX ; les butées Y/Z (cône)
-    /// couvrent l'amplitude autour de la pose de la mort. Les butées sont « molles » (ressort amorti) :
-    /// la résistance monte au-delà de l'amplitude au lieu d'un arrêt sec (corpus §4 et §10).
-    /// Les muscles deviennent des drives PhysX (implicites, donc inconditionnellement stables).
+    /// Replaces EFT's CharacterJoints with anatomical ConfigurableJoints.
+    /// The joint's reference pose is the death pose. The X axis is the direction that increases flexion
+    /// (angular gradient), the Y axis is abduction / lateral tilt. The X limit reproduces the exact
+    /// (asymmetric) flexion range, in the direction measured by the PhysX probe; the Y/Z limits (cone)
+    /// cover the range around the death pose. Limits are "soft" (damped spring):
+    /// resistance ramps up beyond the range instead of a hard stop (corpus §4 and §10).
+    /// Muscles become PhysX drives (implicit, hence unconditionally stable).
     /// </summary>
     internal static class JointRig
     {
@@ -44,7 +44,7 @@ namespace Brutality.Core
                 }
                 catch (Exception e)
                 {
-                    Plugin.Log.LogWarning($"Brutality : articulation {(JointId)jm.Index} non convertie ({e.Message}).");
+                    Plugin.Log.LogWarning($"Brutality: joint {(JointId)jm.Index} not converted ({e.Message}).");
                 }
             }
             return ok;
@@ -56,16 +56,16 @@ namespace Brutality.Core
             var sc = body.Segs[jm.C];
             var spec = jm.Spec;
 
-            // Pose de référence du joint = pose de la mort (aucune hypothèse sur l'instant où Unity la capture).
+            // Joint reference pose = death pose (no assumption about when Unity captures it).
             Quaternion qP = sp.Rb.rotation;
             Quaternion qC = sc.Rb.rotation;
             Quaternion qRel0 = BMath.Normalize(Quaternion.Inverse(qP) * qC);
 
-            // Axes analytiques du joint (local enfant) : insensibles aux singularités de gradients (épaule ±90°).
+            // Analytical joint axes (child local): immune to gradient singularities (shoulder ±90°).
             Vector3 phi0 = JointKinematics.Evaluate(jm.Frame, Quaternion.identity, qRel0, out _);
             JointKinematics.JointAxes(jm.Frame, qRel0, out Vector3 axis, out Vector3 sec);
 
-            // Butée X exacte et asymétrique : [min - φ0, max - φ0] (sens mesuré par la sonde PhysX).
+            // Exact asymmetric X limit: [min - φ0, max - φ0] (direction measured by the PhysX probe).
             float f0 = phi0.x / BMath.Deg;
             float lowRel = Mathf.Min(spec.Dofs[0].MinDeg - f0, -3f);
             float highRel = Mathf.Max(spec.Dofs[0].MaxDeg - f0, 3f);
@@ -75,7 +75,7 @@ namespace Brutality.Core
             float lowX = invX ? -highRel : lowRel;
             float highX = invX ? -lowRel : highRel;
 
-            // Butées Y/Z (cône PhysX, symétriques) : couvrent l'amplitude autour de la pose de la mort.
+            // Y/Z limits (PhysX cone, symmetric): cover the range around the death pose.
             bool isHinge = jm.Kind == JointKind.Knee || jm.Kind == JointKind.Elbow;
             float HalfAround(int d)
             {
@@ -92,9 +92,9 @@ namespace Brutality.Core
             Vector3 anchor = old != null ? old.anchor : Vector3.zero;
             var spawner = sc.T.GetComponent<JointSpawner>();
 
-            // Équilibrage de masse borné (calculé sur les masses anatomiques de base, hors sac/gilet) :
-            // évite qu'un massScale extrême (15-30× sur l'épaule équipée) ne fasse basculer tout le thorax
-            // sous l'action d'un bras de 2 kg ou n'écrase la raideur des butées molles.
+            // Bounded mass balancing (computed on base anatomical masses, excluding backpack/vest):
+            // prevents an extreme massScale (15-30× on a geared shoulder) from tipping the entire thorax
+            // under a 2 kg arm or crushing the stiffness of soft limits.
             float balance = Settings.JointMassBalancing.Value;
             float baseRatio = sc.BaseMass > 1e-3f ? sp.BaseMass / sc.BaseMass : 1f;
             float massScale = Mathf.Clamp(Mathf.Pow(baseRatio, balance), 0.5f, 4f);
@@ -114,8 +114,8 @@ namespace Brutality.Core
                 cj.yMotion = ConfigurableJointMotion.Locked;
                 cj.zMotion = ConfigurableJointMotion.Locked;
                 cj.angularXMotion = ConfigurableJointMotion.Limited;
-                // Charnières (genou, coude) : verrouiller le varus/valgus (Y) évite un cône elliptique 10:1 (8°×80°)
-                // source de jitter PhysX ; PhysX bascule sur la contrainte universelle (twist + 1 swing Z).
+                // Hinges (knee, elbow): locking varus/valgus (Y) avoids a 10:1 elliptical cone (8°×80°)
+                // that causes PhysX jitter; PhysX switches to the universal constraint (twist + 1 swing Z).
                 cj.angularYMotion = isHinge ? ConfigurableJointMotion.Locked : ConfigurableJointMotion.Limited;
                 cj.angularZMotion = ConfigurableJointMotion.Limited;
                 cj.lowAngularXLimit = new SoftJointLimit { limit = lowX };
@@ -123,8 +123,8 @@ namespace Brutality.Core
                 cj.angularYLimit = new SoftJointLimit { limit = halfY };
                 cj.angularZLimit = new SoftJointLimit { limit = halfZ };
 
-                // Butées progressives : raideur issue du couple passif exponentiel, bornée à l'inertie effective
-                // pour éviter les raideurs excessives sur petits segments (avant-bras, tibia) et amortie de façon critique.
+                // Progressive limits: stiffness derived from exponential passive torque, capped to effective inertia
+                // to avoid excessive stiffness on small segments (forearm, shin) and critically damped.
                 float ps = Settings.PassiveStiffness.Value;
                 float iTransEff = Mathf.Max(0.01f, sc.InertiaDiag.x * massScale);
                 float iLongEff = Mathf.Max(0.005f, sc.InertiaDiag.y * massScale);
@@ -153,12 +153,12 @@ namespace Brutality.Core
             }
             finally
             {
-                // Le nouveau joint ne remplace l'ancien qu'une fois entièrement configuré (sinon le membre se détacherait).
+                // The new joint only replaces the old one once fully configured (otherwise the limb would detach).
                 if (!configured && cj != null) UnityEngine.Object.DestroyImmediate(cj);
             }
             if (old != null) UnityEngine.Object.DestroyImmediate(old);
 
-            if (spawner != null) SpawnerJoint(spawner) = cj; // EFT détruira ce joint lui-même (pool)
+            if (spawner != null) SpawnerJoint(spawner) = cj; // EFT will destroy this joint itself (pool)
             jm.UnityJoint = cj;
             jm.Driven = new DrivenJoint
             {
@@ -175,7 +175,7 @@ namespace Brutality.Core
             return true;
         }
 
-        /// <summary>Coupe tous les drives (muscles) : il ne reste que les butées anatomiques.</summary>
+        /// <summary>Cuts all drives (muscles): only the anatomical limits remain.</summary>
         public static void Relax(BodyModel body)
         {
             foreach (var jm in body.Joints)

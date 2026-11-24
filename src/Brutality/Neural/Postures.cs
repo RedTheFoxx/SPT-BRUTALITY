@@ -6,8 +6,8 @@ using static Brutality.Neural.Motor;
 namespace Brutality.Neural
 {
     /// <summary>
-    /// Posture globale (degrés) : membres supérieurs, inférieurs et axe. Les rotations internes et la pronation sont
-    /// exprimées en valeur positive = rotation interne / pronation, le signe anatomique est appliqué par côté.
+    /// Global posture (degrees): upper limbs, lower limbs, and spine. Internal rotations and pronation are
+    /// expressed as positive values = internal rotation / pronation; the anatomical sign is applied per side.
     /// </summary>
     internal struct PostureShape
     {
@@ -29,8 +29,8 @@ namespace Brutality.Neural
         }
 
         /// <summary>
-        /// Rigidité de décortication (lésion au-dessus du noyau rouge) : coudes, poignets et doigts fléchis, bras en
-        /// adduction ramenés sur le thorax ; membres inférieurs en extension et rotation interne.
+        /// Decorticate rigidity (lesion above the red nucleus): elbows, wrists, and fingers flexed, arms
+        /// adducted onto the chest; lower limbs extended and internally rotated.
         /// </summary>
         public static PostureShape Decorticate(System.Random rng)
         {
@@ -46,7 +46,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Émission d'une <see cref="PostureShape"/> sur le tampon moteur (premier plan ou fond).</summary>
+    /// <summary>Emits a <see cref="PostureShape"/> to the motor buffer (foreground or background).</summary>
     internal static class PostureLib
     {
         public static void Arm(NeuralState ns, in PostureShape p, int side, float u, float s, bool bg = false, float clonus = 0f)
@@ -105,8 +105,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Posturing de décortication pendant la chute : coudes fléchis ramenés sur le thorax, membres inférieurs en
-    /// extension et rotation interne. Combiné à l'extension des jambes, il produit la chute « en planche ».
+    /// Decorticate posturing during the fall: elbows flexed and brought onto the chest, lower limbs
+    /// extended and internally rotated. Combined with leg extension, it produces the stiff "plank" fall.
     /// </summary>
     internal sealed class Posturing : MotorProgram
     {
@@ -115,7 +115,7 @@ namespace Brutality.Neural
 
         public Posturing(float start, float duration, float u, System.Random rng)
         {
-            Name = "Décortication";
+            Name = "Decortication";
             _shape = PostureShape.Decorticate(rng);
             Start = start; Duration = duration; Attack = 0.08f; Release = 0.5f;
             _u = u;
@@ -129,8 +129,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Crise de posturing au sol : montée progressive (quelques centaines de ms) vers la posture de décortication,
-    /// maintien avec vagues d'intensité (paroxysmes) et clonus des coudes et des genoux, puis relâchement.
+    /// Posturing episode on the ground: progressive buildup (a few hundred ms) toward decorticate posture,
+    /// sustained with waves of intensity (paroxysms) and elbow/knee clonus, then release.
     /// </summary>
     internal sealed class PosturingEpisode : MotorProgram
     {
@@ -141,7 +141,7 @@ namespace Brutality.Neural
 
         public PosturingEpisode(float start, float duration, float u, System.Random rng)
         {
-            Name = "Crise de décortication";
+            Name = "Decorticate episode";
             _decort = PostureShape.Decorticate(rng);
             _waves = BMath.Range(rng, 1f, 3f);
             _wavePhase = BMath.Range(rng, 0f, BMath.TwoPi);
@@ -158,7 +158,7 @@ namespace Brutality.Neural
         {
             float local = ns.Time - Start;
             float x = Mathf.Clamp01(local / Mathf.Max(0.1f, Duration));
-            // Paroxysmes : l'intensité ondule (jamais sous 65 %).
+            // Paroxysms: intensity undulates (never below 65%).
             float wave = 0.82f + 0.18f * Mathf.Cos(BMath.TwoPi * _waves * x + _wavePhase);
             float u = Mathf.Clamp01(_u * k * wave * ns.Posturing);
             ns.Rigidity = Mathf.Max(ns.Rigidity, u);
@@ -174,8 +174,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Rigidité de posture continue (fond) : entre deux gestes, le corps revient vers sa posture de décortication,
-    /// proportionnellement à l'intensité de l'agonie. Couche de fond : tout geste franc la masque.
+    /// Continuous postural rigidity (background): between gestures, the body returns toward its decorticate posture,
+    /// proportional to agony intensity. Background layer: any overt gesture masks it.
     /// </summary>
     internal sealed class PosturalRigidity : MotorProgram
     {
@@ -185,7 +185,7 @@ namespace Brutality.Neural
 
         public PosturalRigidity(float start, float duration, float u, System.Random rng)
         {
-            Name = "Rigidité de décortication";
+            Name = "Decorticate rigidity";
             _shape = PostureShape.Decorticate(rng);
             _u = u;
             _seed = BMath.Range(rng, 0f, 100f);
@@ -204,8 +204,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Signe de Lazare (réflexe médullaire décrit en mort encéphalique, Ropper 1984) : les bras se fléchissent et se
-    /// lèvent lentement, les mains se croisent sur la poitrine ou vers le cou, puis redescendent.
+    /// Lazarus sign (spinal reflex described in brain death, Ropper 1984): arms flex and rise slowly,
+    /// hands cross over the chest or toward the neck, then lower back down.
     /// </summary>
     internal sealed class LazarusSign : MotorProgram
     {
@@ -214,7 +214,7 @@ namespace Brutality.Neural
 
         public LazarusSign(float start, float duration, float u, System.Random rng)
         {
-            Name = "Signe de Lazare";
+            Name = "Lazarus sign";
             Start = start; Duration = duration;
             Attack = Mathf.Min(BMath.Range(rng, 1.1f, 1.7f), 0.45f * duration);
             Release = Mathf.Min(BMath.Range(rng, 0.8f, 1.3f), 0.35f * duration);

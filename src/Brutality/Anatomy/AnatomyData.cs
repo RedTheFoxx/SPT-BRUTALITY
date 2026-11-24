@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Brutality.Anatomy
 {
-    /// <summary>Les 11 segments rigides du ragdoll EFT (un Rigidbody chacun).</summary>
+    /// <summary>The 11 rigid segments of the EFT ragdoll (one Rigidbody each).</summary>
     internal enum Seg
     {
         Pelvis = 0,
@@ -18,7 +18,7 @@ namespace Brutality.Anatomy
         RCalf = 10,
     }
 
-    /// <summary>Les 10 articulations. Indice de l'articulation = indice du segment enfant - 1.</summary>
+    /// <summary>The 10 joints. Joint index = child segment index - 1.</summary>
     internal enum JointId
     {
         Lumbar = 0,
@@ -35,29 +35,29 @@ namespace Brutality.Anatomy
 
     internal enum JointKind
     {
-        Lumbar,   // rachis thoraco-lombaire (rotule, segment « montant »)
-        Neck,     // rachis cervical + atlanto-occipital (rotule, segment « montant »)
-        Hip,      // coxo-fémorale (rotule, segment « descendant »)
-        Knee,     // fémoro-tibiale (charnière)
-        Shoulder, // gléno-humérale + ceinture scapulaire (rotule, segment « descendant »)
-        Elbow,    // huméro-ulnaire + radio-ulnaire (charnière + prono-supination)
+        Lumbar,   // thoracolumbar spine (ball-and-socket, "ascending" segment)
+        Neck,     // cervical spine + atlanto-occipital (ball-and-socket, "ascending" segment)
+        Hip,      // hip / coxofemoral (ball-and-socket, "descending" segment)
+        Knee,     // knee / femorotibial (hinge)
+        Shoulder, // glenohumeral + shoulder girdle (ball-and-socket, "descending" segment)
+        Elbow,    // humeroulnar + radioulnar (hinge + pronation-supination)
     }
 
     /// <summary>
-    /// Degré de liberté anatomique. Convention : dof 0 = flexion(+)/extension(-),
-    /// dof 1 = abduction(+)/adduction(-) ou inclinaison latérale (droite +) ou varus/valgus,
-    /// dof 2 = rotation axiale.
+    /// Anatomical degree of freedom. Convention: dof 0 = flexion(+)/extension(-),
+    /// dof 1 = abduction(+)/adduction(-) or lateral tilt (right +) or varus/valgus,
+    /// dof 2 = axial rotation.
     /// </summary>
     internal struct DofSpec
     {
-        public float MinDeg, MaxDeg;      // amplitude articulaire de référence
-        public float NeutralDeg;          // position d'équilibre passif (membre relâché)
-        public float PassiveA;            // couple passif à la butée (N·m)
-        public float PassiveB;            // taux exponentiel (1/rad)
-        public float K0;                  // raideur passive de milieu de course (N·m/rad)
-        public float Damping;             // viscosité passive (N·m·s/rad)
-        public float TPos, TNeg;          // couples actifs max isométriques, sens + et - (N·m)
-        public float VMax;                // vitesse angulaire max de raccourcissement (rad/s)
+        public float MinDeg, MaxDeg;      // reference joint range of motion
+        public float NeutralDeg;          // passive equilibrium position (relaxed limb)
+        public float PassiveA;            // passive torque at limit (N·m)
+        public float PassiveB;            // exponential rate (1/rad)
+        public float K0;                  // mid-range passive stiffness (N·m/rad)
+        public float Damping;             // passive viscosity (N·m·s/rad)
+        public float TPos, TNeg;          // max isometric active torques, + and - directions (N·m)
+        public float VMax;                // max shortening angular velocity (rad/s)
 
         public DofSpec(float min, float max, float neutral, float a, float b, float k0, float damping, float tPos, float tNeg, float vMax)
         {
@@ -73,12 +73,12 @@ namespace Brutality.Anatomy
         public DofSpec[] Dofs = new DofSpec[3];
     }
 
-    /// <summary>Paramètres inertiels segmentaires (de Leva 1996, homme), en fractions.</summary>
+    /// <summary>Segmental inertial parameters (de Leva 1996, male), as fractions.</summary>
     internal struct SegmentInertia
     {
-        public float MassFraction;   // fraction de la masse corporelle
-        public float ComFraction;    // position du CdM depuis l'articulation proximale (fraction de longueur), &lt;0 = auto Unity
-        public float RSag, RTrans, RLong; // rayons de giration (fraction de longueur), &lt;0 = auto Unity
+        public float MassFraction;   // fraction of body mass
+        public float ComFraction;    // CoM position from proximal joint (fraction of length), &lt;0 = Unity auto
+        public float RSag, RTrans, RLong; // radii of gyration (fraction of length), &lt;0 = Unity auto
 
         public SegmentInertia(float mass, float com, float rSag, float rTrans, float rLong)
         {
@@ -113,7 +113,7 @@ namespace Brutality.Anatomy
             JointKind.Hip, JointKind.Knee, JointKind.Hip, JointKind.Knee,
         };
 
-        /// <summary>Côté anatomique de l'articulation : -1 gauche, +1 droite, 0 axial.</summary>
+        /// <summary>Anatomical side of the joint: -1 left, +1 right, 0 axial.</summary>
         public static readonly int[] SideOf = { 0, 0, -1, -1, 1, 1, -1, -1, 1, 1 };
 
         public static int ChildSeg(int joint) => joint + 1;
@@ -125,22 +125,22 @@ namespace Brutality.Anatomy
         public static JointId Knee(int side) => side < 0 ? JointId.LKnee : JointId.RKnee;
 
         /// <summary>
-        /// Masses et inerties segmentaires, de Leva (1996), J. Biomech. 29(9):1223-1230, valeurs masculines.
-        /// Tronc scindé : bassin = tronc inférieur (11,17 %) + ½ tronc moyen ; thorax = tronc supérieur (15,96 %) + ½ tronc moyen.
-        /// Avant-bras+main et jambe+pied sont fusionnés (pas de rigidbody distal dans EFT) : CdM et rayons
-        /// de giration recalculés par le théorème de Huygens à partir des valeurs de de Leva.
+        /// Segmental masses and inertias, de Leva (1996), J. Biomech. 29(9):1223-1230, male values.
+        /// Split trunk: pelvis = lower trunk (11.17%) + ½ mid-trunk; thorax = upper trunk (15.96%) + ½ mid-trunk.
+        /// Forearm+hand and calf+foot are merged (no distal rigidbody in EFT): CoM and radii of gyration
+        /// recalculated via the parallel axis theorem from de Leva's values.
         /// </summary>
         public static readonly SegmentInertia[] Inertia =
         {
-            new SegmentInertia(0.1934f, -1f, -1f, -1f, -1f),        // Pelvis (inertie Unity depuis colliders)
+            new SegmentInertia(0.1934f, -1f, -1f, -1f, -1f),        // Pelvis (Unity inertia from colliders)
             new SegmentInertia(0.2412f, -1f, -1f, -1f, -1f),        // Thorax
-            new SegmentInertia(0.0694f, -1f, -1f, -1f, -1f),        // Head (CdM = centre des colliders)
-            new SegmentInertia(0.0271f, 0.5772f, 0.285f, 0.269f, 0.158f), // Bras
-            new SegmentInertia(0.0223f, 0.68f, 0.44f, 0.43f, 0.12f),       // Avant-bras + main
+            new SegmentInertia(0.0694f, -1f, -1f, -1f, -1f),        // Head (CoM = center of colliders)
+            new SegmentInertia(0.0271f, 0.5772f, 0.285f, 0.269f, 0.158f), // Upper arm
+            new SegmentInertia(0.0223f, 0.68f, 0.44f, 0.43f, 0.12f),       // Forearm + hand
             new SegmentInertia(0.0271f, 0.5772f, 0.285f, 0.269f, 0.158f),
             new SegmentInertia(0.0223f, 0.68f, 0.44f, 0.43f, 0.12f),
-            new SegmentInertia(0.1416f, 0.4095f, 0.329f, 0.329f, 0.149f),  // Cuisse
-            new SegmentInertia(0.0570f, 0.60f, 0.36f, 0.36f, 0.11f),       // Jambe + pied
+            new SegmentInertia(0.1416f, 0.4095f, 0.329f, 0.329f, 0.149f),  // Thigh
+            new SegmentInertia(0.0570f, 0.60f, 0.36f, 0.36f, 0.11f),       // Calf + foot
             new SegmentInertia(0.1416f, 0.4095f, 0.329f, 0.329f, 0.149f),
             new SegmentInertia(0.0570f, 0.60f, 0.36f, 0.36f, 0.11f),
         };
@@ -150,11 +150,11 @@ namespace Brutality.Anatomy
         public static JointSpec SpecOf(int joint) => Specs[(int)KindOf[joint]];
 
         /// <summary>
-        /// Amplitudes : NASA Anthropometric Source Book vol. I (1978), Norkin &amp; White (goniométrie),
-        /// Panjabi &amp; White (rachis). Couple passif : forme double exponentielle (Yoon &amp; Mansour 1982 ;
-        /// Riener &amp; Edrich 1999 ; Hoang et al. 2005) — quasi nul en milieu de course, croissance exponentielle
-        /// à l'approche de la butée. Couples actifs max : ordres de grandeur adultes masculins (Anderson,
-        /// Madigan &amp; Nussbaum 2007 ; Frey-Law et al. 2012). VMax : vitesses articulaires maximales typiques.
+        /// Ranges of motion: NASA Anthropometric Source Book vol. I (1978), Norkin &amp; White (goniometry),
+        /// Panjabi &amp; White (spine). Passive torque: double exponential form (Yoon &amp; Mansour 1982;
+        /// Riener &amp; Edrich 1999; Hoang et al. 2005) — near zero mid-range, exponential growth
+        /// approaching the joint limit. Max active torques: adult male orders of magnitude (Anderson,
+        /// Madigan &amp; Nussbaum 2007; Frey-Law et al. 2012). VMax: typical peak joint angular velocities.
         /// </summary>
         private static JointSpec[] BuildSpecs()
         {
@@ -166,8 +166,8 @@ namespace Brutality.Anatomy
                 Dofs = new[]
                 {
                     new DofSpec(-30f, 75f, 5f, 30f, 9f, 8f, 3.0f, 150f, 230f, 8f),   // flexion / extension
-                    new DofSpec(-35f, 35f, 0f, 25f, 9f, 6f, 2.5f, 140f, 140f, 8f),   // inclinaison latérale
-                    new DofSpec(-40f, 40f, 0f, 20f, 9f, 5f, 2.0f, 70f, 70f, 8f),     // rotation axiale
+                    new DofSpec(-35f, 35f, 0f, 25f, 9f, 6f, 2.5f, 140f, 140f, 8f),   // lateral bending
+                    new DofSpec(-40f, 40f, 0f, 20f, 9f, 5f, 2.0f, 70f, 70f, 8f),     // axial rotation
                 }
             };
             specs[(int)JointKind.Neck] = new JointSpec
@@ -195,8 +195,8 @@ namespace Brutality.Anatomy
                 Kind = JointKind.Knee,
                 Dofs = new[]
                 {
-                    new DofSpec(-5f, 140f, 25f, 18f, 10f, 1.0f, 0.8f, 130f, 210f, 16f), // flexion + (ischio-jambiers) / extension - (quadriceps)
-                    new DofSpec(-6f, 6f, 0f, 25f, 14f, 15f, 1.0f, 0f, 0f, 1f),          // varus/valgus : ligamentaire, aucun muscle
+                    new DofSpec(-5f, 140f, 25f, 18f, 10f, 1.0f, 0.8f, 130f, 210f, 16f), // flexion + (hamstrings) / extension - (quadriceps)
+                    new DofSpec(-6f, 6f, 0f, 25f, 14f, 15f, 1.0f, 0f, 0f, 1f),          // varus/valgus: ligamentous, no muscle
                     new DofSpec(-20f, 20f, 0f, 10f, 10f, 2f, 0.5f, 25f, 25f, 10f),
                 }
             };

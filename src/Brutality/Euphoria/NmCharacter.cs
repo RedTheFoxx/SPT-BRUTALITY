@@ -5,8 +5,8 @@ using UnityEngine;
 namespace Brutality.Euphoria
 {
     /// <summary>
-    /// Capteurs du personnage, comme ceux qu'utilisent les comportements NaturalMotion : centre de masse et vitesse,
-    /// appuis des pieds et des mains, hauteur du sol (raycast), orientation, moment cinétique autour du CdM.
+    /// Character sensors, like those used by NaturalMotion behaviors: center of mass and velocity,
+    /// foot and hand contacts, ground height (raycast), orientation, angular momentum around the CoM.
     /// </summary>
     internal sealed class NmCharacter
     {
@@ -17,7 +17,7 @@ namespace Brutality.Euphoria
         public Vector3 Fwd = Vector3.forward, Right = Vector3.right;
         public bool Lying, Airborne;
 
-        private static int _mask;   // 0 = masque pas encore résolu
+        private static int _mask;   // 0 = mask not yet resolved
         private float _groundT = -1f;
         private readonly BodyModel _body;
 
@@ -32,8 +32,8 @@ namespace Brutality.Euphoria
                 if (_mask != 0) return _mask;
                 try { _mask = LayersMaskController.HighPolyWithTerrainMask; }
                 catch { }
-                // Le repli n'est jamais mémorisé : les masques EFT peuvent n'être disponibles qu'après
-                // le chargement du raid, et un repli figé désactiverait le raycast de sol pour la session.
+                // The fallback is never cached: EFT masks may only become available after
+                // raid loading, and a frozen fallback would disable the ground raycast for the session.
                 return _mask != 0 ? _mask : Physics.DefaultRaycastLayers;
             }
         }
@@ -48,7 +48,7 @@ namespace Brutality.Euphoria
             Com = com / m;
             Vel = vel / m;
 
-            // Sol sous le centre de masse (raycast toutes les 0,1 s : suffisant pour un sol continu).
+            // Ground under the center of mass (raycast every 0.1 s: sufficient for continuous ground).
             if (t - _groundT > 0.1f || _groundT < 0f)
             {
                 _groundT = t;
@@ -82,14 +82,14 @@ namespace Brutality.Euphoria
             Vector3 f = Flat(pelvis.F);
             if (f.sqrMagnitude < 0.04f) f = -Flat(pelvis.U);
             Fwd = BMath.SafeNormalize(f, Vector3.forward);
-            Right = Vector3.Cross(Vector3.up, Fwd).normalized;   // repère main gauche d'Unity : up × forward = droite
+            Right = Vector3.Cross(Vector3.up, Fwd).normalized;   // Unity left-handed frame: up × forward = right
             Hip2HeadUp = Vector3.Dot(BMath.SafeNormalize(head.Com - pelvis.Com, Vector3.up), Vector3.up);
             Lying = thorax.Com.y - GroundY < 0.42f && pelvis.Com.y - GroundY < 0.38f;
             float minY = float.MaxValue;
             foreach (var s in b.Segs) minY = Mathf.Min(minY, s.Com.y);
             Airborne = minY - GroundY > 0.3f && !Contact[0] && !Contact[1];
 
-            // Moment cinétique autour du CdM et inertie scalaire du corps (setCharacterDamping).
+            // Angular momentum around the CoM and scalar body inertia (setCharacterDamping).
             Vector3 Lsum = Vector3.zero;
             float I = 0f;
             foreach (var s in b.Segs)

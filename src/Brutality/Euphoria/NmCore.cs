@@ -6,18 +6,18 @@ using UnityEngine;
 
 namespace Brutality.Euphoria
 {
-    /// <summary>Impact d'un projectile tel que le voient les comportements (shotNewBullet).</summary>
+    /// <summary>Projectile impact as seen by behaviors (shotNewBullet).</summary>
     internal sealed class NmHit
     {
         public Segment Part;
-        public Vector3 Local;      // point d'impact dans le repère du segment
-        public Vector3 Dir;        // direction du projectile (unitaire)
-        public float P;            // quantité de mouvement transmise (N·s)
-        public int Side;           // -1 gauche, +1 droite, 0 axial
-        public int ArmSide;        // bras touché (-1/+1) ou 0
-        public int LegSide;        // jambe touchée (-1/+1) ou 0
+        public Vector3 Local;      // impact point in the segment's local frame
+        public Vector3 Dir;        // projectile direction (unit vector)
+        public float P;            // transferred momentum (N·s)
+        public int Side;           // -1 left, +1 right, 0 axial
+        public int ArmSide;        // hit arm (-1/+1) or 0
+        public int LegSide;        // hit leg (-1/+1) or 0
         public bool Torso;
-        public bool Reachable;     // une main peut s'y porter (tronc, bras)
+        public bool Reachable;     // a hand can reach it (trunk, arm)
 
         public Vector3 World => Part.Pos + Part.Q * Local;
 
@@ -44,10 +44,10 @@ namespace Brutality.Euphoria
         }
     }
 
-    /// <summary>Cinématique et capacité articulaire partagées par les comportements Delirium.</summary>
+    /// <summary>Kinematics and joint capacity shared by Delirium behaviors.</summary>
     internal static class Nm
     {
-        /// <summary>Cheville vers un point du monde ; repère du bassin (R, U, F) et position de hanche fournis.</summary>
+        /// <summary>Ankle to a world point; pelvis frame (R, U, F) and hip position provided.</summary>
         public static bool LegIK(BodyModel b, int side, Vector3 hip, Vector3 ankleTarget, Vector3 R, Vector3 U, Vector3 F, out float flex, out float abd, out float knee)
         {
             var thigh = b[side < 0 ? Seg.LThigh : Seg.RThigh];
@@ -58,10 +58,10 @@ namespace Brutality.Euphoria
         public static float ElbowCap(BodyModel b, int side) => b.Joints[(int)AnatomyData.Elbow(side)].Capacity[0];
     }
 
-    /// <summary>Forces de corps entier partagées par les comportements.</summary>
+    /// <summary>Whole-body forces shared by behaviors.</summary>
     internal static class NmPhysics
     {
-        /// <summary>Accélération angulaire du corps entier autour du CdM : m·α×r sur chaque segment, plus α.</summary>
+        /// <summary>Whole-body angular acceleration around the CoM: m·α×r on each segment, plus α.</summary>
         public static void BodyAngularAccel(BodyModel body, Vector3 alpha)
         {
             Vector3 com = Vector3.zero;
@@ -83,10 +83,10 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// Impulsions balistiques (configureBullets / applyBulletImpulse) : chaque impulsion est étalée sur impulsePeriod
-    /// (profil triangulaire), appliquée au point d'impact (force au CdM + couple × impulseTorqueScale). La part « corps
-    /// rigide » (rbRatio) est répartie sur tout le corps (Δv commune, rbLowerShare = 0,5 → au prorata des masses) avec un
-    /// moment borné par rbMaxTwistMomentArm (torsion autour de la verticale) et rbMaxBroomMomentArm (bascule).
+    /// Ballistic impulses (configureBullets / applyBulletImpulse): each impulse is spread over impulsePeriod
+    /// (triangular profile), applied at the impact point (force at CoM + torque × impulseTorqueScale). The "rigid
+    /// body" share (rbRatio) is distributed over the whole body (shared Δv, rbLowerShare = 0.5 → proportional to mass)
+    /// with moment clamped by rbMaxTwistMomentArm (twist around vertical) and rbMaxBroomMomentArm (topple).
     /// </summary>
     internal sealed class NmImpulseQueue
     {

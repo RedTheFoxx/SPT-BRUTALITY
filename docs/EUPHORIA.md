@@ -1,132 +1,78 @@
-# Moteur Euphoria (NaturalMotion) dans Brutality
+# Euphoria (NaturalMotion) Engine in Brutality
 
-Le moteur « Euphoria » est un **portage de Delirium**, le projet open-source issu de la rétro-ingénierie
-d'Euphoria (le moteur des GTA). Seules les lois utiles à un ragdoll de SPT sont traduites.
+The "Euphoria" engine is a **port of Delirium**, the open-source reverse-engineering project of Euphoria (the GTA engine). Only the laws useful for an SPT ragdoll are ported.
 
-Depuis la version 0.2.0, c'est le **seul moteur d'animation** du plugin : l'ancien mode « Brutality »
-(chorégraphies de chute procédurales) a été retiré. L'agonie, le posturing cérébral, la respiration
-et les réflexes de Brutality restent actifs et se mélangent aux comportements Delirium dans le même
-tampon moteur.
+Since version 0.2.0, it is the **sole animation engine** of the plugin: the legacy "Brutality" mode (procedural fall choreographies) was removed. Brutality's agony, cerebral posturing, breathing, and reflexes remain active and blend with Delirium behaviors in the same motor buffer.
 
 ## Sources
-- **[PVCPC/delirium-physics](https://github.com/PVCPC/delirium-physics)** (Rust, GPL-3.0) : réimplémentation
-  d'Euphoria à partir du binaire de GTA IV. Le portage suit son architecture (`nmrs` = squelette et effecteurs,
-  `nmdbm` = équilibre dynamique, `nmbb` = balancier du haut du corps, `nmshot` = comportement `shot`, `nmcf`,
-  `nmrds`, `nmbw`, `nmbf`, `nmiog`) et ses lois numériques (cône de consigne, `blend_to_zero`, `set_stiffness`,
-  `oppose_gravity`, point de capture, contrebalancement des bras, enveloppes de geste).
-- **behaviours.xml de GTA V** : les valeurs numériques de Delirium sont lues dans le binaire de GTA IV (macro
-  `kv!`) et ne sont pas redistribuables. Le portage conserve donc les **lois** et reprend les valeurs publiées par
-  NaturalMotion (`NmParams.cs`, via
-  [alexguirre/GTA-V-Euphoria-Behaviours-Parser](https://github.com/alexguirre/GTA-V-Euphoria-Behaviours-Parser)).
-  Les endroits où Delirium choisit une constante propre sont signalés par un commentaire « Delirium : ».
-- Contraction idiomusculaire post-mortem (phénomène de Zsako) : Madea (éd.), *Estimation of the Time Since Death*,
-  3e éd., CRC 2016, chapitre sur les réactions supravitales. (Programme Brutality, hors Delirium.)
+- **[PVCPC/delirium-physics](https://github.com/PVCPC/delirium-physics)** (Rust, GPL-3.0): reimplementation of Euphoria from the GTA IV binary. The port follows its architecture (`nmrs` = skeleton and effectors, `nmdbm` = dynamic balance, `nmbb` = upper-body balancer, `nmshot` = `shot` behavior, `nmcf`, `nmrds`, `nmbw`, `nmbf`, `nmiog`) and its numerical laws (setpoint cone, `blend_to_zero`, `set_stiffness`, `oppose_gravity`, capture point, arm counterbalance, gesture envelopes).
+- **GTA V `behaviours.xml`**: Delirium's numerical values are read from the GTA IV binary (`kv!` macro) and are not redistributable. The port therefore preserves the **laws** and uses the values published by NaturalMotion (`NmParams.cs`, via [alexguirre/GTA-V-Euphoria-Behaviours-Parser](https://github.com/alexguirre/GTA-V-Euphoria-Behaviours-Parser)). Places where Delirium chooses its own constant are marked with a `Delirium:` comment.
+- Post-mortem idiomuscular contraction (Zsako phenomenon): Madea (ed.), *Estimation of the Time Since Death*, 3rd ed., CRC 2016, chapter on supravital reactions. (Brutality program, outside Delirium.)
 
-## Architecture du portage
-| Fichier | Contenu |
+## Port Architecture
+| File | Contents |
 |---|---|
-| `Euphoria/Delirium/DlCharacter.cs` | `DlCharacter` : effecteurs par articulation et degré de liberté (angle désiré absolu, raideur ω, amortissement ζ, `muscleStiffness`, `oppose_gravity`), masques de message (`ub`, `ua`, `uc`, `uw`, `us`, `un`, `ll`, `lr`, `lb`), `blend_to_zero`, cône de consigne ; `DlBody` (capteurs, poussées et couples par segment) ; `DlPhys` (oppose-gravity en couple réel, raycast, bruit, enveloppe). |
-| `Euphoria/Delirium/DlBalance.cs` | `bodyBalance` / `staggerFall` / `shotFallToKnees` : loi du haut du corps, contrebalancement des bras, gestionnaire d'équilibre (point de capture, pas, bassin, IK des jambes), forces de soutien et de redressement. |
-| `Euphoria/Delirium/DlShot.cs` | machine du comportement `shot` : relâchement, réaction, douleur du rachis, main sur la plaie, bras projeté, jambe qui se dérobe, regard, vrille de choc. |
+| `Euphoria/Delirium/DlCharacter.cs` | `DlCharacter`: effectors per joint and degree of freedom (absolute desired angle, stiffness ω, damping ζ, `muscleStiffness`, `oppose_gravity`), message masks (`ub`, `ua`, `uc`, `uw`, `us`, `un`, `ll`, `lr`, `lb`), `blend_to_zero`, setpoint cone; `DlBody` (sensors, per-segment forces and torques); `DlPhys` (oppose-gravity as real torque, raycast, noise, envelope). |
+| `Euphoria/Delirium/DlBalance.cs` | `bodyBalance` / `staggerFall` / `shotFallToKnees`: upper-body law, arm counterbalance, balance manager (capture point, steps, pelvis, leg IK), support and righting forces. |
+| `Euphoria/Delirium/DlShot.cs` | `shot` behavior state machine: looseness, reaction, spine pain, reach for wound, flung arm, leg give-way, look-at, shock spin. |
 | `Euphoria/Delirium/DlBehaviours.cs` | `catchFall`, `rollDownStairs`, `bodyRollUp`, `armsWindmill`, `pedalLegs`, `bodyWrithe`, `bodyFoetal`, `injuredOnGround`. |
-| `Euphoria/Delirium/DlGrab.cs` | `grab` + `GrabHelper` (sondes décor 8 directions, prise physique à force de rupture, pronation paume, libération après arrachement) et `upperBodyFlinch` (`nmfl`). |
-| `Euphoria/NmPerformance.cs` | orchestrateur : plan de mort, enchaînement des phases (`Balance → Shot → Flinch/Chute → Grab → Sol`), impulsions balistiques, snap, amortissement de rotation, `setCharacterHealth` (vivacité résiduelle), journal. |
+| `Euphoria/Delirium/DlGrab.cs` | `grab` + `GrabHelper` (8-direction environment probes, break-force physical grip, palm pronation, release after breakaway) and `upperBodyFlinch` (`nmfl`). |
+| `Euphoria/NmPerformance.cs` | orchestrator: death plan, phase sequencing (`Balance → Shot → Flinch/Fall → Grab → Ground`), ballistic impulses, snap, angular damping, `setCharacterHealth` (residual liveliness), logging. |
 
-## Unités des effecteurs
-- Delirium : `set_stiffness(s, d)` stocke `strength = s²` et `damping = 2·s·d` ; son moteur en déduit
-  `stiffness = √strength` (pulsation propre ω) et `damping ratio = damping / (2·stiffness)`. Brutality écrit
-  exactement ces deux grandeurs dans `MotorCommandBuffer.AddEffector`, donc **ω = s et ζ = d sans conversion**.
-- `muscleStiffness` multiplie la raideur passive (1,01 − looseness).
-- `oppose_gravity` est une **fraction** (0..1) du couple de gravité du segment, appliquée en couple réel (enfant +
-  réaction sur le parent). Elle ne sert qu'aux membres (bras, jambes) : l'appliquer au rachis annulerait la gravité du
-  tronc et le corps ne tomberait plus. Le poids du corps est porté par les jambes et leurs appuis, jamais par une
-  poussée verticale du balancier.
-- Les comportements n'agissent jamais directement sur un rigidbody : ils écrivent les effecteurs, puis
-  `DlCharacter.Flush` les transmet une fois par pas aux drives PhysX. Les programmes Brutality (posturing,
-  verrouillages, agonie, respiration) écrivent dans le même tampon et se mélangent.
+## Effector Units
+- Delirium: `set_stiffness(s, d)` stores `strength = s²` and `damping = 2·s·d`; its engine derives `stiffness = √strength` (natural frequency ω) and `damping ratio = damping / (2·stiffness)`. Brutality writes these exact two quantities into `MotorCommandBuffer.AddEffector`, so **ω = s and ζ = d with no conversion**.
+- `muscleStiffness` scales passive stiffness (1.01 − looseness).
+- `oppose_gravity` is a **fraction** (0..1) of the segment's gravity torque, applied as a real torque (child + reaction on parent). It is used only on limbs (arms, legs): applying it to the spine would cancel trunk gravity and the body would no longer fall. Body weight is borne by the legs and their ground contacts, never by a vertical balancer push.
+- Behaviors never act directly on a rigidbody: they write effectors, then `DlCharacter.Flush` forwards them once per step to PhysX drives. Brutality programs (posturing, locks, agony, breathing) write into the same buffer and blend together.
 
-## Correspondance des messages
-| Message Euphoria (Delirium) | Portage |
+## Message Mapping
+| Euphoria Message (Delirium) | Port |
 |---|---|
-| `bodyBalance`, `staggerFall`, `shotFallToKnees` | `DlBalance` (+ `stayUpright` : soutien du poids et « dernier carré » sous une rafale) |
+| `bodyBalance`, `staggerFall`, `shotFallToKnees` | `DlBalance` (+ `stayUpright`: weight support and "last stand" under a burst) |
 | `shot` (`nmshot`) | `DlShot` |
-| `configureBullets`, `applyBulletImpulse` | `NmPerformance.OnBullet` + `NmImpulseQueue` (impulsion triangulaire, part corps rigide, amortissement par rafale) |
+| `configureBullets`, `applyBulletImpulse` | `NmPerformance.OnBullet` + `NmImpulseQueue` (triangular impulse, rigid-body share, burst damping) |
 | `shotSnap`, `shotShockSpin`, `setCharacterDamping` | `NmPerformance.Forces`, `DlShot.Forces` |
 | `catchFall`, `rollDownStairs`, `bodyRollUp`, `armsWindmill`, `pedalLegs` | `DlBehaviours` |
 | `grab`, `upperBodyFlinch` | `DlGrab` (`DlGrab` + `GrabHelper` + `DlFlinch`) |
-| `injuredOnGround`, `bodyWrithe`, `bodyFoetal` | `DlBehaviours`, en cohabitation avec l'agonie Brutality |
-| `setCharacterHealth` | `NmPerformance.U(t)` : la vivacité s'éteint avec la vie (le corps devient mou) |
+| `injuredOnGround`, `bodyWrithe`, `bodyFoetal` | `DlBehaviours`, coexisting with Brutality agony |
+| `setCharacterHealth` | `NmPerformance.U(t)`: liveliness fades with health (the body goes limp) |
 
-## Preuves formelles et fidélité Delirium (0.3.0)
-La suite `tests/Brutality.DeliriumTests` compile et exécute directement les vraies sources C# du plugin dans une simulation 3D hors-jeu à 60 Hz :
-- **Ordre d'exécution (`nm.rs`)** : `Balance` s'exécute avant `Shot` afin de ne pas écraser la main sur la plaie ni les genoux en dérobement.
-- **Lois effecteurs (`nmrs`)** : `set_stiffness(s, d)` (`strength = s²`, `damping = 2·s·d`, `ω = √strength`, `ζ = damping / (2·ω)`), `set_relaxation` à `ζ` invariant, cône `1 + 25 / (strength + 256)`, masques et `lock`/`unlock`, émission du DOF 2 de pronation sur les coudes.
-- **Physique réelle (`nmdbm`, `nmshot`, `nmgr`)** : `oppose_gravity` borné et projeté sur l'axe des charnières (action + réaction exactes), `Shot::wrist` / `ForearmPronationForNormal`, `Shot::pull` action/réaction main ↔ plaie, `shockSpin` en N·m proportionnel au bras de levier, `Grab` sur murs/rebords sans faux positif sur sol plat, et dérobements unilatéraux (1 jambe), synchrones (2 jambes) et décalés (2 temps).
+## Formal Proofs and Delirium Fidelity (0.4.0)
+The `tests/Brutality.DeliriumTests` suite compiles and runs the actual C# plugin sources directly in an off-game 3D simulation at 60 Hz:
+- **Execution order (`nm.rs`)**: `Balance` runs before `Shot` so it does not overwrite reaching for the wound or giving way at the knees.
+- **Effector laws (`nmrs`)**: `set_stiffness(s, d)` (`strength = s²`, `damping = 2·s·d`, `ω = √strength`, `ζ = damping / (2·ω)`), `set_relaxation` with invariant `ζ`, cone `1 + 25 / (strength + 256)`, masks and `lock`/`unlock`, and DOF 2 pronation emission on elbows.
+- **Real physics (`nmdbm`, `nmshot`, `nmgr`)**: bounded `oppose_gravity` projected onto hinge axes (exact action + reaction), `Shot::wrist` / `ForearmPronationForNormal`, `Shot::pull` hand ↔ wound action/reaction, `shockSpin` in N·m proportional to lever arm, `Grab` on walls/ledges with zero false positives on flat ground, and unilateral (1-leg), synchronous (2-leg), and staggered (2-stage) leg give-ways.
 
-Le tableau complet des **77 assertions** (31 Delirium + 46 Cinématique/ISB/BepInEx), les empreintes SHA-256 vérifiables et les scénarios à reproduire dans `demo/banc-essai.html` sont regroupés dans [`docs/VERIFICATION.md`](VERIFICATION.md).
+The complete table of **77 assertions** (31 Delirium + 46 Kinematics/ISB/BepInEx), verifiable SHA-256 digests, and reproducible scenarios in `demo/test-bench.html` are collected in [`docs/VERIFICATION.md`](VERIFICATION.md).
 
-## Ce qui n'est pas porté, et pourquoi
-- **SDK, playroom, lecteurs de fichiers** (XML/messages) : sans objet hors de l'outil de Delirium.
-- **`getup`, `ledge` (escalade), `walk`/`run`, portails, skate** : supposent un agent vivant qui se relève ou se
-  déplace ; un ragdoll de mort SPT ne les utilise jamais (`grab` est en revanche porté pour s'agripper aux murs, caisses et rebords pendant la chute).
-- **Clavicules et poignets** : absents du ragdoll EFT (mains fusionnées avec l'avant-bras). Le masque `uc` vise les
-  épaules, `uw` est vide.
-- **`balancerCollisionsReaction`** (glissade contre un mur) : non porté ; le contact avec le décor reste géré par
-  PhysX.
-- **Articulations de cheville et de pied** : le pied n'est pas simulé ; l'inclinaison du bassin que Delirium
-  transmet à la cheville va au rachis, pour ne pas combattre la cinématique inverse des jambes.
+## What Is Not Ported, and Why
+- **SDK, playroom, file readers** (XML/messages): irrelevant outside Delirium's tool.
+- **`getup`, `ledge` (climbing), `walk`/`run`, portals, skate**: assume a living agent getting back up or moving around; an SPT death ragdoll never uses them (`grab` is ported, however, to grab walls, crates, and ledges during the fall).
+- **Clavicles and wrists**: absent from the EFT ragdoll (hands are merged with the forearm). The `uc` mask targets shoulders; `uw` is empty.
+- **`balancerCollisionsReaction`** (sliding along a wall): not ported; environment contact remains handled by PhysX.
+- **Ankle and foot joints**: the foot is not simulated; pelvis tilt that Delirium sends to the ankle goes to the spine so it does not fight leg inverse kinematics.
 
-## Choix du plan et roulades
-Delirium ne décide pas lui-même qu'un corps roule : c'est la tâche « shot » du jeu qui choisit le message
-(`rollDownStairs`, `staggerFall`, …). Le portage reprend donc la loi de la roulade, mais la **sélection** du plan est à
-nous :
+## Plan Selection and Rolling
+Delirium does not decide on its own that a body rolls: the game's "shot" task selects the message (`rollDownStairs`, `staggerFall`, …). The port therefore reuses the rolling law, while **plan selection** is our own:
 
-- élan ≥ 2,4 m/s au moment de la mort (course, choc en mouvement) → roulade d'emblée ; ≥ 1,8 m/s → effondrement ;
-- sinon tirage pondéré entre treize plans : titube, chute à genoux, glissade sur les genoux, quatre pattes,
-  effondrement, effondrement assis, effondrement latéral, plongeon, chute en planche, moulinets, pivot, vrille et
-  roulade (poids 0,65 à 0,85 × variété pour les plans qui demandent de l'élan ; × 1,4 à 2 selon le tir, la posture
-  accroupie, la jambe touchée et le mouvement) ;
-- la bascule de perte d'équilibre est orientée : un azimut est tiré dans le repère du bassin (0 = avant, π/2 = droite,
-  π = arrière), décalé par l'axe du tir et par le plan. Elle est appliquée comme un couple de corps entier sur 0,45 s,
-  et non plus comme une unique bascule en avant ; c'est ce qui fait tomber le corps en avant, à la renverse, sur le
-  flanc ou en diagonale selon la mort ;
-- un **directeur de variété** retient les cinq derniers plans et divise leur poids jusqu'à 0,12 : un même plan ne
-  revient pas avant plusieurs corps. Chaque mort reçoit en outre une signature (force de bascule, cadence des gestes,
-  asymétrie) ;
-- même le relâchement (mort encéphalique, souffle, section médullaire) est orienté : le corps s'affaisse dans l'axe de
-  la poussée puis bascule avec une force tirée à chaque mort ;
-- une roulade de plan garde un court instant d'équilibre (0,12–0,35 s) puis bascule en avant : sans cette bascule, le
-  corps s'accroupit sur place et la rotation ne se voit pas ;
-- pendant la chute, la roulade remplace les rattrapages dès 1,2 m/s d'élan latéral ;
-- au sol, elle n'est plus coupée à l'instant du contact : elle continue (ou démarre) si le corps a encore de l'élan
-  (> 1,4 m/s ou > 3 rad/s de rotation du thorax), puis s'éteint d'elle-même après 4 s en chute / 2,4 s au sol, ou dès
-  que la translation retombe sous 0,45 m/s après 1,2 s ;
-- au sol encore, un retournement peut être tiré (rouler sur le flanc ou se retourner) : c'est un couple de corps entier,
-  pas une pose, donc l'agonie continue par-dessus ;
-- la chute en planche (posturing) force une raideur de 15 et un rachis cambré pendant 1,5 s : le corps tombe à la
-  renverse, raide, au lieu de s'effondrer.
+- momentum ≥ 2.4 m/s at death (running, hit while moving) → immediate roll; ≥ 1.8 m/s → collapse;
+- otherwise weighted draw among thirteen plans: stagger, fall to knees, knee slide, all fours, collapse, seated collapse, side collapse, dive, board fall, windmill, pivot, spin, and roll (weight 0.65 to 0.85 × variety for momentum-requiring plans; × 1.4 to 2 depending on shot direction, crouched posture, hit leg, and movement);
+- the loss-of-balance tip is directional: an azimuth is drawn in the pelvis frame (0 = forward, π/2 = right, π = backward), offset by the shot axis and plan. It is applied as a whole-body torque over 0.45 s rather than a single forward tip; this makes the body fall forward, backward, sideways, or diagonally depending on the death;
+- a **variety director** remembers the last five plans and divides their weight down to 0.12: the same plan does not recur for several bodies. Each death also receives a signature (tip force, gesture cadence, asymmetry);
+- even slackening (brain death, blast, spinal cord transection) is directional: the body slumps along the push axis and then tips with a force drawn per death;
+- a roll plan keeps a brief balance window (0.12–0.35 s) then pitches forward: without this tip, the body crouches in place and rotation is barely visible;
+- during the fall, rolling replaces catch-fall as soon as lateral momentum reaches 1.2 m/s;
+- on the ground, it is no longer cut off at the instant of contact: it continues (or starts) if the body still has momentum (> 1.4 m/s or > 3 rad/s thorax angular velocity), then fades out on its own after 4 s falling / 2.4 s on the ground, or as soon as translation drops below 0.45 m/s after 1.2 s;
+- on the ground as well, a roll-over may be drawn (rolling onto a flank or turning over): it is a whole-body torque, not a pose, so agony continues on top of it;
+- the board fall (posturing) forces a stiffness of 15 and an arched spine for 1.5 s: the body falls backward stiffly instead of collapsing.
 
-## Gestes et variété des agonies
-Les gestes involontaires ne sont pas seulement pondérés par le mécanisme : chaque mort tire une **palette** (quatre à
-six gestes privilégiés, trois à cinq atténués), une cadence, une asymétrie et une amplitude de contorsions. La mémoire
-des deux morts précédentes réduit en plus le poids des gestes déjà vus (`Core/VarietyDirector.cs`). Les gestes
-transversaux ajoutés (pontage, reptation sur les coudes, tête qui frappe le sol, jambes croisées, bras au-dessus de la
-tête, mains sur la poitrine, torsion axiale, talon qui glisse, épaules haussées, nuque cambrée, frisson) sont écartés
-d'eux-mêmes par les capacités articulaires : une paraplégie ne fait pas de pontage, un bras détruit ne presse pas sa
-poitrine.
+## Agony Gestures and Variety
+Involuntary gestures are not merely weighted by mechanism: each death draws a **palette** (four to six favored gestures, three to five attenuated ones), a cadence, an asymmetry, and a contortion amplitude. Memory of the previous two deaths further reduces the weight of recently seen gestures (`Core/VarietyDirector.cs`). The added cross-cutting gestures (bridging, elbow crawl, head banging the ground, crossed legs, arms overhead, hands pressing chest, continuous axial twist, heel sliding toward glute, shoulders shrugging, arched neck, full-body shudder) are automatically filtered by joint capacities: paraplegia prevents bridging, a destroyed arm cannot press the chest.
 
-Les moulinets ne démarrent plus en concurrence avec une roulade : les deux écrivaient la même posture.
+Windmill arms no longer start concurrently with a roll: both wrote the same posture.
 
-## Son de chute
-EFT ne joue le son de chute du cadavre (`Corpse.PlayCorpseDropSound`, banque `ProneDropSoundBank` selon la surface)
-qu'à la **création du ragdoll** — dans `Corpse.TryToCreateRagdoll` —, donc au moment de la mort et pas au contact avec le
-sol. Brutality le rejoue une seule fois quand le corps arrive réellement au sol (phase « au sol » d'Euphoria, ou baisse
-de 35 cm du bassin et vitesse retombée sinon), et seulement si le corps a vraiment chu (vitesse verticale acquise
-≥ 0,8 m/s) ; une mort allongée ne déclenche rien.
+## Fall Sound
+EFT only plays the corpse drop sound (`Corpse.PlayCorpseDropSound`, `ProneDropSoundBank` by surface) at **ragdoll creation** — inside `Corpse.TryToCreateRagdoll` — i.e., at the moment of death rather than on ground contact. Brutality replays it once when the body actually reaches the ground (Euphoria "on ground" phase, or otherwise a 35 cm pelvis drop and settled velocity), and only if the body truly fell (acquired vertical speed ≥ 0.8 m/s); a prone death triggers nothing.
 
-## Cadavres simulés en permanence
-Après la phase active, le corps n'est plus figé. PhysX l'endort au repos, ce qui ne coûte presque rien. Une balle
-(délégué de tir de `BallisticsCalculator`) le réveille : impulsion étalée, rebond contre le sol et contraction
-idiomusculaire locale, puis nouvelle réaction `shot` si le mourant est encore conscient. Le rappel
-`OnRigidbodyStopped` du jeu est appelé une seule fois. Au-delà du plafond de cadavres simulés, les plus anciens sont
-figés comme en vanilla. Les corps observés d'un client Fika gardent le comportement vanilla.
+## Permanently Simulated Corpses
+After the active phase, the body is no longer frozen. PhysX puts it to sleep at rest, which costs almost nothing. A bullet (shot delegate from `BallisticsCalculator`) wakes it up: spread impulse, ground bounce, and local idiomuscular contraction, then a fresh `shot` reaction if the dying body is still conscious. The game's `OnRigidbodyStopped` callback is invoked once. Beyond the simulated corpse cap, the oldest ones are frozen as in vanilla. Observed bodies on a Fika client retain vanilla behavior.

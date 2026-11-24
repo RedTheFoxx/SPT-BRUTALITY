@@ -1,4 +1,4 @@
-// Réimplémentation minimale des types mathématiques d'UnityEngine (mêmes conventions et formules).
+// Minimal reimplementation of UnityEngine math types (same conventions and formulas).
 using System;
 
 namespace UnityEngine
@@ -55,14 +55,14 @@ namespace UnityEngine
         public Quaternion(float x, float y, float z, float w) { this.x = x; this.y = y; this.z = z; this.w = w; }
         public static Quaternion identity => new Quaternion(0, 0, 0, 1);
 
-        // Formule identique à UnityEngine.Quaternion.operator*(Quaternion, Quaternion).
+        // Formula identical to UnityEngine.Quaternion.operator*(Quaternion, Quaternion).
         public static Quaternion operator *(Quaternion lhs, Quaternion rhs) => new Quaternion(
             lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
             lhs.w * rhs.y + lhs.y * rhs.w + lhs.z * rhs.x - lhs.x * rhs.z,
             lhs.w * rhs.z + lhs.z * rhs.w + lhs.x * rhs.y - lhs.y * rhs.x,
             lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z);
 
-        // Formule identique à UnityEngine.Quaternion.operator*(Quaternion, Vector3).
+        // Formula identical to UnityEngine.Quaternion.operator*(Quaternion, Vector3).
         public static Vector3 operator *(Quaternion rotation, Vector3 point)
         {
             float num = rotation.x * 2f, num2 = rotation.y * 2f, num3 = rotation.z * 2f;

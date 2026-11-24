@@ -6,8 +6,8 @@ using UnityEngine;
 namespace Brutality.Euphoria
 {
     /// <summary>
-    /// Base commune des comportements du portage Delirium. Un comportement ne touche jamais aux rigidbodies :
-    /// il écrit les effecteurs (<see cref="DlCharacter"/>), comme <c>nmrs::Character::eff</c> dans Delirium.
+    /// Common base for Delirium port behaviors. A behavior never touches rigidbodies directly:
+    /// it writes effectors (<see cref="DlCharacter"/>), like <c>nmrs::Character::eff</c> in Delirium.
     /// </summary>
     internal abstract class DlBehaviour
     {
@@ -32,7 +32,7 @@ namespace Brutality.Euphoria
 
         public virtual void Stop(float t) => Active = false;
 
-        /// <summary>Cinématique inverse du bras vers un point du monde ; renvoie false si le squelette l'interdit.</summary>
+        /// <summary>Arm inverse kinematics to a world point; returns false if the skeleton forbids it.</summary>
         protected bool ArmIK(int side, Vector3 target, out float flexDeg, out float abdDeg, out float elbowDeg)
         {
             var body = B.Body;
@@ -43,7 +43,7 @@ namespace Brutality.Euphoria
                 th.R, th.U, th.F, out flexDeg, out abdDeg, out elbowDeg, out _);
         }
 
-        /// <summary>Amène la main sur une cible en pondérant la consigne (Delirium : limb_ik avec poids w).</summary>
+        /// <summary>Moves the hand to a target by blending the command (Delirium: limb_ik with weight w).</summary>
         protected void ArmTo(int side, Vector3 target, float w, float stiffness, float damping)
         {
             if (w <= 0.01f) return;
@@ -57,21 +57,21 @@ namespace Brutality.Euphoria
             Ch.BlendDesired((int)el, 0, e * BMath.Deg, w);
         }
 
-        /// <summary>Delirium (nmcf::clav_follow) : la ceinture scapulaire suit l'épaule au prorata des amplitudes.</summary>
+        /// <summary>Delirium (nmcf::clav_follow): the shoulder girdle follows the shoulder proportionally to range.</summary>
         protected void ClavicleFollow(int side)
         {
-            // Pas d'articulation de clavicule sur le ragdoll EFT : l'épaule joue les deux rôles. On conserve la
-            // fonction pour que les comportements qui l'appellent restent lisibles.
+            // No clavicle joint on the EFT ragdoll: the shoulder plays both roles. Keep the
+            // function so calling behaviors remain readable.
         }
 
         protected static Vector3 Horiz(Vector3 v) => DlBody.Horiz(v);
     }
 
     /// <summary>
-    /// catchFall, porté depuis <c>nmcf::CatchFall</c> de Delirium : les bras sondent le sol et les surfaces proches
-    /// dans le sens de la chute, la paume s'oriente vers la normale par pronation de l'avant-bras, la raideur
-    /// diminue au contact (armReduceSpeed) pour amortir l'impact, le tronc s'enroule (curl), les jambes se replient,
-    /// la torsion du rachis retombe, et le cou regarde le point de chute.
+    /// catchFall, ported from Delirium's <c>nmcf::CatchFall</c>: arms probe the ground and nearby surfaces
+    /// in the fall direction, palms orient toward the normal via forearm pronation, stiffness drops
+    /// on contact (armReduceSpeed) to cushion the impact, trunk curls, legs tuck,
+    /// spine twist decays, and the neck looks at the landing point.
     /// </summary>
     internal sealed class DlCatchFall : DlBehaviour
     {
@@ -91,7 +91,7 @@ namespace Brutality.Euphoria
             if (!Ch.Busy[0]) Ch.SetStiffness("ul", DlCfg.CatchArmsStiffness - 1f, 1f);
             if (!Ch.Busy[1]) Ch.SetStiffness("ur", DlCfg.CatchArmsStiffness - 1f, 1f);
             Ch.SetStiffness("lb", DlCfg.CatchLegsStiffness, 0.5f);
-            // Membres seulement : un oppose_gravity sur le rachis porterait le tronc et le corps ne tomberait pas.
+            // Limbs only: oppose_gravity on the spine would support the trunk and the body wouldn't fall.
             if (!Ch.Busy[0]) Ch.SetOpposeGravity("ul", 0.6f);
             if (!Ch.Busy[1]) Ch.SetOpposeGravity("ur", 0.6f);
             Ch.SetOpposeGravity("lb", 0.5f);
@@ -135,23 +135,23 @@ namespace Brutality.Euphoria
             }
             Ch.SetMuscleStiffness((int)JointId.Lumbar, 0.7f);
 
-            // Direction de la chute (Delirium nmcf.rs:191-198) : composante horizontale de la vitesse du thorax par
-            // rapport aux bras + biais descendant constant (-FALL_G * bias * up) pour toujours sonder vers le sol.
+            // Fall direction (Delirium nmcf.rs:191-198): horizontal component of thorax velocity relative
+            // to the arms + constant downward bias (-FALL_G * bias * up) to always probe toward the ground.
             Vector3 under = (_armVel(0) + _armVel(1)) * 0.5f;
             Vector3 s3 = B.Part(Seg.Thorax).V;
             Vector3 d = s3 - under;
             float du = Vector3.Dot(Vector3.up, d);
-            // Delirium : (-FALL_G).fma(kv, du) - du = -FALL_G * kv (vers le bas) ajouté à la vitesse horizontale + descente.
+            // Delirium: (-FALL_G).fma(kv, du) - du = -FALL_G * kv (downward) added to horizontal velocity + descent.
             Vector3 downBias = Vector3.down * (1.25f + Mathf.Max(0f, -du) * 0.4f);
             _dir = BMath.SafeNormalize(DlBody.Horiz(d) + downBias, Vector3.down);
-            // Dans EFT, Sensors.Fwd pointe vers l'avant (inverse de m.c de GTA IV) : forward > 0 en chute avant.
+            // In EFT, Sensors.Fwd points forward (opposite of GTA IV's m.c): forward > 0 in a forward fall.
             _forward = Vector3.Dot(Sensors.Fwd, _dir);
             _upright = Mathf.Clamp01(Vector3.Dot(Vector3.up, B.Part(Seg.Thorax).U));
 
             float back = -Vector3.Dot(Sensors.Fwd, B.Vel - under);
             float curl = Mathf.Clamp01(Mathf.Clamp01(2f * Mathf.Max(0f, back)) * _upright - _forward * 0.5f);
 
-            // Tronc enroulé, torsion qui retombe si aucun spineTwist n'est actif.
+            // Curled trunk, twist decays if no spineTwist is active.
             for (int j = 0; j < DlCharacter.NJ; j++)
             {
                 if (!IsSpine(j)) continue;
@@ -159,10 +159,10 @@ namespace Brutality.Euphoria
                 Ch.SetRelative(j, 1, _lean2);
                 Ch.SetDesired(j, 2, Ch.Desired(j).z * (1f / (1f + 0.35f * dt)));
             }
-            // Chute avant : tête relevée (extension) ; chute arrière : menton rentré (flexion) pour protéger l'occiput.
+            // Forward fall: head raised (extension); backward fall: chin tucked (flexion) to protect the occiput.
             Ch.SetRelative((int)JointId.Neck, 0, _forward > 0.35f ? -0.45f : _forward < -0.35f ? 0.6f : 0.2f);
 
-            // Jambes repliées, genoux qui amortissent (le genou positive = flexion dans la convention SPT).
+            // Tucked legs, cushioning knees (positive knee = flexion in SPT convention).
             float onBack = Mathf.Clamp01(Vector3.Dot(Sensors.Fwd, Vector3.up));
             float bend = (onBack + 1f) * k - onBack;
             for (int i = 0; i < 2; i++)
@@ -174,8 +174,8 @@ namespace Brutality.Euphoria
                 Ch.SetRelative(knee, 0, Mathf.Clamp(0.35f + 0.45f * _leg[i] * bend, 0f, 1f));
             }
 
-            // Bras : sonde vers le sol / obstacle dans la direction de chute, pronation de la paume face à la normale,
-            // raideur réduite au contact (armReduceSpeed). Saute un bras déjà agrippé au décor (Ch.Busy).
+            // Arms: probe toward ground / obstacle in the fall direction, palm pronation facing the normal,
+            // stiffness reduced on contact (armReduceSpeed). Skips an arm already gripping scenery (Ch.Busy).
             var thorax = B.Part(Seg.Thorax);
             Vector3 trunkAxis = thorax.U;
             for (int i = 0; i < 2; i++)
@@ -187,7 +187,7 @@ namespace Brutality.Euphoria
                 int shoulder = (int)AnatomyData.Shoulder(sd);
                 Vector3 sh = B.JointPos((JointId)shoulder);
                 _armK[kk] = Mathf.Min(1f, _armK[kk] + dt * 2f);
-                // Delirium nmcf.rs:278-285 : décalage le long de l'axe buste (out), sonde le long de _dir.
+                // Delirium nmcf.rs:278-285: offset along trunk axis (out), probe along _dir.
                 Vector3 outAxis = _forward > 0f
                     ? BMath.SafeNormalize(trunkAxis + Sensors.Fwd * (0.4f * _upright), trunkAxis)
                     : trunkAxis;
@@ -203,7 +203,7 @@ namespace Brutality.Euphoria
                 if (len > DlCfg.ArmReachLength) delta *= DlCfg.ArmReachLength / len;
                 else if (len < 0.2f && len > 1e-4f) delta *= 0.2f / len;
                 ArmTo(sd, sh + delta, 1f, DlCfg.CatchArmsStiffness * Mathf.Max(0.4f, _armK[kk]), 1f);
-                // Pronation de l'avant-bras (Shot::wrist nmcf.rs:336-340) : tourne la paume face au sol / mur.
+                // Forearm pronation (Shot::wrist nmcf.rs:336-340): turns palm to face the ground / wall.
                 Vector3 palmNormal = hit ? hitNormal : Vector3.up;
                 float pron = DlPhys.ForearmPronationForNormal(B.Body, sd, palmNormal);
                 Ch.BlendDesired((int)AnatomyData.Elbow(sd), 2, pron, hit ? 0.85f : 0.5f);
@@ -212,7 +212,7 @@ namespace Brutality.Euphoria
                 ClavicleFollow(sd);
             }
 
-            // Le cou regarde le point de chute (Delirium : headLook vers head.pos + dir ; Atan2 déjà en radians !).
+            // Neck looks at the landing point (Delirium: headLook toward head.pos + dir; Atan2 already in radians!).
             Vector3 look = B.Part(Seg.Head).Com + _dir;
             Vector3 neckTarget = look - B.JointPos(JointId.Neck);
             float yaw = Mathf.Atan2(Vector3.Dot(neckTarget, Sensors.Right), Vector3.Dot(neckTarget, Sensors.Fwd));
@@ -220,7 +220,7 @@ namespace Brutality.Euphoria
             Ch.BlendDesired((int)JointId.Neck, 0, Mathf.Clamp(-pitchLook, -0.7f, 0.7f), 0.6f);
             Ch.BlendDesired((int)JointId.Neck, 2, Mathf.Clamp(yaw, -0.8f, 0.8f), 0.6f);
 
-            // Au contact, la nuque encaisse : la tête se cale sur l'axe du corps (Delirium : touched).
+            // On contact, the neck braces: head aligns with the body axis (Delirium: touched).
             if (Sensors.HandContact[0] || Sensors.HandContact[1]) _touched = true;
             if (_touched)
             {
@@ -240,9 +240,9 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// bodyRollUp, porté depuis <c>nmru::RollUp</c> de Delirium : mise en boule asymétrique, poussée dynamique des
-    /// jambes modulée par l'orientation du buste (<c>legPush</c>), et bras qui s'étendent vers le sol dans la
-    /// direction de chute pour amortir/freiner la roulade (<c>useArmToSlowDown</c>, <c>armReachAmount</c>).
+    /// bodyRollUp, ported from Delirium's <c>nmru::RollUp</c>: asymmetric curling, dynamic leg
+    /// push modulated by torso orientation (<c>legPush</c>), and arms reaching toward the ground in the
+    /// fall direction to cushion/slow the roll (<c>useArmToSlowDown</c>, <c>armReachAmount</c>).
     /// </summary>
     internal sealed class DlRollUp : DlBehaviour
     {
@@ -294,7 +294,7 @@ namespace Brutality.Euphoria
             _roll = k;
             if (sp < 0.3f) _still += dt; else _still = 0f;
 
-            // Orientation prédite du buste : quand les jambes passent vers le sol, legPush les étend pour relancer la roulade.
+            // Predicted torso orientation: when legs swing toward the ground, legPush extends them to sustain the roll.
             Quaternion dq = Quaternion.AngleAxis(B.AngVel.magnitude * 0.15f * Mathf.Rad2Deg,
                 BMath.SafeNormalize(B.AngVel, Vector3.up));
             Vector3 fPred = dq * th.F;
@@ -311,7 +311,7 @@ namespace Brutality.Euphoria
             float armL = UseArmToSlowDown * spin > 0f ? 1f - Mathf.Abs(spin) * slow : 1f;
             float armR = UseArmToSlowDown * spin <= 0f ? 1f - Mathf.Abs(spin) * slow : 1f;
 
-            // Jambes en boule asymétrique + poussée rythmée (nmru.rs:135-146).
+            // Asymmetric curled legs + rhythmic push (nmru.rs:135-146).
             for (int i = 0; i < 2; i++)
             {
                 int sd = i == 0 ? -1 : 1;
@@ -338,7 +338,7 @@ namespace Brutality.Euphoria
             Ch.SetRelative((int)JointId.Neck, 0, (0.35f + 0.25f * k) * w);
             Ch.SetOpposeGravity((int)JointId.Lumbar, 0f);
 
-            // Bras amortisseurs (Delirium nmru.rs:167-202) : tendent vers le sens de chute pour protéger la tête.
+            // Cushioning arms (Delirium nmru.rs:167-202): reach toward the fall direction to protect the head.
             for (int i = 0; i < 2; i++)
             {
                 if (Ch.Busy[i]) continue;
@@ -368,9 +368,9 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// rollDownStairs, porté depuis <c>nmrds::RollDownStairs</c> de Delirium : pilote <see cref="DlRollUp"/> pour la
-    /// posture en boule + bras amortisseurs, suit la direction lissée du mouvement (ou imposée), applique le couple
-    /// d'aide au roulement dans <see cref="Forces"/> et réduit la vrille parasite autour de la verticale.
+    /// rollDownStairs, ported from Delirium's <c>nmrds::RollDownStairs</c>: drives <see cref="DlRollUp"/> for the
+    /// curled posture + cushioning arms, follows smoothed movement (or imposed) direction, applies the
+    /// roll-assist torque in <see cref="Forces"/>, and reduces parasitic spin around the vertical axis.
     /// </summary>
     internal sealed class DlRollDownStairs : DlBehaviour
     {
@@ -384,12 +384,12 @@ namespace Brutality.Euphoria
         private readonly DlRollUp _rollUp;
         private float _slope;
 
-        /// <param name="maxAge">Durée de vie du roulement : une roulade au sol s'arrête plus tôt qu'une chute.</param>
+        /// <param name="maxAge">Roll lifetime: a ground roll stops sooner than a fall.</param>
         public DlRollDownStairs(NmPerformance perf, float t, Vector3 dir, float maxAge = 4f, bool customDir = true) : base(perf, "rollDownStairs", t)
         {
             _maxAge = maxAge;
             _customDir = customDir;
-            perf.Log(t, maxAge < 4f ? "rollDownStairs (au sol)" : "rollDownStairs");
+            perf.Log(t, maxAge < 4f ? "rollDownStairs (on ground)" : "rollDownStairs");
             _dir = BMath.SafeNormalize(dir, Sensors.Fwd);
             _sum = Vector3.down;
             _rollUp = new DlRollUp(perf, t, DlCfg.RollStiffness)
@@ -407,8 +407,8 @@ namespace Brutality.Euphoria
             if (!Active) return;
             float w = Mathf.Clamp01(weight);
             if (w <= 0.02f) return;
-            // La roulade s'éteint d'elle-même quand le corps a fini de tourner (Delirium arrête le sous-comportement
-            // sur la vitesse, pas à l'instant du contact).
+            // The roll stops by itself when the body finishes spinning (Delirium stops the sub-behavior
+            // based on velocity, not at the instant of contact).
             float speedNow = Horiz(B.Vel).magnitude;
             if (t - Start > _maxAge || (t - Start > 1.2f && speedNow < 0.45f && B.AngVel.magnitude < 1.2f))
             {
@@ -422,7 +422,7 @@ namespace Brutality.Euphoria
             _rollUp.Tick(t, dt, w);
         }
 
-        /// <summary>Couple de roulement fidèle à <c>nmrds::RollDownStairs::roll_force</c> (appliqué dans Forces).</summary>
+        /// <summary>Roll torque faithful to <c>nmrds::RollDownStairs::roll_force</c> (applied in Forces).</summary>
         public void Forces(float t, float dt, float weight)
         {
             if (!Active) return;
@@ -445,7 +445,7 @@ namespace Brutality.Euphoria
             float alphaMag = Mathf.Clamp((targetW - wNow) * 4.2f, -14f, 14f) * ForceMag * airScale * w;
             DlPhys.BodyAngularAccel(B, axis * alphaMag);
 
-            // Réduction du spin parasite autour de la verticale (nmcf::spin_reduction).
+            // Reduction of parasitic spin around the vertical axis (nmcf::spin_reduction).
             if (ZAxisSpinReduction > 0f && touching)
             {
                 float yawW = Vector3.Dot(B.AngVel, Vector3.up);
@@ -463,9 +463,9 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// armsWindmill (Delirium : <c>nmaw::Windmill</c>) : cercles sagittaux déphasés entre bras gauche et droit,
-    /// sens piloté par la vitesse angulaire du tronc, arrêt individuel d'un bras dès contact (<c>disableOnImpact</c>),
-    /// et contre-torsion du rachis et du cou en phase avec les moulinets.
+    /// armsWindmill (Delirium: <c>nmaw::Windmill</c>): phase-offset sagittal circles between left and right arms,
+    /// direction driven by trunk angular velocity, individual arm stop on contact (<c>disableOnImpact</c>),
+    /// and counter-twist of spine and neck in phase with the windmilling.
     /// </summary>
     internal sealed class DlWindmill : DlBehaviour
     {
@@ -478,7 +478,7 @@ namespace Brutality.Euphoria
         public DlWindmill(NmPerformance perf, float t) : base(perf, "armsWindmill", t)
         {
             _ph = BMath.Range(perf.Rng, 0f, BMath.TwoPi);
-            // Déphasage naturel (en opposition, jamais synchrone comme un robot).
+            // Natural phase offset (in opposition, never robotic-synchronous).
             PhaseOffset = BMath.Range(perf.Rng, 2.2f, 4.0f);
         }
 
@@ -495,7 +495,7 @@ namespace Brutality.Euphoria
             }
             if (!_going[0] && !_going[1])
             {
-                // Delirium nmaw.rs:68-73 : quand les deux bras ont touché, la raideur retombe.
+                // Delirium nmaw.rs:68-73: when both arms have touched, stiffness drops.
                 Ch.SetStiffness("ua", DlCfg.WindmillShoulderStiffness * 0.5f, 1f);
                 return;
             }
@@ -515,10 +515,10 @@ namespace Brutality.Euphoria
                 Vector3 target = c + th.F * (r * Mathf.Cos(at)) + th.U * (r * Mathf.Sin(at));
                 ArmTo(sd, target, u, DlCfg.WindmillShoulderStiffness, 1f);
                 Ch.SetStiffness(AnatomyData.Elbow(sd), DlCfg.WindmillElbowStiffness, 1f);
-                // Prono-supination oscillante pendant les moulinets.
+                // Oscillating pronation-supination during windmilling.
                 Ch.BlendDesired((int)AnatomyData.Elbow(sd), 2, Mathf.Cos(at) * 0.7f * Motor.InternalRotSign(sd), u * 0.7f);
             }
-            // Contre-torsion du rachis et du cou (Delirium nmaw.rs:95-99).
+            // Spine and neck counter-twist (Delirium nmaw.rs:95-99).
             float s = Mathf.Sin(_ph);
             Ch.BlendDesired((int)JointId.Lumbar, 2, s * 0.22f, u * 0.7f);
             Ch.BlendDesired((int)JointId.Neck, 2, -s * 0.3f, u * 0.6f);
@@ -526,7 +526,7 @@ namespace Brutality.Euphoria
         }
     }
 
-    /// <summary>pedalLegs : chevilles lancées sur des cercles désynchronisés (Delirium : nmpd).</summary>
+    /// <summary>pedalLegs: ankles driven on desynchronized circles (Delirium: nmpd).</summary>
     internal sealed class DlPedal : DlBehaviour
     {
         private readonly float[] _ph = { 0f, Mathf.PI };
@@ -562,8 +562,8 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// bodyWrithe, porté depuis <c>nmbw::Writhe</c> : chaque articulation dérive sur un bruit lissé (périodes
-    /// distinctes pour les bras, le dos et les jambes), avec repli des membres et balancement d'un flanc à l'autre.
+    /// bodyWrithe, ported from <c>nmbw::Writhe</c>: each joint drifts on smoothed noise (distinct
+    /// periods for arms, back, and legs), with limb tucking and side-to-side rocking.
     /// </summary>
     internal sealed class DlWrithe : DlBehaviour
     {
@@ -617,11 +617,11 @@ namespace Brutality.Euphoria
                     for (int d = 0; d < 3; d++) Ch.BlendDesired(sh, d, LerpMid(sh, d, x[d]), u * armsBlend);
                     float elbow = Mathf.Clamp((i == 0 ? Mathf.Sin(a + p22) : Mathf.Cos(a + p23)) * amp, -1f, 1f);
                     Ch.BlendDesired(el, 0, LerpMid(el, 0, elbow), u * armsBlend);
-                    // Prono-supination agonique des avant-bras.
+                    // Agonic forearm pronation-supination.
                     Ch.BlendDesired(el, 2, LerpMid(el, 2, Mathf.Sin(a * 0.8f + (i == 0 ? p15 : p24)) * 0.8f), u * armsBlend);
                 }
 
-                // Dissymétrie gauche/droite fidèle à nmbw.rs:131-138 (sin à gauche, cos à droite).
+                // Left/right asymmetry faithful to nmbw.rs:131-138 (sin on left, cos on right).
                 float g = _t * 2f;
                 float la = amp;
                 if (i == 0)
@@ -658,7 +658,7 @@ namespace Brutality.Euphoria
             _rollT += dt;
         }
 
-        /// <summary>Balancement d'un flanc à l'autre au sol (Delirium nmbw.rs:139-150), appliqué dans Forces().</summary>
+        /// <summary>Side-to-side rocking on the ground (Delirium nmbw.rs:139-150), applied in Forces().</summary>
         public void Forces(float t, float dt, float weight)
         {
             if (!Active || !RollOver || _lastU <= 0.02f) return;
@@ -678,7 +678,7 @@ namespace Brutality.Euphoria
         }
     }
 
-    /// <summary>bodyFoetal, porté depuis <c>nmbf::Foetal</c> : repli avec asymétrie de raideur, torsion du dos et pronation.</summary>
+    /// <summary>bodyFoetal, ported from <c>nmbf::Foetal</c>: curling with stiffness asymmetry, back twist, and pronation.</summary>
     internal sealed class DlFoetal : DlBehaviour
     {
         private readonly float[] _asym = { 1f, 1f };
@@ -737,8 +737,8 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// injuredOnGround, porté depuis <c>nmshot</c> : les mains reviennent sur les plaies accessibles, un genou remonte
-    /// par instants, la tête suit la douleur et le corps tente de rouler vers la blessure.
+    /// injuredOnGround, ported from <c>nmshot</c>: hands return to reachable wounds, a knee occasionally
+    /// pulls up, head follows pain, and the body attempts to roll toward the injury.
     /// </summary>
     internal sealed class DlInjuredOnGround : DlBehaviour
     {

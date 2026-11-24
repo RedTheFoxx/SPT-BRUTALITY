@@ -7,9 +7,9 @@ using static Brutality.Neural.Motor;
 namespace Brutality.Neural
 {
     /// <summary>
-    /// Respiration laborieuse : soulèvement du buste, tête qui bascule légèrement en arrière et épaules qui se
-    /// haussent à chaque inspiration (inspiration brève, expiration lente). Rapide et ample pendant l'agonie,
-    /// elle ralentit et s'amenuise à mesure qu'elle s'éteint. Couche de fond, masquée par les gestes francs.
+    /// Labored breathing: chest rises, head tilts slightly back, and shoulders lift on each inhalation
+    /// (brief inhale, slow exhale). Fast and deep during agony, it slows and fades as agony subsides.
+    /// Background layer, masked by overt gestures.
     /// </summary>
     internal sealed class LaboredBreathing : MotorProgram
     {
@@ -22,7 +22,7 @@ namespace Brutality.Neural
 
         public LaboredBreathing(float start, float duration, System.Random rng)
         {
-            Name = "Respiration laborieuse";
+            Name = "Labored breathing";
             Start = start; Duration = duration; Attack = 0.6f; Release = 1f;
             _fast = BMath.Range(rng, 0.9f, 1.4f);
             _slow = BMath.Range(rng, 2.4f, 3.6f);
@@ -62,8 +62,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Dernier soupir : une inspiration profonde (buste qui se soulève, tête rejetée, épaules haussées), un temps
-    /// d'arrêt, puis l'expiration et la tête qui roule sur le côté pendant que tout se relâche.
+    /// Last breath: a deep inhalation (chest rises, head tilts back, shoulders lift), a brief pause,
+    /// then exhalation and the head rolling to the side as everything relaxes.
     /// </summary>
     internal sealed class LastBreath : MotorProgram
     {
@@ -75,7 +75,7 @@ namespace Brutality.Neural
 
         public LastBreath(float start, float duration, System.Random rng)
         {
-            Name = "Dernier soupir";
+            Name = "Last breath";
             Start = start; Duration = duration; Attack = 0.05f; Release = 0.1f;
             _inhale = BMath.Range(rng, 0.32f, 0.48f);
             _hold = BMath.Range(rng, 0.12f, 0.28f);
@@ -118,12 +118,12 @@ namespace Brutality.Neural
         }
     }
 
-    // ===================================================================== gestes d'agonie
+    // ===================================================================== agony gestures
 
     /// <summary>
-    /// Crise tonico-clonique (anoxie cérébrale, syncope convulsive) : phase tonique (extension axiale, bras fléchis
-    /// et écartés, jambes raides, vibration), puis secousses cloniques en flexion dont le rythme ralentit
-    /// (de ~7 à ~2 Hz) jusqu'à l'épuisement post-critique.
+    /// Tonic-clonic seizure (cerebral anoxia, convulsive syncope): tonic phase (axial extension, flexed and
+    /// abducted arms, stiff legs, vibration), then clonic flexion jerks whose rhythm slows down
+    /// (from ~7 to ~2 Hz) until post-ictal exhaustion.
     /// </summary>
     internal sealed class TonicClonicSeizure : MotorProgram
     {
@@ -134,7 +134,7 @@ namespace Brutality.Neural
 
         public TonicClonicSeizure(float start, float u, System.Random rng)
         {
-            Name = "Crise tonico-clonique";
+            Name = "Tonic-clonic seizure";
             _tonic = BMath.Range(rng, 0.45f, 0.9f);
             int n = rng.Next(5, 12);
             _jerks = new float[n];
@@ -191,8 +191,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Main tendue : un bras se lève lentement, en tremblant (vers le ciel sur le dos, devant soi sur le ventre
-    /// ou le flanc), la tête tournée vers la main, puis retombe d'un coup.
+    /// Reaching out: one arm slowly rises while trembling (skyward when supine, forward when prone
+    /// or on the side), head turned toward the hand, then drops suddenly.
     /// </summary>
     internal sealed class AgonalReach : MotorProgram
     {
@@ -202,7 +202,7 @@ namespace Brutality.Neural
 
         public AgonalReach(int side, bool skyward, float start, float duration, float u, System.Random rng)
         {
-            Name = skyward ? "Main tendue vers le ciel" : "Main tendue";
+            Name = skyward ? "Reaching skyward" : "Reaching out";
             _side = side;
             if (skyward)
             {
@@ -236,8 +236,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Tentative de ramper (sur le ventre) : bras qui se tendent loin devant puis tirent, en alternance, jambe
-    /// opposée qui se replie en grenouille et pousse, tête relevée. Avec des jambes paralysées, le corps se traîne.
+    /// Crawl attempt (prone): arms alternate reaching far forward then pulling, opposite leg
+    /// bends frog-like and pushes, head lifted. With paralyzed legs, the body drags itself.
     /// </summary>
     internal sealed class CrawlAttempt : MotorProgram
     {
@@ -247,7 +247,7 @@ namespace Brutality.Neural
 
         public CrawlAttempt(int cycles, float start, float period, float u, System.Random rng)
         {
-            Name = "Tentative de ramper";
+            Name = "Crawl attempt";
             _period = period;
             _first = BMath.Chance(rng, 0.5f) ? -1 : 1;
             Start = start; Duration = cycles * period; Attack = 0.25f; Release = 0.4f;
@@ -296,8 +296,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Tentative de se relever (sur le ventre) : mains sous les épaules, les bras poussent en tremblant, le buste se
-    /// décolle et la tête se relève… puis un coude cède et le corps s'écrase.
+    /// Push-up attempt (prone): hands under shoulders, arms push while trembling, chest lifts
+    /// and head rises... then an elbow gives way and the body collapses.
     /// </summary>
     internal sealed class PushUpAttempt : MotorProgram
     {
@@ -307,7 +307,7 @@ namespace Brutality.Neural
 
         public PushUpAttempt(float start, float duration, float u, System.Random rng)
         {
-            Name = "Tentative de se relever";
+            Name = "Push-up attempt";
             _buckle = BMath.Chance(rng, 0.5f) ? -1 : 1;
             _height = BMath.Range(rng, 0.6f, 1f);
             Start = start; Duration = duration; Attack = 0.15f; Release = 0.05f;
@@ -335,14 +335,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Tentative de se redresser (sur le dos) : tête et buste se décollent, appui sur les coudes, puis tout retombe.</summary>
+    /// <summary>Sit-up attempt (supine): head and chest lift off the ground, propping on elbows, then everything drops back.</summary>
     internal sealed class SitUpAttempt : MotorProgram
     {
         private readonly float _u;
 
         public SitUpAttempt(float start, float duration, float u)
         {
-            Name = "Tentative de se redresser";
+            Name = "Sit-up attempt";
             Start = start; Duration = duration; Attack = 0.25f; Release = 0.12f;
             _u = u;
             IsAgonyEvent = true;
@@ -367,7 +367,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>La tête se soulève lentement en tremblant (vers le haut, quelle que soit l'orientation), puis retombe.</summary>
+    /// <summary>The head slowly lifts while trembling (upward, regardless of orientation), then drops back.</summary>
     internal sealed class HeadLift : MotorProgram
     {
         private readonly float _flex, _lat;
@@ -375,7 +375,7 @@ namespace Brutality.Neural
 
         public HeadLift(float supine, float sideUp, float start, float duration, float u, System.Random rng)
         {
-            Name = "Relève la tête";
+            Name = "Head lift";
             if (Mathf.Abs(sideUp) > Mathf.Abs(supine)) { _flex = BMath.Range(rng, 0f, 15f); _lat = 28f * Mathf.Sign(sideUp); }
             else if (supine > 0f) { _flex = BMath.Range(rng, 35f, 50f); _lat = 0f; }
             else { _flex = BMath.Range(rng, -50f, -35f); _lat = 0f; }
@@ -393,7 +393,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Un genou (ou les deux) remonte lentement, le pied glissant au sol, puis la jambe se rallonge.</summary>
+    /// <summary>One knee (or both) slowly draws up with the foot sliding on the ground, then the leg extends back out.</summary>
     internal sealed class KneeRaise : MotorProgram
     {
         private readonly int[] _sides;
@@ -402,7 +402,7 @@ namespace Brutality.Neural
 
         public KneeRaise(int[] sides, float start, float duration, float u, System.Random rng)
         {
-            Name = sides.Length > 1 ? "Genoux qui remontent" : "Genou qui remonte";
+            Name = sides.Length > 1 ? "Knees raising" : "Knee raise";
             _sides = sides;
             _hip = BMath.Range(rng, 60f, 85f); _abd = BMath.Range(rng, 5f, 15f); _knee = BMath.Range(rng, 90f, 115f);
             Start = start; Duration = duration; Attack = 0.5f; Release = 0.3f;
@@ -424,7 +424,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Tambourinement des talons : petites flexions-extensions alternées et rapides des jambes.</summary>
+    /// <summary>Heel drumming: rapid alternating small flexions and extensions of the legs.</summary>
     internal sealed class HeelDrum : MotorProgram
     {
         private readonly float _omega;
@@ -432,7 +432,7 @@ namespace Brutality.Neural
 
         public HeelDrum(float start, float duration, float freq, float u)
         {
-            Name = "Talons qui tambourinent";
+            Name = "Heel drumming";
             Start = start; Duration = duration; Attack = 0.12f; Release = 0.25f;
             _omega = BMath.TwoPi * freq;
             _u = u;
@@ -453,7 +453,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Le bras se lève puis frappe le sol, 2 à 4 fois.</summary>
+    /// <summary>The arm raises then slaps the ground, 2 to 4 times.</summary>
     internal sealed class GroundSlap : MotorProgram
     {
         private readonly int[] _sides;
@@ -462,7 +462,7 @@ namespace Brutality.Neural
 
         public GroundSlap(int[] sides, int reps, float start, float period, float u)
         {
-            Name = "Frappe le sol";
+            Name = "Ground slap";
             _sides = sides;
             _period = period;
             Start = start; Duration = reps * period; Attack = 0f; Release = 0f;
@@ -492,7 +492,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Bras de protection : avant-bras croisés devant le visage, tête détournée, parfois genoux ramenés.</summary>
+    /// <summary>Protective arms: forearms crossed in front of the face, head turned away, sometimes knees drawn up.</summary>
     internal sealed class ShieldArms : MotorProgram
     {
         private readonly int[] _sides;
@@ -502,7 +502,7 @@ namespace Brutality.Neural
 
         public ShieldArms(int[] sides, bool legs, float start, float duration, float u, System.Random rng)
         {
-            Name = "Se protège le visage";
+            Name = "Shielding face";
             _sides = sides;
             _legs = legs;
             _flex = BMath.Range(rng, 98f, 118f);
@@ -535,7 +535,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Jambes en ciseaux (spasticité des adducteurs) : les cuisses se croisent et se décroisent.</summary>
+    /// <summary>Scissor legs (adductor spasticity): the thighs cross and uncross.</summary>
     internal sealed class Scissor : MotorProgram
     {
         private readonly float _period;
@@ -544,7 +544,7 @@ namespace Brutality.Neural
 
         public Scissor(int swaps, float start, float period, float u, System.Random rng)
         {
-            Name = "Jambes en ciseaux";
+            Name = "Scissor legs";
             _period = period;
             _first = BMath.Chance(rng, 0.5f) ? -1 : 1;
             Start = start; Duration = swaps * period; Attack = 0.15f; Release = 0.3f;
@@ -565,7 +565,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Balancement d'un flanc à l'autre : torsion du tronc et de la tête, jambe opposée qui pousse, bras qui croise.</summary>
+    /// <summary>Side-to-side rocking: trunk and head twist, opposite leg pushes, arm crosses over.</summary>
     internal sealed class Rocking : MotorProgram
     {
         private readonly float _period, _phase;
@@ -573,7 +573,7 @@ namespace Brutality.Neural
 
         public Rocking(int cycles, float start, float period, float u, System.Random rng)
         {
-            Name = "Balancement";
+            Name = "Rocking";
             _period = period;
             _phase = BMath.Chance(rng, 0.5f) ? 0f : Mathf.PI;
             Start = start; Duration = cycles * period; Attack = 0.25f; Release = 0.35f;
@@ -588,7 +588,7 @@ namespace Brutality.Neural
             float u = _u * k;
             Pose(ns, JointId.Lumbar, 10f, 10f * s, 28f * s, u, 0.85f);
             Pose(ns, JointId.Neck, 10f, NoChange, 32f * s, u * 0.8f, 0.7f);
-            int push = s > 0f ? -1 : 1;   // la jambe opposée au sens de la torsion pousse
+            int push = s > 0f ? -1 : 1;   // the leg opposite to the twist direction pushes
             float m = Mathf.Abs(s);
             Pose(ns, AnatomyData.Hip(push), 45f * m, -10f * m, NoChange, u, 0.8f);
             Pose(ns, AnatomyData.Knee(push), 65f * m, NoChange, NoChange, u, 0.8f);
@@ -597,7 +597,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Mains au visage (brûlures, tête, souffle) : cinématique inverse vers l'avant du visage, tête fléchie.</summary>
+    /// <summary>Hands to face (burns, head, blast): inverse kinematics toward the front of the face, head flexed.</summary>
     internal sealed class HandsToFace : MotorProgram
     {
         private readonly int[] _sides;
@@ -605,7 +605,7 @@ namespace Brutality.Neural
 
         public HandsToFace(int[] sides, float start, float duration, float u)
         {
-            Name = "Mains au visage";
+            Name = "Hands to face";
             _sides = sides;
             Start = start; Duration = duration; Attack = 0.2f; Release = 0.35f;
             _u = u;

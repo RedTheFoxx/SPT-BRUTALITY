@@ -13,15 +13,15 @@ using UnityEngine;
 namespace Brutality.Patches
 {
     /// <summary>
-    /// Points d'ancrage dans le jeu (Harmony) :
-    ///  1. UnityEngine.Physics.Simulate  — préfixe : Brutality agit avant chaque pas PhysX (EFT simule en mode Script,
-    ///     Smoothie plafonne la fréquence à 60 Hz : les couples restent cohérents quel que soit le pas) ;
-    ///  2. Player.OnDead                 — postfixe : prise en charge du cadavre qui vient d'être créé ;
-    ///  3. *.ApplyDamageInfo             — préfixe : historique des blessures (toutes les surcharges, Fika compris) ;
-    ///  4. PlayerRigidbodySleepHierarchy.TryPutToSleep — préfixe : les corps gérés par Brutality ne sont pas rendormis
-    ///     de force par EFT (qui appellerait Sleep() à chaque image) : le sommeil naturel de PhysX suffit ;
-    ///  5. GameWorld.OnGameStarted       — postfixe : enveloppe le délégué de tir de BallisticsCalculator (comme HollywoodFX)
-    ///     pour transmettre aux corps simulés les balles qui les touchent.
+    /// Game hook points (Harmony):
+    ///  1. UnityEngine.Physics.Simulate  — prefix: Brutality runs before each PhysX step (EFT simulates in Script mode,
+    ///     Smoothie caps the rate at 60 Hz: torques remain consistent regardless of step size);
+    ///  2. Player.OnDead                 — postfix: takes over the newly created corpse;
+    ///  3. *.ApplyDamageInfo             — prefix: wound history (all overloads, including Fika);
+    ///  4. PlayerRigidbodySleepHierarchy.TryPutToSleep — prefix: bodies managed by Brutality are not force-slept
+    ///     by EFT (which would call Sleep() every frame): PhysX natural sleep is sufficient;
+    ///  5. GameWorld.OnGameStarted       — postfix: wraps BallisticsCalculator's shot delegate (like HollywoodFX)
+    ///     to forward bullets hitting simulated corpses.
     /// </summary>
     internal static class BrutalityPatches
     {
@@ -45,8 +45,8 @@ namespace Brutality.Patches
             Try("ApplyDamageInfo", () =>
             {
                 int n = 0;
-                // Préfixe : la mort (Player.OnDead) est déclenchée *pendant* ApplyDamageInfo ; la blessure fatale
-                // doit donc être enregistrée avant l'appel d'origine.
+                // Prefix: death (Player.OnDead) is triggered *during* ApplyDamageInfo; the fatal wound
+                // must therefore be recorded before the original call.
                 var pre = new HarmonyMethod(typeof(BrutalityPatches), nameof(DamagePrefix)) { priority = Priority.First };
                 foreach (var m in FindDamageMethods())
                 {
@@ -57,10 +57,10 @@ namespace Brutality.Patches
                     }
                     catch (Exception e)
                     {
-                        Plugin.Log.LogWarning($"Brutality : impossible de patcher {m.DeclaringType?.FullName}.ApplyDamageInfo : {e.Message}");
+                        Plugin.Log.LogWarning($"Brutality: unable to patch {m.DeclaringType?.FullName}.ApplyDamageInfo: {e.Message}");
                     }
                 }
-                Plugin.Log.LogInfo($"Brutality : suivi des blessures sur {n} implémentation(s) de ApplyDamageInfo.");
+                Plugin.Log.LogInfo($"Brutality: wound tracking on {n} ApplyDamageInfo implementation(s).");
             });
 
             Try("GameWorld.OnGameStarted", () =>
@@ -69,14 +69,14 @@ namespace Brutality.Patches
                 h.Patch(m, postfix: new HarmonyMethod(typeof(BrutalityPatches), nameof(GameStartedPostfix)) { priority = Priority.Low });
             });
 
-            // Fin de raid : libère les composants (listes statiques, délégués, joints) au lieu de les laisser
-            // s'accumuler d'un raid à l'autre.
+            // End of raid: release components (static lists, delegates, joints) instead of letting them
+            // accumulate from raid to raid.
             Try("GameWorld.OnDestroy", () =>
             {
                 var m = AccessTools.DeclaredMethod(typeof(GameWorld), "OnDestroy");
                 if (m == null || m.DeclaringType != typeof(GameWorld))
                 {
-                    Plugin.LogDebug("Brutality : GameWorld.OnDestroy non déclaré ; le nettoyage sera fait au raid suivant.");
+                    Plugin.LogDebug("Brutality: GameWorld.OnDestroy not declared; cleanup will run on next raid.");
                     return;
                 }
                 h.Patch(m, postfix: new HarmonyMethod(typeof(BrutalityPatches), nameof(WorldDestroyedPostfix)) { priority = Priority.Low });
@@ -97,7 +97,7 @@ namespace Brutality.Patches
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"Brutality : échec du patch {name} : {e}");
+                Plugin.Log.LogError($"Brutality: patch {name} failed: {e}");
             }
         }
 
@@ -134,7 +134,7 @@ namespace Brutality.Patches
             return found;
         }
 
-        // ------------------------------------------------------------------ patchs
+        // ------------------------------------------------------------------ patches
 
         private static void SimulatePrefix(float step)
         {
@@ -162,7 +162,7 @@ namespace Brutality.Patches
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError("Brutality : prise en charge de la mort impossible : " + e);
+                Plugin.Log.LogError("Brutality: unable to take over death: " + e);
             }
         }
 
@@ -175,11 +175,11 @@ namespace Brutality.Patches
             }
             catch (Exception e)
             {
-                Plugin.LogDebug("enregistrement de blessure : " + e.Message);
+                Plugin.LogDebug("wound recording: " + e.Message);
             }
         }
 
-        // ------------------------------------------------------------------ balles sur les corps simulés
+        // ------------------------------------------------------------------ bullets on simulated bodies
 
         private static readonly AccessTools.FieldRef<BallisticsCalculator, ShotDelegate> ShotDelegateRef =
             AccessTools.FieldRefAccess<BallisticsCalculator, ShotDelegate>("_shotDelegate");
@@ -190,38 +190,38 @@ namespace Brutality.Patches
         {
             try
             {
-                // Restes éventuels d'un raid dont le GameWorld n'a pas déclenché OnDestroy.
+                // Any leftovers from a raid whose GameWorld did not trigger OnDestroy.
                 BrutalityRagdoll.ClearAll();
                 var calc = __instance != null ? __instance.GetComponent<BallisticsCalculator>() : null;
                 if (calc == null) return;
                 var current = ShotDelegateRef(calc);
                 if (current == null) return;
-                // Ne jamais envelopper deux fois : le délégué s'appellerait lui-même en boucle.
+                // Never wrap twice: the delegate would call itself in a loop.
                 if (current == (ShotDelegate)OnShot) return;
                 _originalShot = current;
                 ShotDelegateRef(calc) = OnShot;
-                Plugin.LogDebug("Brutality : délégué de tir enveloppé (balles sur les corps simulés).");
+                Plugin.LogDebug("Brutality: shot delegate wrapped (bullets on simulated bodies).");
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning("Brutality : impossible d'intercepter les tirs sur les cadavres : " + e.Message);
+                Plugin.Log.LogWarning("Brutality: unable to intercept shots on corpses: " + e.Message);
             }
         }
 
         private static void WorldDestroyedPostfix()
         {
             try { BrutalityRagdoll.ClearAll(); }
-            catch (Exception e) { Plugin.LogDebug("nettoyage de fin de raid : " + e.Message); }
+            catch (Exception e) { Plugin.LogDebug("end-of-raid cleanup: " + e.Message); }
         }
 
         private static void OnShot(Shot shot)
         {
             try { ForwardShot(shot); }
-            catch (Exception e) { Plugin.LogDebug("tir sur cadavre : " + e.Message); }
+            catch (Exception e) { Plugin.LogDebug("shot on corpse: " + e.Message); }
             _originalShot?.Invoke(shot);
         }
 
-        /// <summary>Quantité de mouvement transmise (p = m·v, variation propre à la classe de munition) puis file du corps touché.</summary>
+        /// <summary>Transferred momentum (p = m·v, variation specific to ammo class) then forwarded to the struck body.</summary>
         private static void ForwardShot(Shot shot)
         {
             if (shot == null || !Settings.Enabled.Value) return;

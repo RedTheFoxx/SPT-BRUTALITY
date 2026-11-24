@@ -6,37 +6,36 @@ using UnityEngine;
 namespace Brutality.Core
 {
     /// <summary>
-    /// Signature d'une mort : ce qui distingue cette agonie de la précédente. Elle est tirée une seule fois, à la mort,
-    /// puis lue par le contrôleur neural (palette de gestes, cadence, asymétrie) et par la performance Euphoria
-    /// (bascule, vrille).
+    /// Death signature: what distinguishes this agony from the previous one. Drawn once at death,
+    /// then read by the neural controller (gesture palette, tempo, asymmetry) and by the Euphoria performance
+    /// (topple, spin).
     /// </summary>
     internal sealed class DeathSignature
     {
-        /// <summary>Cadence des gestes involontaires (0,8 à 1,28).</summary>
+        /// <summary>Cadence of involuntary gestures (0.8 to 1.28).</summary>
         public float Tempo = 1f;
-        /// <summary>Amplitude du tremblement (0,7 à 1,4).</summary>
+        /// <summary>Tremor amplitude (0.7 to 1.4).</summary>
         public float Tremor = 1f;
-        /// <summary>Amplitude des contorsions continues (0,7 à 1,35).</summary>
+        /// <summary>Continuous writhing amplitude (0.7 to 1.35).</summary>
         public float Writhing = 1f;
-        /// <summary>Asymétrie du corps (-1 à 1) : un côté est plus actif que l'autre.</summary>
+        /// <summary>Body asymmetry (-1 to 1): one side is more active than the other.</summary>
         public float Asymmetry;
-        /// <summary>Modulation de la bascule de chute (0,8 à 1,25).</summary>
+        /// <summary>Fall topple modulation (0.8 to 1.25).</summary>
         public float ToppleJitter = 1f;
-        /// <summary>Multiplicateur de poids par geste : la « palette » de cette mort.</summary>
+        /// <summary>Weight multiplier per gesture: the "palette" of this death.</summary>
         public float[] Palette = Array.Empty<float>();
     }
 
     /// <summary>
-    /// Mémoire des morts récentes. Deux morts ne doivent jamais se ressembler : ce directeur retient les plans de
-    /// chute et les gestes des dernières morts de la session et pénalise leur retour, et tire pour chaque mort une
-    /// palette de gestes privilégiés / atténués. Le résultat est combinatoire : quelques plans × une palette propre
-    /// à chaque mort × des paramètres continus (cadence, asymétrie, bascule) donnent un très grand nombre de
-    /// cinématiques distinctes.
+    /// Memory of recent deaths. No two deaths should ever look alike: this director remembers the fall plans
+    /// and gestures of recent deaths in the session, penalizes their recurrence, and draws a palette of
+    /// favored / attenuated gestures for each death. The result is combinatorial: a few plans × a per-death
+    /// palette × continuous parameters (tempo, asymmetry, topple) yield a huge number of distinct kinematics.
     /// </summary>
     internal static class VarietyDirector
     {
         private const int PlanMemory = 5;
-        /// <summary>Nombre de morts prises en compte pour la mémoire des gestes.</summary>
+        /// <summary>Number of deaths considered for gesture memory.</summary>
         private const int GestureDeaths = 2;
 
         private static readonly List<int> Plans = new List<int>(PlanMemory);
@@ -45,10 +44,10 @@ namespace Brutality.Core
         private static readonly List<int> PreviousGestures = new List<int>(16);
         private static int _deathIndex;
 
-        /// <summary>Nombre de morts traitées depuis le chargement (journal).</summary>
+        /// <summary>Number of deaths processed since loading (log).</summary>
         public static int DeathCount => _deathIndex;
 
-        /// <summary>Nouvelle mort : la mort précédente devient l'historique, l'historique ancien est oublié.</summary>
+        /// <summary>New death: the previous death becomes history, older history is forgotten.</summary>
         public static void BeginDeath()
         {
             _deathIndex++;
@@ -57,11 +56,11 @@ namespace Brutality.Core
             LastGestures.Clear();
         }
 
-        // ---------------------------------------------------------------- plans de chute
+        // ---------------------------------------------------------------- fall plans
 
         /// <summary>
-        /// Poids relatif d'un plan de chute : un plan déjà joué récemment est fortement déconseillé, pour qu'une
-        /// même silhouette de mort ne revienne pas avant plusieurs corps.
+        /// Relative weight of a fall plan: a recently played plan is strongly discouraged so that
+        /// the same death silhouette does not repeat for several bodies.
         /// </summary>
         public static float PlanMultiplier(int kind)
         {
@@ -83,7 +82,7 @@ namespace Brutality.Core
             while (Sectors.Count > 2) Sectors.RemoveAt(Sectors.Count - 1);
         }
 
-        /// <summary>Secteur de chute dans le repère du corps : 0 avant, 1 côté, 2 arrière.</summary>
+        /// <summary>Fall sector in the body frame: 0 front, 1 side, 2 back.</summary>
         public static int Sector(float azimuth)
         {
             float a = Mathf.Abs(Mathf.Repeat(azimuth, BMath.TwoPi));
@@ -92,9 +91,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Pénalité de direction : après une chute arrière, une autre chute arrière est improbable. Sans cette
-        /// mémoire, les plans arrière (effondrement, titubation, assis, planche) s'enchaînent et donnent l'impression
-        /// que tous les corps basculent du même côté.
+        /// Direction penalty: after a backward fall, another backward fall is unlikely. Without this
+        /// memory, backward plans (collapse, stagger, sit, plank) chain together and make it look like
+        /// all bodies topple to the same side.
         /// </summary>
         public static float SectorMultiplier(float azimuth)
         {
@@ -105,7 +104,7 @@ namespace Brutality.Core
             return m;
         }
 
-        // ---------------------------------------------------------------- gestes
+        // ---------------------------------------------------------------- gestures
 
         public static void RecordGesture(AgonyEvent e)
         {
@@ -114,8 +113,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Pénalité de récence d'un geste : celui de la mort précédente est rare, celui de l'avant-dernière le sera
-        /// un peu moins. Un geste peut donc revenir, mais jamais comme habitude.
+        /// Recency penalty for a gesture: one from the previous death is rare, one from two deaths ago
+        /// slightly less so. A gesture can still recur, but never as a habit.
         /// </summary>
         public static float GestureMultiplier(AgonyEvent e)
         {
@@ -126,11 +125,11 @@ namespace Brutality.Core
             return m;
         }
 
-        // ---------------------------------------------------------------- tirage de la signature
+        // ---------------------------------------------------------------- signature draw
 
         /// <summary>
-        /// Tire la signature de la mort. <paramref name="variety"/> (réglage « Variété des gestes ») module l'écart
-        /// entre les palettes : à 0, toutes les morts partagent la même palette neutre.
+        /// Draws the death signature. <paramref name="variety"/> ("Gesture variety" setting) modulates the spread
+        /// between palettes: at 0, all deaths share the same neutral palette.
         /// </summary>
         public static DeathSignature Draw(System.Random rng, float variety)
         {
@@ -148,7 +147,7 @@ namespace Brutality.Core
             s.Palette = new float[n];
             for (int i = 0; i < n; i++) s.Palette[i] = 1f;
 
-            // Gestes privilégiés : chaque mort a sa « signature » gestuelle.
+            // Favored gestures: each death has its own gestural "signature".
             int boost = 4 + rng.Next(3);
             for (int b = 0; b < boost; b++)
             {
@@ -156,7 +155,7 @@ namespace Brutality.Core
                 float m = BMath.Range(rng, 1.5f, 3.2f);
                 s.Palette[i] = Mathf.Max(s.Palette[i], Mathf.Lerp(1f, m, v));
             }
-            // Gestes atténués : deux morts de suite ne montrent pas les mêmes réflexes.
+            // Attenuated gestures: two consecutive deaths do not show the same reflexes.
             int damp = 3 + rng.Next(3);
             for (int d = 0; d < damp; d++)
             {
@@ -167,7 +166,7 @@ namespace Brutality.Core
             return s;
         }
 
-        /// <summary>Réinitialise la mémoire (changement de raid : les corps précédents ne sont plus visibles).</summary>
+        /// <summary>Resets memory (raid change: previous bodies are no longer visible).</summary>
         public static void Reset()
         {
             Plans.Clear();

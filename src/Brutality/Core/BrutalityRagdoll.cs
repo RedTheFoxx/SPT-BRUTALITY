@@ -12,10 +12,10 @@ using UnityEngine;
 namespace Brutality.Core
 {
     /// <summary>
-    /// Composant attaché au cadavre pendant sa simulation. Pilote, avant chaque pas PhysX, le système nerveux,
-    /// les muscles et les tissus. Après la phase active (10 s au plus), le cadavre n'est plus figé : il reste simulé
-    /// (sommeil PhysX au repos, quasi gratuit) et réagit aux balles et aux chocs ; au-delà du plafond de cadavres
-    /// simulés, les plus anciens sont rendus au jeu, qui les fige comme en vanilla.
+    /// Component attached to the corpse during its simulation. Drives the nervous system, muscles, and tissues
+    /// before each PhysX step. After the active phase (at most 10 s), the corpse is no longer frozen: it remains
+    /// simulated (PhysX sleep at rest, virtually free) and reacts to bullets and impacts; beyond the simulated
+    /// corpse cap, the oldest ones are handed back to the game, which freezes them like vanilla.
     /// </summary>
     internal sealed class BrutalityRagdoll : MonoBehaviour
     {
@@ -64,8 +64,8 @@ namespace Brutality.Core
         private readonly List<PendingHit> _hits = new List<PendingHit>(4);
 
         public float Age => Time.time - _t0;
-        /// <summary>Tant que Brutality gère le corps, la mise en sommeil d'EFT (qui rendort le corps à chaque image) est bloquée :
-        /// le sommeil naturel de PhysX suffit et une balle peut réveiller le corps.</summary>
+        /// <summary>As long as Brutality manages the body, EFT's sleep check (which puts the body back to sleep every frame)
+        /// is blocked: PhysX's natural sleep suffices and a bullet can wake the body.</summary>
         public bool KeepAwake => !_released;
 
         public static BrutalityRagdoll OwnerOf(Rigidbody rb)
@@ -74,7 +74,7 @@ namespace Brutality.Core
             return RbOwners.TryGetValue(rb, out var owner) && owner != null ? owner : null;
         }
 
-        // ------------------------------------------------------------------ initialisation
+        // ------------------------------------------------------------------ initialization
 
         public bool Initialize(Player player, Corpse corpse, CorpseRagdoll ragdoll, bool observed)
         {
@@ -87,29 +87,29 @@ namespace Brutality.Core
             _body = BodyModel.TryBuild(ragdoll, player, _ctx, out string error);
             if (_body == null)
             {
-                Plugin.Log.LogWarning("Brutality : ragdoll non pris en charge (" + error + ") — comportement vanilla conservé.");
+                Plugin.Log.LogWarning("Brutality: unsupported ragdoll (" + error + ") — keeping vanilla behavior.");
                 return false;
             }
 
             int max = Settings.MaxSimultaneousCorpses.Value;
             float dist = CameraDistance(_body[Seg.Pelvis].T.position);
-            // Seuls les corps en phase active comptent : les cadavres endormis (simulation permanente) ne coûtent presque rien.
+            // Only active-phase bodies count: sleeping corpses (permanent simulation) cost almost nothing.
             int simulating = 0;
             foreach (var r in Active) if (r != null && !r._dormant) simulating++;
             _light = simulating >= max || dist > Settings.FullSimulationDistance.Value;
 
-            // Initialiser le contrôleur moteur AVANT de remplacer les CharacterJoint d'EFT (si Init échoue,
-            // les joints d'origine n'ont pas encore été détruits et le ragdoll reste 100 % vanilla).
+            // Initialize the motor controller BEFORE replacing EFT's CharacterJoints (if Init fails,
+            // the original joints have not been destroyed yet and the ragdoll stays 100% vanilla).
             try
             {
-                // État courant des segments (orientation, CdM) : la performance Euphoria choisit son plan dès l'initialisation.
+                // Current segment state (orientation, CoM): the Euphoria performance chooses its plan at init.
                 _body.ReadState();
                 _neural = new NeuralController();
                 _neural.Init(_body, _ctx, _light, _maxDuration);
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError("Brutality : initialisation du contrôle moteur impossible — comportement vanilla conservé. " + e);
+                Plugin.Log.LogError("Brutality: motor controller initialization failed — keeping vanilla behavior. " + e);
                 try { _body.Restore(); } catch { }
                 _body = null;
                 return false;
@@ -119,38 +119,38 @@ namespace Brutality.Core
             _impulses = _neural.Nm?.Impulses ?? new NmImpulseQueue(_body, _ch);
             _permanent = Settings.PermanentSimulation.Value && !observed;
 
-            // Joints anatomiques PhysX (butées exactes + muscles en drives implicites).
+            // Anatomical PhysX joints (exact limits + implicit drive muscles).
             int converted = JointRig.Build(_body);
             if (converted < AnatomyData.JointCount)
-                Plugin.Log.LogWarning($"Brutality : {converted}/{AnatomyData.JointCount} articulations converties en joints anatomiques.");
+                Plugin.Log.LogWarning($"Brutality: {converted}/{AnatomyData.JointCount} joints converted to anatomical joints.");
 
 
-            // Les muscles sont déjà actifs à l'instant de la mort : pas d'affaissement artificiel au premier pas.
+            // Muscles are already active at the moment of death: no artificial slump on the first step.
             foreach (var jm in _body.Joints)
                 for (int d = 0; d < 3; d++)
                 {
                     jm.Activation[d] = _neural.InitialTone * jm.Capacity[d];
-                    jm.Ref[d] = jm.Phi[d];   // la trajectoire de référence part de la pose de la mort
+                    jm.Ref[d] = jm.Phi[d];   // reference trajectory starts from the death pose
                     jm.RefV[d] = 0f;
                 }
 
-            // L'arrêt du ragdoll passe par le délégué du jeu : on l'enveloppe (compatible Smoothie, HollywoodFX, Fika).
+            // Ragdoll stopping goes through the game's delegate: wrap it (compatible with Smoothie, HollywoodFX, Fika).
             _originalCheck = ragdoll._checkCorpseIsStill;
             ragdoll._checkCorpseIsStill = CheckCorpseIsStill;
-            // L'impulsion vanilla (HIT_FORCE = 150 N·s, irréaliste) est remplacée par l'impulsion balistique réelle.
+            // Vanilla impulse (HIT_FORCE = 150 N·s, unrealistic) is replaced by real ballistic impulse.
             ragdoll._hasImpulse = false;
 
             foreach (var s in _body.Segs) RbOwners[s.Rb] = this;
             Active.Add(this);
 
             Plugin.Log.LogInfo(string.Format(
-                "Brutality : {0} mort — {1}, zone {2}/{3}, {4}, {5:0} J, {6:0.0} N·s, masse {7:0} kg (+{8:0.0} kg équipement), posture {9}{10}",
+                "Brutality: {0} died — {1}, zone {2}/{3}, {4}, {5:0} J, {6:0.0} N·s, mass {7:0} kg (+{8:0.0} kg gear), pose {9}{10}",
                 player.Profile?.Nickname ?? player.ProfileId, _ctx.Mechanism, _ctx.BodyPart, _ctx.ColliderType,
-                (_ctx.Ammo?.Caliber ?? _ctx.DamageType.ToString()) + (_ctx.Ammo != null ? $" ({_ctx.KickClass}, poussée ×{_ctx.KickScale:0.00})" : string.Empty),
+                (_ctx.Ammo?.Caliber ?? _ctx.DamageType.ToString()) + (_ctx.Ammo != null ? $" ({_ctx.KickClass}, kick ×{_ctx.KickScale:0.00})" : string.Empty),
                 _ctx.ImpactEnergy, _ctx.ImpactMomentum * _ctx.KickScale, _ctx.BodyMassKg,
                 _ctx.GearThoraxKg + _ctx.GearBackKg + _ctx.GearHeadKg, _ctx.Pose,
-                (_neural.Nm != null ? ", Euphoria " + _neural.Nm.Plan.Kind : ", tissus passifs")
-                + (_light ? " [simulation allégée]" : string.Empty)));
+                (_neural.Nm != null ? ", Euphoria " + _neural.Nm.Plan.Kind : ", passive tissues")
+                + (_light ? " [lightweight simulation]" : string.Empty)));
             if (Settings.DebugLogging.Value && _neural.Journal.Length > 0)
                 Plugin.Log.LogInfo("  " + _neural.Journal);
             return true;
@@ -168,7 +168,7 @@ namespace Brutality.Core
             return cam != null ? Vector3.Distance(cam.transform.position, p) : 0f;
         }
 
-        // ------------------------------------------------------------------ arrêt
+        // ------------------------------------------------------------------ stopping
 
         private bool CheckCorpseIsStill(bool sleeping, float timePass)
         {
@@ -179,7 +179,7 @@ namespace Brutality.Core
             }
             catch (Exception e)
             {
-                Plugin.LogDebug("délégué d'arrêt d'origine : " + e.Message);
+                Plugin.LogDebug("original stop delegate: " + e.Message);
             }
             if (this == null || _released) return original;
             if (_frozenByCap) return true;
@@ -187,7 +187,7 @@ namespace Brutality.Core
             bool stop = _finished || Age >= _maxDuration;
             if (_permanent)
             {
-                // Jamais figé : le jeu reçoit une seule fois son signal « corps arrêté » à la fin de la phase active.
+                // Never frozen: the game receives its "corpse stopped" signal once at the end of the active phase.
                 if (stop && !_stopInvoked) InvokeStopped();
                 return false;
             }
@@ -195,7 +195,7 @@ namespace Brutality.Core
             {
                 try
                 {
-                    if (ObservedStillForced(oc)) return true; // l'hôte Fika a figé le corps
+                    if (ObservedStillForced(oc)) return true; // Fika host froze the body
                     ObservedIsStill(oc) = stop;
                 }
                 catch { }
@@ -204,9 +204,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Rappel « corps arrêté » d'EFT (Corpse.OnRigidbodyStopped : rendu et culling du loot ; un cadavre n'a pas de
-        /// renderer de loot en cache) appelé une seule fois, puis remplacé par un rappel vide pour qu'un gel ultérieur
-        /// (plafond de cadavres) ne le rejoue pas.
+        /// EFT's "corpse stopped" callback (Corpse.OnRigidbodyStopped: loot rendering and culling; a corpse has no
+        /// cached loot renderer) called once, then replaced with a no-op callback so a later freeze
+        /// (corpse cap) does not replay it.
         /// </summary>
         private void InvokeStopped()
         {
@@ -214,12 +214,12 @@ namespace Brutality.Core
             var cb = _ragdoll._onRigidbodyStopped;
             _ragdoll._onRigidbodyStopped = NoOp;
             try { cb?.Invoke(); }
-            catch (Exception e) { Plugin.LogDebug("rappel d'arrêt du cadavre : " + e.Message); }
+            catch (Exception e) { Plugin.LogDebug("corpse stop callback: " + e.Message); }
         }
 
-        // ------------------------------------------------------------------ balles sur le corps
+        // ------------------------------------------------------------------ bullets on corpse
 
-        /// <summary>Balle reçue par le corps (délégué de tir du jeu) : traitée au pas physique suivant.</summary>
+        /// <summary>Bullet received by the body (game shot delegate): processed on the next physics step.</summary>
         public void OnBullet(Rigidbody rb, Vector3 point, Vector3 dir, float p)
         {
             if (_released || _body == null || _hits.Count >= 16) return;
@@ -230,8 +230,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Mourant encore conscient (performance Euphoria) : nouvelle balle → réaction shot (relâchement, main sur la plaie,
-        /// dernier carré debout). Sinon (cadavre) : impulsion étalée, rebond contre le sol, contraction idiomusculaire.
+        /// Dying while still conscious (Euphoria performance): new bullet → shot reaction (relaxation, hand on wound,
+        /// last stand). Otherwise (corpse): spread impulse, ground bounce, idiomuscular twitch.
         /// </summary>
         private void ProcessHits(float t)
         {
@@ -248,7 +248,7 @@ namespace Brutality.Core
                 }
                 _ch.Sense(t);
                 Vector3 J = hit.Dir * (h.P * (1f + 2f * pm));
-                if (_ch.Lying && J.y < 0f) J.y *= -0.7f;   // tissus comprimés contre le sol : rebond
+                if (_ch.Lying && J.y < 0f) J.y *= -0.7f;   // tissues compressed against ground: bounce
                 Vector3 rb = BMath.SafeNormalize(NmCharacter.Flat(hit.Dir), _ch.Fwd) * (_body.TotalMass * 0.12f * Mathf.Clamp(h.P / 3f, 0.5f, 2f) * pm)
                            + Vector3.up * (_body.TotalMass * 0.05f * pm);
                 _impulses.Queue(t, h.Seg, h.Point, J, rb);
@@ -261,7 +261,7 @@ namespace Brutality.Core
 
         // ------------------------------------------------------------------ simulation
 
-        /// <summary>Appelé par l'horloge physique (préfixe de Physics.Simulate).</summary>
+        /// <summary>Called by the physics clock (Physics.Simulate prefix).</summary>
         public void PhysicsStep(float step)
         {
             if (_useFallback) return;
@@ -280,9 +280,9 @@ namespace Brutality.Core
                 if (!_errorLogged)
                 {
                     _errorLogged = true;
-                    Plugin.Log.LogError("Brutality : erreur de simulation, retour au ragdoll passif. " + e);
+                    Plugin.Log.LogError("Brutality: simulation error, reverting to passive ragdoll. " + e);
                 }
-                Release("erreur");
+                Release("error");
             }
         }
 
@@ -293,7 +293,7 @@ namespace Brutality.Core
             float dt = Mathf.Min(rawStep, 0.1f);
             if (_body == null || !_body.IsAlive)
             {
-                Release("ragdoll arrêté par le jeu");
+                Release("ragdoll stopped by game");
                 return;
             }
             float t = Age;
@@ -305,13 +305,13 @@ namespace Brutality.Core
             if (!_impulsesApplied)
             {
                 _impulsesApplied = true;
-                // Utilise le pas PhysX réel (non borné) : sinon un lag >100 ms sur-annule les impulsions
-                // étrangères et propulse le corps en arrière. Ignoré en mode repli (pas PhysX inconnu).
+                // Uses the actual (unclamped) PhysX step: otherwise a >100 ms lag over-cancels foreign
+                // impulses and flings the body backward. Skipped in fallback mode (PhysX step unknown).
                 if (fromPhysicsSimulate && Settings.CancelForeignImpulses.Value) CancelPendingForces(rawStep);
                 var nm = _neural.Nm;
                 if (nm != null)
                 {
-                    // Le tir mortel devient le premier shotNewBullet de la performance Euphoria.
+                    // The fatal shot becomes the first shotNewBullet of the Euphoria performance.
                     Impacts.Apply(_body, _ctx, (seg, point, dir, p, lethal) =>
                     {
                         if (lethal) nm.OnBullet(t, NmHit.Make(_body, seg, point, dir, p));
@@ -335,15 +335,15 @@ namespace Brutality.Core
             _neural.Update(t, dt, grounded);
             TrackDropSound(t);
 
-            // Fin de toute commande musculaire : garantit une vraie phase de relâchement flasque sous gravité
-            // avant toute dissipation terminale ou figement cinématique.
+            // End of all muscle command: guarantees a true flaccid relaxation phase under gravity
+            // before any terminal dissipation or kinematic freeze.
             float musclesEnd = _neural.ActiveEnd;
             bool muscles = t < musclesEnd || _neural.HasActiveTwitch(t);
-            // Le tonus passif (rappel vers NeutralDeg) s'éteint en ~0,45 s après la coupure musculaire
-            // afin que les membres retombent complètement sous leur poids au lieu de se figer fléchis.
+            // Passive tone (pull toward NeutralDeg) fades out in ~0.45 s after muscle cutoff
+            // so limbs drop completely under their own weight instead of freezing flexed.
             float passiveTone = muscles ? 1f : 1f - BMath.SmoothStep(musclesEnd, musclesEnd + 0.45f, t);
-            // Dissipation terminale légère uniquement dans les derniers instants (et au moins 1,2 s après musclesEnd)
-            // pour ne pas ralentir en « mélasse » la retombée des membres.
+            // Light terminal dissipation only in the final moments (and at least 1.2 s after musclesEnd)
+            // so limbs do not fall in slow-motion "molasses".
             float settleStart = Mathf.Min(Mathf.Max(musclesEnd + 1.2f, _maxDuration - 0.85f), _maxDuration - 0.45f);
             _fade = BMath.SmoothStep(settleStart, _maxDuration - 0.1f, t);
 
@@ -353,8 +353,8 @@ namespace Brutality.Core
             ApplyThoraxArmClearance(dt);
             ApplySettling();
 
-            // Arrêt anticipé uniquement APRÈS coupure musculaire, désactivation complète des muscles
-            // et au moins 1,0 s de chute libre relâchée sous gravité.
+            // Early stop ONLY AFTER muscle cutoff, full muscle deactivation,
+            // and at least 1.0 s of relaxed free fall under gravity.
             bool relaxed = !muscles && t > musclesEnd + 1.0f && MaxMuscleActivation() < 0.02f;
             if (relaxed && _body.MaxSpeed < 0.045f && _body.MaxAngularSpeed < 0.18f) _stillTimer += dt;
             else _stillTimer = 0f;
@@ -366,19 +366,19 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Son de chute du cadavre. EFT ne le joue qu'à la création du ragdoll (<c>Corpse.TryToCreateRagdoll</c>
-        /// appelle <c>PlayCorpseDropSound</c>), donc au moment de la mort et pas à l'impact : sous Brutality, le corps
-        /// tombe sans qu'aucun son ne marque le contact avec le sol. On rejoue le même son du jeu une seule fois, quand
-        /// le corps arrive réellement au sol, et seulement s'il a vraiment chu (vitesse verticale acquise).
+        /// Corpse drop sound. EFT only plays it at ragdoll creation (<c>Corpse.TryToCreateRagdoll</c>
+        /// calls <c>PlayCorpseDropSound</c>), i.e. at death rather than on impact: under Brutality, the body
+        /// falls without any sound marking ground contact. We play the same game sound once, when
+        /// the body actually hits the ground, and only if it truly fell (acquired vertical speed).
         /// </summary>
         private void TrackDropSound(float t)
         {
             if (_dropSoundPlayed) return;
-            // Mort allongée : le corps est déjà au sol, il n'y a pas de chute à sonoriser.
+            // Prone death: body is already on the ground, no fall to sonorize.
             if (_ctx.Pose == EPlayerPose.Prone) { _dropSoundPlayed = true; return; }
             var pelvis = _body[Seg.Pelvis];
             if (float.IsNaN(_pelvisY0)) _pelvisY0 = pelvis.Pos.y;
-            // Vitesse verticale descendante acquise depuis la mort : un corps déjà au sol (mort allongée) n'en a pas.
+            // Downward vertical speed acquired since death: a body already on the ground (prone death) has none.
             _dropPeak = Mathf.Max(_dropPeak, -pelvis.V.y);
             if (t < 0.12f) return;
             var nm = _neural.Nm;
@@ -391,15 +391,15 @@ namespace Brutality.Core
             try
             {
                 _corpse.PlayCorpseDropSound();
-                Plugin.LogDebug($"  son de chute au sol à t={t:0.00}s (impact {_dropPeak:0.0} m/s)");
+                Plugin.LogDebug($"  ground drop sound at t={t:0.00}s (impact {_dropPeak:0.0} m/s)");
             }
             catch (Exception e)
             {
-                Plugin.LogDebug("son de chute : " + e.Message);
+                Plugin.LogDebug("drop sound: " + e.Message);
             }
         }
 
-        /// <summary>Fin de la phase active : le corps reste simulé (amortissement léger, sommeil PhysX d'origine).</summary>
+        /// <summary>End of active phase: body remains simulated (light damping, original PhysX sleep).</summary>
         private void EnterCorpse(float t)
         {
             if (_dormant) return;
@@ -424,34 +424,34 @@ namespace Brutality.Core
             }
             if (Settings.DebugLogging.Value)
             {
-                Plugin.Log.LogInfo($"Brutality : fin de la phase active après {t:0.00} s ({_steps} pas) — cadavre simulé en permanence ({Corpses.Count}).");
-                if (_neural.Journal.Length > 0) Plugin.Log.LogInfo("  journal moteur : " + _neural.Journal);
-                if (_neural.Nm != null && _neural.Nm.Journal.Length > 0) Plugin.Log.LogInfo("  journal Euphoria :" + _neural.Nm.Journal);
+                Plugin.Log.LogInfo($"Brutality: active phase ended after {t:0.00} s ({_steps} steps) — permanently simulated corpse ({Corpses.Count}).");
+                if (_neural.Journal.Length > 0) Plugin.Log.LogInfo("  motor log: " + _neural.Journal);
+                if (_neural.Nm != null && _neural.Nm.Journal.Length > 0) Plugin.Log.LogInfo("  Euphoria log:" + _neural.Nm.Journal);
             }
         }
 
-        /// <summary>Plafond de cadavres simulés atteint : le corps est rendu au jeu, qui le fige comme en vanilla.</summary>
+        /// <summary>Simulated corpse cap reached: body is handed back to the game, which freezes it like vanilla.</summary>
         private void FreezeByCap()
         {
             _frozenByCap = true;
-            Release("plafond de cadavres simulés");
+            Release("simulated corpse cap");
         }
 
         /// <summary>
-        /// Cadavre au repos : rien n'est calculé tant que PhysX le garde endormi. Réveillé (balle, choc, explosion), il est
-        /// piloté par les tissus passifs, les impulsions étalées et les contractions idiomusculaires.
+        /// Resting corpse: nothing is computed while PhysX keeps it asleep. When woken (bullet, impact, explosion),
+        /// it is driven by passive tissues, spread impulses, and idiomuscular twitches.
         /// </summary>
         private void CorpseStep(float rawStep)
         {
             if (_body == null || !_body.IsAlive)
             {
-                Release("ragdoll arrêté par le jeu");
+                Release("ragdoll stopped by game");
                 return;
             }
             float t = Age;
-            // Le corps n'est piloté que pendant ~2,5 s après une balle ou une contraction. Le reste du temps, on ne touche
-            // plus à rien : réécrire les cibles des drives et appliquer des forces réveille les rigidbodies à chaque pas,
-            // empêche PhysX de les endormir et fait vibrer les segments légers (bras).
+            // The body is only driven for ~2.5 s after a bullet or twitch. The rest of the time, we touch
+            // nothing: rewriting drive targets and applying forces wakes rigidbodies every step,
+            // prevents PhysX from putting them to sleep, and makes light segments (arms) vibrate.
             if (_hits.Count > 0 || _impulses.Pending || _neural.HasActiveTwitch(t)) _wakeUntil = Mathf.Max(_wakeUntil, t + 2.5f);
             if (t > _wakeUntil)
             {
@@ -465,15 +465,15 @@ namespace Brutality.Core
             _body.ComputeKinematics(dt);
             ProcessHits(t);
             _neural.Update(t, dt, true);
-            // Tonus passif nul : il s'est déjà éteint en fin de phase active ; le rétablir ferait retomber les membres à chaque passage au repos.
+            // Zero passive tone: it already faded out at the end of the active phase; restoring it would make limbs drop again on every rest transition.
             DriveController.Step(_body, _neural.Buffer, dt, 1.3f, _neural.HasActiveTwitch(t), 0f);
             _impulses.Step(t, dt);
             ApplyThoraxArmClearance(dt);
         }
 
         /// <summary>
-        /// Cadavre au repos : drives réduits à une viscosité articulaire (aucun ressort, aucune cible), écrits une seule fois.
-        /// Le corps reste passif et dynamique ; PhysX peut l'endormir, un choc le réveille.
+        /// Resting corpse: drives reduced to joint viscosity (no spring, no target), written once.
+        /// The body remains passive and dynamic; PhysX can put it to sleep, an impact wakes it.
         /// </summary>
         private void ApplyRestDrives()
         {
@@ -497,9 +497,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Barrière tissus mous entre le thorax et les bras / avant-bras (les colliders du cadavre ne se touchent
-        /// pas entre eux) : repousse de manière critique-amortie (stable quel que soit dt) tout point du bras ou de
-        /// l'avant-bras qui pénètre dans la cage thoracique, avec réaction égale et opposée sur le thorax.
+        /// Soft-tissue barrier between the thorax and upper arms / forearms (corpse colliders do not collide
+        /// with each other): critically-damped pushback (stable for any dt) on any arm or forearm point
+        /// penetrating the ribcage, with equal and opposite reaction on the thorax.
         /// </summary>
         private void ApplyThoraxArmClearance(float dt)
         {
@@ -538,7 +538,7 @@ namespace Brutality.Core
             Vector3 bestPt = Vector3.zero;
             Vector3 bestN = Vector3.zero;
 
-            // Point le plus enfoncé le long du segment (sans tester l'emboîture proximale de l'épaule).
+            // Deepest point along the segment (without testing the proximal shoulder socket).
             int count = isForearm ? 3 : 2;
             for (int i = 0; i < count; i++)
             {
@@ -552,7 +552,7 @@ namespace Brutality.Core
                     bestN = n;
                 }
             }
-            // Zone morte de 4 mm : un bras posé contre le buste ne reçoit plus une force qui oscille d'un pas à l'autre.
+            // 4 mm deadzone: an arm resting against the torso no longer receives a force oscillating step to step.
             if (bestDepth <= 0.004f) return;
             bestDepth -= 0.004f;
 
@@ -564,7 +564,7 @@ namespace Brutality.Core
             float accel = k * bestDepth + c * vIn;
             if (accel <= 0f) return;
 
-            // Masse effective au point de contact (translation + rotation) pour une stabilité exacte en Euler symplectique.
+            // Effective mass at the contact point (translation + rotation) for exact stability under symplectic Euler.
             float invM = 1f / Mathf.Max(0.2f, arm.Mass) + 1f / Mathf.Max(2f, thorax.Mass);
             Vector3 cArm = Vector3.Cross(rArm, bestN);
             float cArm2 = cArm.sqrMagnitude;
@@ -587,8 +587,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Annule les forces et impulsions accumulées depuis la mort (autres mods) : la force accumulée est exprimée
-        /// pour le pas à venir, on lui oppose exactement la force inverse sur ce même pas.
+        /// Cancels forces and impulses accumulated since death (other mods): accumulated force is expressed
+        /// for the upcoming step, so we apply the exact opposite force on that same step.
         /// </summary>
         private void CancelPendingForces(float step)
         {
@@ -607,10 +607,10 @@ namespace Brutality.Core
                 if (tq.sqrMagnitude > 1e-8f && !float.IsNaN(tq.x)) rb.AddTorque(-tq, ForceMode.Force);
             }
             if (totalImpulse > 0.5f)
-                Plugin.LogDebug($"  impulsions étrangères neutralisées : {totalImpulse:0.0} N·s");
+                Plugin.LogDebug($"  foreign impulses neutralized: {totalImpulse:0.0} N·s");
         }
 
-        /// <summary>Phase terminale : dissipation progressive pour que le corps soit au repos avant l'arrêt forcé.</summary>
+        /// <summary>Terminal phase: progressive dissipation so the body comes to rest before forced stop.</summary>
         private void ApplySettling()
         {
             float f = _fade;
@@ -633,16 +633,16 @@ namespace Brutality.Core
         private void Update()
         {
             if (_released) return;
-            // Repli si le patch Physics.Simulate n'a pas pu être installé ou n'est jamais appelé
-            // (méthode inlinée par le JIT) : pilotage par FixedUpdate (cadence fixe indépendante du framerate).
+            // Fallback if the Physics.Simulate patch could not be installed or is never called
+            // (method inlined by JIT): drive via FixedUpdate (fixed rate independent of framerate).
             if (!_useFallback && (!PhysicsClock.PatchInstalled || (Age > 0.4f && _steps == 0)))
             {
                 _useFallback = true;
-                Plugin.Log.LogWarning("Brutality : aucun pas Physics.Simulate intercepté, pilotage par FixedUpdate (repli).");
+                Plugin.Log.LogWarning("Brutality: no Physics.Simulate step intercepted, driving via FixedUpdate (fallback).");
             }
-            // Le jeu cesse de simuler dès que les rigidbodies sont kinématiques : on libère ici.
+            // The game stops simulating as soon as rigidbodies are kinematic: release here.
             if (_body == null || !_body.IsAlive || (!_permanent && Age > _maxDuration + 3f))
-                Release(_body != null && _body.IsAlive ? "délai dépassé" : "ragdoll arrêté par le jeu");
+                Release(_body != null && _body.IsAlive ? "timeout exceeded" : "ragdoll stopped by game");
         }
 
         private void Release(string reason)
@@ -656,13 +656,13 @@ namespace Brutality.Core
                 foreach (var s in _body.Segs)
                     if (s?.Rb != null && RbOwners.TryGetValue(s.Rb, out var o) && o == this) RbOwners.Remove(s.Rb);
                 try { JointRig.Relax(_body); } catch { }
-                try { _body.Restore(); } catch (Exception e) { Plugin.LogDebug("restauration : " + e.Message); }
+                try { _body.Restore(); } catch (Exception e) { Plugin.LogDebug("restore: " + e.Message); }
             }
             if (Settings.DebugLogging.Value)
             {
-                Plugin.Log.LogInfo($"Brutality : fin de simulation ({reason}) après {Age:0.00} s, {_steps} pas physiques.");
-                if (_neural != null && _neural.Journal.Length > 0) Plugin.Log.LogInfo("  journal moteur : " + _neural.Journal);
-                if (_neural?.Nm != null && _neural.Nm.Journal.Length > 0) Plugin.Log.LogInfo("  journal Euphoria :" + _neural.Nm.Journal);
+                Plugin.Log.LogInfo($"Brutality: simulation ended ({reason}) after {Age:0.00} s, {_steps} physics steps.");
+                if (_neural != null && _neural.Journal.Length > 0) Plugin.Log.LogInfo("  motor log: " + _neural.Journal);
+                if (_neural?.Nm != null && _neural.Nm.Journal.Length > 0) Plugin.Log.LogInfo("  Euphoria log:" + _neural.Nm.Journal);
             }
             if (this != null) Destroy(this);
         }
@@ -687,7 +687,7 @@ namespace Brutality.Core
             for (int i = Active.Count - 1; i >= 0; i--)
             {
                 var r = Active[i];
-                if (r != null) r.Release("fin de raid");
+                if (r != null) r.Release("end of raid");
             }
             Active.Clear();
             Corpses.Clear();
@@ -695,7 +695,7 @@ namespace Brutality.Core
         }
     }
 
-    /// <summary>Horloge physique : Brutality s'exécute juste avant chaque Physics.Simulate (mode Script d'EFT).</summary>
+    /// <summary>Physics clock: Brutality executes just before each Physics.Simulate (EFT Script mode).</summary>
     internal static class PhysicsClock
     {
         public static bool PatchInstalled;
@@ -704,8 +704,8 @@ namespace Brutality.Core
         {
             PhysxProbe.OnStep();
             var list = BrutalityRagdoll.Active;
-            // Parcours arrière + sortie anticipée : PhysicsStep peut libérer un autre corps (plafond de cadavres
-            // simulés), ce qui décale la liste. On ignore simplement l'index devenu hors bornes.
+            // Reverse iteration + bounds check: PhysicsStep may release another body (simulated corpse
+            // cap), which shifts the list. Simply skip any index that went out of bounds.
             for (int i = list.Count - 1; i >= 0; i--)
             {
                 if (i >= list.Count) continue;

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Brutality.Euphoria
 {
-    /// <summary>Point d'accroche détecté dans le décor autour du mourant (Delirium : <c>grabhelper::GrabHelper</c>).</summary>
+    /// <summary>Grip target detected in the environment around the dying character (Delirium: <c>grabhelper::GrabHelper</c>).</summary>
     internal struct DlGrabTarget
     {
         public Vector3 Point;
@@ -15,7 +15,7 @@ namespace Brutality.Euphoria
         public bool IsLedge;
     }
 
-    /// <summary>Prise physique temporaire d'une main sur un obstacle (Delirium : <c>nmgr::Grip</c>).</summary>
+    /// <summary>Temporary physical grip of a hand on an obstacle (Delirium: <c>nmgr::Grip</c>).</summary>
     internal sealed class DlGrip
     {
         public Vector3 AnchorWorld;
@@ -27,14 +27,14 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// Comportement <c>grab</c> + <c>GrabHelper</c>, portés depuis <c>nmgr::Grab</c> et <c>grabhelper.rs</c> de Delirium.
+    /// <c>grab</c> + <c>GrabHelper</c> behavior, ported from Delirium's <c>nmgr::Grab</c> and <c>grabhelper.rs</c>.
     ///
-    /// Quand un mur, une caisse, une table, une rambarde ou un rebord se trouve à portée pendant le déséquilibre ou la
-    /// chute, le personnage cherche un point d'appui par raycasts multiples, tend la ou les mains adéquates (selon
-    /// l'angle par rapport au thorax : <c>reachAngle</c> / <c>oneSideReachAngle</c>), oriente la paume contre la surface
-    /// par pronation de l'avant-bras, attire la main (impulsion <c>pull</c>), verrouille une prise physique réelle à
-    /// force de rupture (<c>GrabStrength</c>) qui retient et fait pivoter le corps, puis lâche dès que la charge arrache
-    /// la prise, que <c>GrabHoldMaxTime</c> expire ou que la conscience s'éteint.
+    /// When a wall, crate, table, railing, or ledge is within reach during imbalance or fall,
+    /// the character searches for a support point via multiple raycasts, reaches with the appropriate hand(s)
+    /// (based on angle relative to thorax: <c>reachAngle</c> / <c>oneSideReachAngle</c>), orients the palm against
+    /// the surface via forearm pronation, pulls the hand (<c>pull</c> impulse), locks a real physical grip with
+    /// breaking force (<c>GrabStrength</c>) that holds and pivots the body, then releases as soon as the load tears
+    /// the grip, <c>GrabHoldMaxTime</c> expires, or consciousness fades.
     /// </summary>
     internal sealed class DlGrab : DlBehaviour
     {
@@ -64,8 +64,8 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// Sonde le décor autour du buste (murs, caisses, piliers, rebords) pour trouver une surface saisissable
-        /// (équivalent de <c>grabhelper::GrabHelper::find_surface</c>, étendu à un balayage directionnel complet).
+        /// Probes scenery around the torso (walls, crates, pillars, ledges) to find a grabbable surface
+        /// (equivalent to <c>grabhelper::GrabHelper::find_surface</c>, extended to a full directional sweep).
         /// </summary>
         public static bool ProbeEnvironment(DlBody b, NmCharacter sensors, Vector3 fallHint, out DlGrabTarget found)
         {
@@ -77,7 +77,7 @@ namespace Brutality.Euphoria
             if (right.sqrMagnitude < 1e-4f) right = sensors.Right;
             right.Normalize();
 
-            // 8 directions autour du mourant (priorité au sens de chute, devant et côtés) + sonde rebord en contrebas.
+            // 8 directions around the dying character (priority to fall direction, front and sides) + lower ledge probe.
             Vector3[] dirs =
             {
                 fwd,
@@ -92,18 +92,18 @@ namespace Brutality.Euphoria
 
             float bestScore = float.MaxValue;
             bool any = false;
-            float minY = sensors.GroundY + 0.35f; // ignore le sol plat : c'est le rôle de catchFall
+            float minY = sensors.GroundY + 0.35f; // ignore flat ground: that is catchFall's role
 
             for (int i = 0; i < dirs.Length; i++)
             {
                 if (!DlPhys.Cast(origin, dirs[i], DlCfg.GrabSearchDist, out Vector3 pt, out Vector3 nrm)) continue;
-                // Surface utilisable : mur (normale quasi horizontale) ou rebord/caisse/table surélevé (> 35 cm du sol).
+                // Usable surface: wall (nearly horizontal normal) or elevated ledge/crate/table (> 35 cm above ground).
                 bool isWall = Mathf.Abs(Vector3.Dot(nrm, Vector3.up)) < 0.65f;
                 bool isLedge = !isWall && pt.y >= minY && pt.y <= origin.y + 0.45f;
                 if (!isWall && !isLedge) continue;
                 float dist = Vector3.Distance(origin, pt);
                 if (dist < 0.16f || dist > DlCfg.GrabSearchDist) continue;
-                // Priorise les surfaces dans la direction de chute et proches.
+                // Prioritize surfaces in the fall direction and nearby.
                 float align = Vector3.Dot(BMath.SafeNormalize(pt - origin, fwd), fwd);
                 float score = dist - 0.25f * align - (isLedge ? 0.12f : 0f);
                 if (score < bestScore)
@@ -136,7 +136,7 @@ namespace Brutality.Euphoria
             }
             _searchAge += dt;
 
-            // Décision gauche / droite selon la distance, l'approche et le gisement par rapport au thorax (nmgr.rs:307-353).
+            // Left / right decision based on distance, approach, and bearing relative to thorax (nmgr.rs:307-353).
             Decide(out bool left, out bool right);
             if (!Grabbing || (!left && !right))
             {
@@ -145,7 +145,7 @@ namespace Brutality.Euphoria
                 return;
             }
 
-            // Sépare légèrement les deux mains si elles visent le même point (Delirium nmgr.rs:233-240 : apart()).
+            // Slightly separate both hands if they aim at the same point (Delirium nmgr.rs:233-240: apart()).
             Vector3 tangent = Vector3.Cross(_target.Normal, Vector3.up);
             if (tangent.sqrMagnitude < 1e-3f) tangent = Sensors.Right;
             tangent.Normalize();
@@ -179,7 +179,7 @@ namespace Brutality.Euphoria
                 return;
             }
 
-            // SpineTwist + HeadLook vers le point saisi (Delirium nmgr.rs:255-268).
+            // SpineTwist + HeadLook toward the grabbed point (Delirium nmgr.rs:255-268).
             Vector3 mid = left && right ? 0.5f * (ptL + ptR) : (left ? ptL : ptR);
             Vector3 rel = mid - B.Part(Seg.Thorax).Com;
             float yaw = Mathf.Atan2(Vector3.Dot(rel, Sensors.Right), Vector3.Dot(rel, Sensors.Fwd));
@@ -200,7 +200,7 @@ namespace Brutality.Euphoria
             float dist = DlCfg.GrabSearchDist;
             Grabbing = (len - closing) < (Grabbing ? dist + 0.25f : dist);
 
-            // Gisement horizontal dans le repère du thorax (nmgr.rs:331-339).
+            // Horizontal bearing in the thorax frame (nmgr.rs:331-339).
             float x = Vector3.Dot(d, th.R);
             float z = Vector3.Dot(d, th.F);
             float ang = Mathf.Atan2(x, z);
@@ -237,12 +237,12 @@ namespace Brutality.Euphoria
             Vector3 handPos = B.HandPos(sd);
             float distToTarget = Vector3.Distance(handPos, worldPt);
 
-            // Pronation de l'avant-bras : la paume se tourne face à la surface à saisir (nmgr.rs:402, 473-480).
+            // Forearm pronation: palm turns to face the surface to grab (nmgr.rs:402, 473-480).
             float pron = DlPhys.ForearmPronationForNormal(B.Body, sd, normal);
 
             if (grip == null || grip.Broken)
             {
-                // Phase d'approche : IK + attraction pull() vers le point cible.
+                // Approach phase: IK + pull() attraction toward the target point.
                 Vector3 delta = worldPt - shPos;
                 float len = delta.magnitude;
                 Vector3 aim = len > DlCfg.GrabMaxReach ? shPos + delta * (DlCfg.GrabMaxReach / len) : worldPt;
@@ -252,7 +252,7 @@ namespace Brutality.Euphoria
                 Ch.SetOpposeGravity(el, 1f);
                 if (distToTarget < 3f * DlCfg.GrabDist) _pulling[i] = true;
 
-                // Verrouillage de la prise dès que la main touche la zone (Delirium nmgr.rs:461-466).
+                // Lock the grip as soon as the hand touches the zone (Delirium nmgr.rs:461-466).
                 if (distToTarget < DlCfg.GrabDist && (grip == null))
                 {
                     Grips[i] = new DlGrip
@@ -262,12 +262,12 @@ namespace Brutality.Euphoria
                         RestLength = Mathf.Min(distToTarget, 0.08f),
                     };
                     EverGripped = true;
-                    Perf.Log(Perf.Time, $"grab : prise main {(sd < 0 ? "G" : "D")} ({(_target.IsLedge ? "rebord" : "surface")})");
+                    Perf.Log(Perf.Time, $"grab: hand {(sd < 0 ? "L" : "R")} grip ({(_target.IsLedge ? "ledge" : "surface")})");
                 }
                 return;
             }
 
-            // Phase de maintien : prise physique active, traction réflexe du coude (pullUp), raideur de retenue.
+            // Hold phase: active physical grip, reflex elbow pull (pullUp), holding stiffness.
             _held[i] += dt;
             grip.HeldTime = _held[i];
             grip.RestLength = Mathf.Clamp(grip.RestLength - dt * 0.25f, 0f, distToTarget);
@@ -275,7 +275,7 @@ namespace Brutality.Euphoria
             float armK = Mathf.Lerp(DlCfg.GrabArmStiffness, DlCfg.GrabHoldStiffness, pullRamp) * u;
             Ch.SetStiffness(AnatomyData.Shoulder(sd), armK, 0.7f, 1.1f);
             Ch.SetStiffness(AnatomyData.Elbow(sd), armK, 0.7f, 1.1f);
-            // Légère flexion réflexe du coude (pullUpStrength) pour se retenir avant de céder.
+            // Slight reflex elbow flexion (pullUpStrength) to hold on before giving way.
             Ch.BlendDesired(el, 0, Mathf.Lerp(Ch.Actual(el, B.Body).x, 1.35f, 0.5f * pullRamp), 0.7f * u);
             Ch.BlendDesired(el, 2, pron, 0.95f * u);
             Ch.SetOpposeGravity(sh, 1f);
@@ -284,9 +284,9 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// Forces physiques de <c>grab</c> :
-        ///  - attraction <c>pull</c> en approche (Delirium nmgr.rs:453-460) ;
-        ///  - contrainte élastique amortie de prise <c>DlGrip</c> avec force de rupture <c>GrabStrength</c>
+        /// Physical forces of <c>grab</c>:
+        ///  - <c>pull</c> attraction during approach (Delirium nmgr.rs:453-460);
+        ///  - damped elastic grip constraint <c>DlGrip</c> with breaking force <c>GrabStrength</c>
         ///    (Delirium ragdoll.rs:3604 + nmgr.rs:181-187 <c>snapped</c>).
         /// </summary>
         public void Forces(float t, float dt, float weight)
@@ -309,20 +309,20 @@ namespace Brutality.Euphoria
                     float d = diff.magnitude;
                     float stretch = Mathf.Max(0f, d - grip.RestLength);
                     Vector3 dir = d > 1e-4f ? diff / d : Vector3.zero;
-                    // Ressort amorti de maintien sur la prise : retient la main et fait pivoter le corps.
+                    // Damped holding spring on the grip: holds the hand and pivots the body.
                     float springF = stretch * 950f;
                     float dampF = -Vector3.Dot(handVel, dir) * 42f;
                     Vector3 f = dir * Mathf.Max(0f, springF + dampF) - (handVel - dir * Vector3.Dot(handVel, dir)) * 18f;
                     float maxF = _strength * u;
                     float mag = f.magnitude;
                     grip.LastForce = mag;
-                    // Rupture de la prise si la charge arrache la main ou que la distance dérape (nmgr.rs:181).
+                    // Grip breaks if the load tears the hand away or distance slips too far (nmgr.rs:181).
                     if (mag > maxF * 1.45f || d > 0.36f)
                     {
                         grip.Broken = true;
                         SnapCount++;
                         ReleaseArm(i);
-                        Perf.Log(t, $"grab : prise main {(sd < 0 ? "G" : "D")} arrachée ({mag:0} N)");
+                        Perf.Log(t, $"grab: hand {(sd < 0 ? "L" : "R")} grip torn off ({mag:0} N)");
                         continue;
                     }
                     if (mag > maxF) f *= maxF / mag;
@@ -363,9 +363,9 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// upperBodyFlinch, porté depuis <c>nmfl::Flinch</c> de Delirium : réflexe protecteur du haut du corps face à une
-    /// menace/tir frontal ou rafale — avant-bras levés devant le visage/torse en pronation, dos légèrement cambré ou
-    /// rentré, puis relâchement progressif.
+    /// upperBodyFlinch, ported from Delirium's <c>nmfl::Flinch</c>: protective upper-body reflex against a
+    /// frontal threat/shot or burst — forearms raised in front of face/chest in pronation, back slightly arched or
+    /// tucked, then gradual relaxation.
     /// </summary>
     internal sealed class DlFlinch : DlBehaviour
     {
@@ -395,12 +395,12 @@ namespace Brutality.Euphoria
             bool fromBehind = Mathf.Abs(bearing) > 1.7f;
 
             Ch.SetStiffness("ub", DlCfg.FlinchBodyStiffness * env, DlCfg.FlinchDamping);
-            // Légère flexion/torsion défensive du tronc.
+            // Slight defensive trunk flexion/twist.
             Ch.BlendDesired((int)JointId.Lumbar, 0, fromBehind ? -0.15f : 0.28f, 0.65f * env);
             Ch.BlendDesired((int)JointId.Lumbar, 2, Mathf.Clamp(-bearing * 0.35f, -0.45f, 0.45f), 0.6f * env);
             Ch.BlendDesired((int)JointId.Neck, 0, 0.25f, 0.55f * env);
 
-            // Avant-bras levés devant le visage / haut de poitrine en pronation (paumes vers l'extérieur/menace).
+            // Forearms raised in front of face / upper chest in pronation (palms facing outward/threat).
             for (int i = 0; i < 2; i++)
             {
                 if (Ch.Busy[i]) continue;
@@ -409,7 +409,7 @@ namespace Brutality.Euphoria
                 float n = (DlPhys.Noise01(_age * 2f, _seed, i * 3.1f) - 0.5f) * 0.08f;
                 Vector3 guard = th.Com + th.U * (0.20f + n) + th.F * 0.30f + th.R * (sd * 0.14f);
                 ArmTo(sd, guard, 0.85f * env, DlCfg.FlinchBodyStiffness, 1f);
-                // Pronation franche pour présenter l'avant-bras / dos du poignet face au tir.
+                // Clear pronation to present the forearm / back of wrist toward the shot.
                 Ch.BlendDesired((int)AnatomyData.Elbow(sd), 2, 0.85f * Motor.InternalRotSign(sd), 0.85f * env);
                 Ch.SetOpposeGravity((int)AnatomyData.Shoulder(sd), 1f);
                 Ch.SetOpposeGravity((int)AnatomyData.Elbow(sd), 1f);

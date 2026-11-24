@@ -14,75 +14,75 @@ namespace Brutality.Neural
         Roll,
         Clutch,
         HeadTurn,
-        ArmThrust,   // bras qui se tendent brusquement
-        LegJerk,     // genoux qui se replient par saccades
-        Spasm,       // secousse myoclonique globale (flexion ou extension)
-        Decorticate, // crise de décortication
-        Lazarus,     // signe de Lazare : bras qui se lèvent et se croisent sur la poitrine
-        Seizure,     // crise tonico-clonique
-        Reach,       // main tendue, qui retombe d'un coup
-        Crawl,       // tentative de ramper (sur le ventre)
-        PushUp,      // tentative de se relever sur les bras (sur le ventre)
-        SitUp,       // tentative de se redresser (sur le dos)
-        HeadLift,    // relève la tête
-        KneeRaise,   // genou qui remonte puis glisse
-        HeelDrum,    // talons qui tambourinent
-        GroundSlap,  // frappe le sol
-        Shield,      // se protège le visage
-        Scissor,     // jambes en ciseaux
-        Rocking,     // balancement d'un flanc à l'autre
-        HandsToFace, // mains au visage
-        HipBridge,   // pontage : bassin soulevé en arc, appui sur les pieds et les épaules
-        ElbowDrag,   // reptation sur les coudes (sur le ventre)
-        HeadBang,    // tête qui se soulève puis frappe le sol
-        LegCross,    // une jambe se croise par-dessus l'autre
-        ArmsOverhead,// bras tendus au-dessus de la tête, tremblants
-        ChestClutch, // mains qui pressent la poitrine (respiration agonique)
-        TwistArch,   // torsion axiale continue du tronc
-        HeelSlide,   // talon qui glisse vers la fesse puis revient
-        ShoulderHunch,// épaules qui montent vers les oreilles à chaque gaspe
-        NeckArch,    // nuque en extension forcée puis relâchée
-        Shudder,     // frisson de tout le corps
+        ArmThrust,   // arms suddenly thrusting outward
+        LegJerk,     // knees jerking into flexion
+        Spasm,       // global myoclonic jerk (flexion or extension)
+        Decorticate, // decorticate episode
+        Lazarus,     // Lazarus sign: arms rising and crossing over the chest
+        Seizure,     // tonic-clonic seizure
+        Reach,       // arm reaching out, then dropping suddenly
+        Crawl,       // crawl attempt (prone)
+        PushUp,      // attempt to push up on arms (prone)
+        SitUp,       // attempt to sit up (supine)
+        HeadLift,    // head lifting
+        KneeRaise,   // knee drawing up then sliding back
+        HeelDrum,    // heels drumming
+        GroundSlap,  // slapping the ground
+        Shield,      // shielding the face
+        Scissor,     // scissor legs
+        Rocking,     // rocking side to side
+        HandsToFace, // hands to face
+        HipBridge,   // hip bridge: pelvis arched up, supported on feet and shoulders
+        ElbowDrag,   // dragging on elbows (prone)
+        HeadBang,    // head lifting then striking the ground
+        LegCross,    // one leg crossing over the other
+        ArmsOverhead,// arms stretched overhead, trembling
+        ChestClutch, // hands pressing the chest (agonal breathing)
+        TwistArch,   // continuous axial trunk twisting
+        HeelSlide,   // heel sliding toward the buttock then extending back
+        ShoulderHunch,// shoulders hunching toward the ears on each gasp
+        NeckArch,    // neck forced into hyperextension then released
+        Shudder,     // full-body shudder
         Count,
     }
 
     /// <summary>
-    /// Chronologie neuromusculaire d'un mécanisme lésionnel. Ordres de grandeur physiopathologiques :
-    ///  - destruction encéphalique / tronc cérébral : perte du tonus en quelques dizaines de ms, posturing et
-    ///    réflexes médullaires libérés (secousses, extensions brusques des membres) ;
-    ///  - section médullaire : paralysie flasque immédiate sous le niveau lésionnel ;
-    ///  - arrêt circulatoire (cœur, gros vaisseaux) : conscience perdue en ~5-15 s, myoclonies anoxiques fréquentes ;
-    ///  - hémorragie / syncope : effondrement progressif, myoclonies de la syncope convulsive ;
-    ///  - souffle : flaccidité immédiate, corps projeté.
-    /// Les intensités sont réglées pour un rendu lisible en jeu (gestes francs) ; « Vigueur des spasmes » les module.
-    /// Les valeurs sont tirées aléatoirement dans les intervalles pour qu'aucune mort ne se ressemble.
+    /// Neuromuscular timeline of an injury mechanism. Pathophysiological orders of magnitude:
+    ///  - brain / brainstem destruction: tone loss within tens of ms, posturing and released
+    ///    spinal reflexes (jerks, sudden limb extensions);
+    ///  - spinal cord transection: immediate flaccid paralysis below the lesion level;
+    ///  - circulatory arrest (heart, great vessels): consciousness lost in ~5-15 s, frequent anoxic myoclonus;
+    ///  - hemorrhage / syncope: progressive collapse, convulsive syncope myoclonus;
+    ///  - blast: immediate flaccidity, body thrown.
+    /// Intensities are tuned for readable in-game rendering (overt gestures); "Spasm vigor" scales them.
+    /// Values are sampled randomly within ranges so no two deaths look alike.
     /// </summary>
     internal sealed class MechanismProfile
     {
-        public bool Startle;            // historique : le sursaut est joué par le comportement shot
+        public bool Startle;            // historical: startle is played by the shot behavior
         public float ToneDelay;
-        public Vector2[] ToneTau = new Vector2[4]; // membres inférieurs, tronc, cou, membres supérieurs
-        public float BuckleProb;         // historique : le flambage est joué par shotFallToKnees
+        public Vector2[] ToneTau = new Vector2[4]; // lower limbs, trunk, neck, upper limbs
+        public float BuckleProb;         // historical: knee buckling is played by shotFallToKnees
         public float LockProb;
         public float DecorticateProb;
         public float FencingProb;
-        public float GuardingProb;       // historique : la défense abdominale vient de injuredOnGround / bodyFoetal
-        public float EarlyClutchProb;    // historique : la main sur la plaie vient du comportement shot
-        public float DeathThrowProb;     // historique : le bras projeté vient du comportement shot    // extension réflexe des bras à l'impact
+        public float GuardingProb;       // historical: abdominal guarding comes from injuredOnGround / bodyFoetal
+        public float EarlyClutchProb;    // historical: hand on wound comes from the shot behavior
+        public float DeathThrowProb;     // historical: thrown arm comes from the shot behavior    // reflex arm extension on impact
         public Vector2 AgonyStart = new Vector2(0.5f, 1.0f);
         public Vector2 AgonyI0;
         public Vector2 AgonyDuration;
-        public float EventRate;         // événements / s à intensité 1
+        public float EventRate;         // events / s at intensity 1
         public float[] Weights = new float[(int)AgonyEvent.Count];
         public float TremorDeg;
         public float GaspProb;
-        public float Writhing;          // amplitude relative des contorsions continues
+        public float Writhing;          // relative amplitude of continuous writhing
         public bool HeadLoll = true;
-        public float RigidityProb;          // rigidité de posture continue pendant l'agonie
-        public float BreathingProb = 0.85f; // respiration laborieuse visible
-        public float LastBreathProb = 0.65f;// dernier soupir en fin d'agonie
+        public float RigidityProb;          // continuous postural rigidity during agony
+        public float BreathingProb = 0.85f; // visible labored breathing
+        public float LastBreathProb = 0.65f;// last breath at end of agony
 
-        /// <summary>Poids explicitement fixé : la valeur (même nulle) ne sera pas écrasée par les gestes transversaux.</summary>
+        /// <summary>Explicitly set weight: the value (even zero) will not be overwritten by shared gestures.</summary>
         private readonly bool[] _explicit = new bool[(int)AgonyEvent.Count];
 
         private MechanismProfile W(AgonyEvent e, float w)
@@ -92,7 +92,7 @@ namespace Brutality.Neural
             return this;
         }
 
-        /// <summary>Ajoute un geste transversal sans écraser un poids explicitement fixé par le profil.</summary>
+        /// <summary>Adds a shared gesture without overwriting a weight explicitly set by the profile.</summary>
         private void Add(AgonyEvent e, float w)
         {
             int i = (int)e;
@@ -100,10 +100,10 @@ namespace Brutality.Neural
         }
 
         /// <summary>
-        /// Gestes transversaux, disponibles pour tous les mécanismes. Ils sont pondérés par la palette de la mort et
-        /// désactivés par les capacités articulaires (un paraplégique ne fait pas de pontage, un bras détruit ne presse
-        /// pas sa poitrine) : les ajouter élargit le répertoire sans diluer les réflexes propres à chaque lésion. Les
-        /// profils qui veulent les écarter les mettent explicitement à zéro.
+        /// Shared gestures available to all mechanisms. They are weighted by the death palette and
+        /// disabled by joint capacities (a paraplegic does not hip-bridge, a destroyed arm does not clutch
+        /// the chest): adding them broadens the repertoire without diluting lesion-specific reflexes.
+        /// Profiles that want to exclude them set them explicitly to zero.
         /// </summary>
         private MechanismProfile Shared()
         {
@@ -138,9 +138,9 @@ namespace Brutality.Neural
             switch (m)
             {
                 case DeathMechanism.Cerebral:
-                    // Encéphale détruit : le tonus s'éteint en quelques dizaines de ms et le corps lâche d'un bloc.
-                    // Aucun posturing — il suppose un tronc cérébral intact — et aucune rigidité : blackout puis chute
-                    // instantanée, seuls les réflexes médullaires libérés subséquents (secousses) restent.
+                    // Brain destroyed: tone drops within tens of ms and the body collapses as a whole.
+                    // No posturing — that requires an intact brainstem — and no rigidity: instant blackout and drop,
+                    // leaving only subsequent released spinal reflexes (jerks).
                     return new MechanismProfile
                     {
                         Startle = false, ToneDelay = 0f,
@@ -210,14 +210,14 @@ namespace Brutality.Neural
                 case DeathMechanism.ThoracicCord:
                 {
                     var p = For(DeathMechanism.Thoracic);
-                    p.BuckleProb = 0.2f; // jambes flasques : elles cèdent d'elles-mêmes
+                    p.BuckleProb = 0.2f; // flaccid legs: they give way on their own
                     p.Weights[(int)AgonyEvent.Pedal] = 0f;
                     p.Weights[(int)AgonyEvent.Kick] = 0f;
                     p.Weights[(int)AgonyEvent.LegJerk] = 0f;
                     p.Weights[(int)AgonyEvent.Curl] = 0.3f;
                     p.Weights[(int)AgonyEvent.Flail] = 1.6f;
                     p.Weights[(int)AgonyEvent.ArmThrust] = 2.5f;
-                    // Paraplégie : les jambes ne bougent plus, le blessé se traîne sur les bras.
+                    // Paraplegia: legs no longer move, the wounded person drags themselves with their arms.
                     p.Weights[(int)AgonyEvent.KneeRaise] = 0f; p.Weights[(int)AgonyEvent.HeelDrum] = 0f;
                     p.Weights[(int)AgonyEvent.Scissor] = 0f; p.Weights[(int)AgonyEvent.SitUp] = 0f; p.Weights[(int)AgonyEvent.Rocking] = 0.3f;
                     p.Weights[(int)AgonyEvent.Crawl] = 2.5f; p.Weights[(int)AgonyEvent.PushUp] = 1.8f; p.Weights[(int)AgonyEvent.Reach] = 2f;

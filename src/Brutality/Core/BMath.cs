@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Utilitaires mathématiques (angles en radians).</summary>
+    /// <summary>Math utilities (angles in radians).</summary>
     internal static class BMath
     {
         public const float Pi = Mathf.PI;
@@ -17,14 +17,14 @@ namespace Brutality.Core
             return a;
         }
 
-        /// <summary>Angle de torsion (swing-twist) d'un quaternion autour d'un axe unitaire.</summary>
+        /// <summary>Twist angle (swing-twist) of a quaternion around a unit axis.</summary>
         public static float TwistAngle(Quaternion q, Vector3 axis)
         {
             float d = q.x * axis.x + q.y * axis.y + q.z * axis.z;
             return WrapPi(2f * Mathf.Atan2(d, q.w));
         }
 
-        /// <summary>Angle signé (rad) de a vers b autour de n ; a et b sont projetés sur le plan normal à n.</summary>
+        /// <summary>Signed angle (rad) from a to b around n; a and b are projected onto the plane normal to n.</summary>
         public static float SignedAngleOnPlane(Vector3 a, Vector3 b, Vector3 n)
         {
             a -= n * Vector3.Dot(a, n);
@@ -43,14 +43,14 @@ namespace Brutality.Core
             return m > 1e-6f ? v / m : fallback;
         }
 
-        /// <summary>Repère orthonormé (R, U, F) à partir d'un axe U prioritaire et d'un indice R ; F = R × U (antérieur).</summary>
+        /// <summary>Orthonormal frame (R, U, F) from a primary U axis and an R hint; F = R × U (anterior).</summary>
         public static void OrthoFrame(Vector3 up, Vector3 rightHint, Vector3 forwardHint, out Vector3 r, out Vector3 u, out Vector3 f)
         {
             u = SafeNormalize(up, Vector3.up);
             Vector3 rr = rightHint - u * Vector3.Dot(rightHint, u);
             if (rr.sqrMagnitude < 0.04f * Mathf.Max(rightHint.sqrMagnitude, 1e-6f))
             {
-                // Indice droit quasi parallèle à U : on dérive R de l'indice antérieur (R = U × F).
+                // Right hint nearly parallel to U: derive R from the anterior hint (R = U × F).
                 Vector3 ff = forwardHint - u * Vector3.Dot(forwardHint, u);
                 ff = SafeNormalize(ff, Mathf.Abs(u.z) < 0.9f ? Vector3.forward : Vector3.right);
                 rr = Vector3.Cross(u, ff);
@@ -66,7 +66,7 @@ namespace Brutality.Core
             return t * t * (3f - 2f * t);
         }
 
-        /// <summary>Enveloppe attaque/maintien/relâchement entre 0 et 1.</summary>
+        /// <summary>Attack/sustain/release envelope between 0 and 1.</summary>
         public static float Envelope(float t, float start, float duration, float attack, float release)
         {
             float local = t - start;
@@ -82,7 +82,7 @@ namespace Brutality.Core
 
         public static bool Chance(System.Random rng, float p) => rng.NextDouble() < p;
 
-        /// <summary>Tirage gaussien (Box-Muller).</summary>
+        /// <summary>Gaussian draw (Box-Muller).</summary>
         public static float Gaussian(System.Random rng, float mean, float sd)
         {
             double u1 = 1.0 - rng.NextDouble();
@@ -91,20 +91,20 @@ namespace Brutality.Core
             return mean + sd * (float)z;
         }
 
-        /// <summary>Bruit lisse 1D déterministe (somme de sinusoïdes incommensurables), dans [-1, 1].</summary>
+        /// <summary>Deterministic 1D smooth noise (sum of incommensurable sinusoids), in [-1, 1].</summary>
         public static float SmoothNoise(float t, float seed)
         {
             return 0.5f * Mathf.Sin(t * 1.31f + seed) + 0.3f * Mathf.Sin(t * 2.17f + seed * 1.7f) + 0.2f * Mathf.Sin(t * 3.73f + seed * 2.3f);
         }
 
-        /// <summary>Moment d'inertie d'un segment autour d'un axe unitaire passant par son centre de masse.</summary>
+        /// <summary>Moment of inertia of a segment around a unit axis passing through its center of mass.</summary>
         public static float MomentAboutAxis(Quaternion principalRotWorld, Vector3 principalInertia, Vector3 axisWorld)
         {
             Vector3 n = Quaternion.Inverse(principalRotWorld) * axisWorld;
             return principalInertia.x * n.x * n.x + principalInertia.y * n.y * n.y + principalInertia.z * n.z * n.z;
         }
 
-        /// <summary>Normalise un quaternion pour éviter toute dérive numérique après multiplications répétées.</summary>
+        /// <summary>Normalizes a quaternion to prevent numerical drift after repeated multiplications.</summary>
         public static Quaternion Normalize(Quaternion q)
         {
             float m = Mathf.Sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
@@ -114,8 +114,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Intégration analytique exacte d'un oscillateur amorti critique (ζ = 1) vers <paramref name="goal"/>,
-        /// inconditionnellement stable quel que soit <paramref name="dt"/>, avec vitesse plafonnée à ±<paramref name="vlim"/>.
+        /// Exact analytical integration of a critically damped oscillator (ζ = 1) toward <paramref name="goal"/>,
+        /// unconditionally stable for any <paramref name="dt"/>, with velocity clamped to ±<paramref name="vlim"/>.
         /// </summary>
         public static void StepCriticallyDamped(ref float x, ref float v, float goal, float omega, float dt, float vlim)
         {
@@ -128,7 +128,7 @@ namespace Brutality.Core
             {
                 vNew = vNew > 0f ? vlim : -vlim;
                 xNew = x + vNew * dt;
-                // Ne pas dépasser la cible lors d'un pas long à vitesse plafonnée.
+                // Do not overshoot the target during a long step at capped velocity.
                 if ((x - goal) * (xNew - goal) < 0f)
                 {
                     xNew = goal;

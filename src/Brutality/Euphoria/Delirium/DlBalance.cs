@@ -5,49 +5,47 @@ using UnityEngine;
 
 namespace Brutality.Euphoria
 {
-    /// <summary>Options du balancier, tirées du plan de mort (Delirium : message bodyBalance / staggerFall / shotFallToKnees).</summary>
+    /// <summary>Balancer options, derived from the death plan (Delirium: bodyBalance / staggerFall / shotFallToKnees message).</summary>
     internal sealed class DlBalanceOptions
     {
         public bool Stagger, FallToKnees;
         public int MaxSteps = 3;
         public float MaxTime = 2f, PerStep = 1f, KneelHold = 0.6f, Sink0, DontStepTime;
         public int InjuredLeg;
-        /// <summary>Balle dans le dos : le quadriceps cède, le bassin descend sur les genoux au lieu de basculer.</summary>
+        /// <summary>Shot in the back: quadriceps give way, pelvis drops onto the knees instead of toppling.</summary>
         public float GiveWay;
-        /// <summary>Effondrement assis : les hanches plient, le bassin descend, aucun pas n'est tenté.</summary>
+        /// <summary>Seated collapse: hips flex, pelvis drops, no step is attempted.</summary>
         public bool Sit;
-        /// <summary>Inclinaison latérale imposée (-1 gauche, +1 droite) : la chute part sur le côté.</summary>
+        /// <summary>Imposed lateral lean (-1 left, +1 right): fall goes sideways.</summary>
         public int LeanSide;
-        /// <summary>Vrille autour de la verticale au début de l'équilibre (rad/s²) : le corps pivote avant de tomber.</summary>
+        /// <summary>Twist around vertical at balance start (rad/s²): body pivots before falling.</summary>
         public float YawAccel;
-        /// <summary>Delirium leanInDirection : direction horizontale d'inclinaison du balancier.</summary>
+        /// <summary>Delirium leanInDirection: horizontal lean direction of the balancer.</summary>
         public Vector3 LeanDir;
-        /// <summary>Intensité de leanInDirection (0 = inactif, 0.1..0.35 = typique Delirium).</summary>
+        /// <summary>Intensity of leanInDirection (0 = inactive, 0.1..0.35 = typical Delirium).</summary>
         public float LeanAmount;
-        /// <summary>Appliquer leanInDirection comme force horizontale sur le bassin (Delirium : applyAsForce).</summary>
+        /// <summary>Apply leanInDirection as horizontal force on the pelvis (Delirium: applyAsForce).</summary>
         public bool LeanAsForce;
-        /// <summary>Mode de dérobement des jambes : 0 = aucun, 1 = une jambe cède, 2 = deux jambes ensemble, 3 = deux jambes en décalé.</summary>
+        /// <summary>Leg buckling mode: 0 = none, 1 = one leg gives way, 2 = both legs together, 3 = both legs staggered.</summary>
         public int BuckleMode;
-        /// <summary>Jambe qui cède en premier (-1 gauche, +1 droite).</summary>
+        /// <summary>Leg that gives way first (-1 left, +1 right).</summary>
         public int BuckleLeg;
-        /// <summary>Délai avant le dérobement initial (s) et décalage de la seconde jambe en mode 3 (s).</summary>
+        /// <summary>Delay before initial buckling (s) and stagger delay for the second leg in mode 3 (s).</summary>
         public float BuckleDelay = 0.08f, BuckleStaggerDelay = 0.16f;
     }
 
     /// <summary>
-    /// Balancier dynamique, porté depuis <c>nmbb::BodyBalance</c> (loi du haut du corps) et <c>nmdbm</c>
-    /// (gestionnaire d'équilibre dynamique : placement des pieds, contrôle du bassin, cinématique inverse des jambes)
-    /// de Delirium.
+    /// Dynamic balancer, ported from Delirium's <c>nmbb::BodyBalance</c> (upper-body law) and <c>nmdbm</c>
+    /// (dynamic balance manager: foot placement, pelvis control, leg inverse kinematics).
     ///
-    /// Principe identique : le personnage n'a pas de chevilles motrices, donc le bassin est tenu par une force
-    /// corrective (Delirium : la raideur des hanches et le « stabilise ») tandis que les jambes sont posées par
-    /// cinématique inverse sur un point de capture (Hof 2005 ; Pratt 2006) borné par l'amplitude de hanche. Chaque
-    /// pas réduit la raideur des jambes ; quand le point de capture sort du polygone de sustentation et que le
-    /// balancier renonce, le corps tombe (retour « balance », puis catchFall).
+    /// Same principle: the character has no actuated ankles, so the pelvis is held by a corrective force
+    /// (Delirium: hip stiffness and "stabilise") while the legs are placed via inverse kinematics onto a
+    /// capture point (Hof 2005; Pratt 2006) clamped by hip range. Each step reduces leg stiffness; when the
+    /// capture point exits the support polygon and the balancer gives up, the body falls ("balance" return, then catchFall).
     ///
-    /// Les membres supérieurs sont contrebalancés par la cinématique des hanches comme dans Delirium :
-    /// l'épaule suit la hanche opposée, le coude suit l'écart hanche désirée/réelle, l'abduction suit celle de la
-    /// hanche, et un terme de « moulinet » (somersault / sideSomersault) s'ajoute quand le corps tourne vite.
+    /// Upper limbs are counterbalanced by hip kinematics as in Delirium:
+    /// the shoulder tracks the opposite hip, the elbow tracks desired/actual hip error, abduction tracks
+    /// hip abduction, and a "windmill" term (somersault / sideSomersault) is added when the body spins fast.
     /// </summary>
     internal sealed class DlBalance
     {
@@ -64,11 +62,11 @@ namespace Brutality.Euphoria
         public float MaxTime;
         public int MaxSteps;
         public Vector3 LeanVec;
-        /// <summary>Échelle de raideur du genou par jambe (Delirium : dbm_knee_scale, abaissée par shot.collapse).</summary>
+        /// <summary>Per-leg knee stiffness scale (Delirium: dbm_knee_scale, lowered by shot.collapse).</summary>
         public readonly float[] KneeScale = { 1f, 1f };
-        /// <summary>Niveau de dérobement instantané [0..1] par jambe (0 = gauche, 1 = droite).</summary>
+        /// <summary>Instantaneous buckling level [0..1] per leg (0 = left, 1 = right).</summary>
         public readonly float[] LegBuckle = { 0f, 0f };
-        /// <summary>Inclinaison additionnelle du bassin demandée par shot.collapse (Delirium : dbm_acc).</summary>
+        /// <summary>Additional pelvis lean requested by shot.collapse (Delirium: dbm_acc).</summary>
         public float AccBias;
 
         private readonly DlBody _b;
@@ -117,7 +115,7 @@ namespace Brutality.Euphoria
             _ch.ResetAll();
             foreach (var j in DlCharacter.Mask("us")) _ch.SetMuscleStiffness((int)j, 0.8f);
             foreach (var j in DlCharacter.Mask("un")) _ch.SetMuscleStiffness((int)j, 0.8f);
-            // Seuls les membres sont soulagés : porter le rachis reviendrait à annuler la gravité du tronc.
+            // Only limbs are gravity-compensated: supporting the spine would cancel trunk gravity.
             _ch.SetOpposeGravity("ua", 1f);
             _ch.SetOpposeGravity("lb", 0.4f);
             _ch.BlendToZero("uc", 1f);
@@ -143,10 +141,10 @@ namespace Brutality.Euphoria
             Failed = true;
             FailT = t;
             Why = why;
-            _perf.Log(t, "déséquilibre : " + why);
+            _perf.Log(t, "imbalance: " + why);
         }
 
-        /// <summary>Connecte <c>nmshot::Shot::collapse</c> au balancier (Delirium : dbm_knee_scale + dbm_acc).</summary>
+        /// <summary>Connects <c>nmshot::Shot::collapse</c> to the balancer (Delirium: dbm_knee_scale + dbm_acc).</summary>
         public void CollapseLeg(int side, float strength01)
         {
             if (side == 0) return;
@@ -158,7 +156,7 @@ namespace Brutality.Euphoria
             AccBias = Mathf.Min(AccBias, -0.5f * w);
         }
 
-        // ------------------------------------------------------------------ haut du corps (nmbb::BodyBalance::tick)
+        // ------------------------------------------------------------------ upper body (nmbb::BodyBalance::tick)
 
         public void Tick(NeuralState ns, float t, float dt)
         {
@@ -172,13 +170,13 @@ namespace Brutality.Euphoria
             }
             float lean = Mathf.Sqrt(Mathf.Max(0f, 1f - _s.Hip2HeadUp * _s.Hip2HeadUp));
             bool lastStand = _perf.LastStandUntil > t;
-            if (!O.FallToKnees && lean > (lastStand ? 0.85f : DlCfg.BalanceAbortThreshold)) { Fail(t, "inclinaison"); return; }
-            if (!O.FallToKnees && _s.Com.y - _s.FootMinY < DlCfg.GiveUpHeight) { Fail(t, "hauteur"); return; }
-            if (t - _start > MaxTime) { Fail(t, "durée max"); return; }
-            if (O.Stagger && LowerK <= 8.01f) { Fail(t, "jambes"); return; }
+            if (!O.FallToKnees && lean > (lastStand ? 0.85f : DlCfg.BalanceAbortThreshold)) { Fail(t, "lean"); return; }
+            if (!O.FallToKnees && _s.Com.y - _s.FootMinY < DlCfg.GiveUpHeight) { Fail(t, "height"); return; }
+            if (t - _start > MaxTime) { Fail(t, "max duration"); return; }
+            if (O.Stagger && LowerK <= 8.01f) { Fail(t, "legs"); return; }
 
-            // Raideurs de base des membres (Delirium nmbb.rs:159-167 : seuls les coudes prennent 0.6 × bodyStiffness,
-            // les épaules conservent bodyStiffness).
+            // Base limb stiffnesses (Delirium nmbb.rs:159-167: only elbows take 0.6 × bodyStiffness,
+            // shoulders keep bodyStiffness).
             _ch.SetStiffness("ub", DlCfg.BalanceBodyStiffness, DlCfg.BalanceDamping);
             _ch.SetStiffness("ua", DlCfg.BalanceBodyStiffness, DlCfg.BalanceDamping);
             _ch.SetStiffness("un", DlCfg.BalanceBodyStiffness, 1f);
@@ -189,7 +187,7 @@ namespace Brutality.Euphoria
             foreach (var j in DlCharacter.Mask("us")) _ch.SetMuscleStiffness((int)j, 0.8f);
             foreach (var j in DlCharacter.Mask("un")) _ch.SetMuscleStiffness((int)j, 0.8f);
 
-            // Flexion du rachis : S-curve de repos, puis compensation de l'inclinaison du tronc.
+            // Spine flexion: resting S-curve, then trunk lean compensation.
             float roll = Mathf.Asin(Mathf.Clamp(Vector3.Dot(_b.Part(Seg.Thorax).U, _b.Right), -1f, 1f)) * Mathf.Rad2Deg;
             var spine = DlCharacter.Mask("us");
             DlCfg.Range((int)JointId.Lumbar, 1, out float lo1, out float hi1);
@@ -197,7 +195,7 @@ namespace Brutality.Euphoria
             float[] baseLean = { -0.10f, 0.01f, -0.10f, 0.10f };
             float[] twistGain = { 0.35f, 0.20f, 0.60f, 0.10f };
 
-            // Torsion : écart hanche gauche/droite (Delirium : tw = (hip0.desired - hip1.desired)·a + (hip0.actual - hip1.actual)).
+            // Twist: left/right hip difference (Delirium: tw = (hip0.desired - hip1.desired)·a + (hip0.actual - hip1.actual)).
             float hipDesDiff = _ch.Desired((int)JointId.LHip).x - _ch.Desired((int)JointId.RHip).x;
             float hipActDiff = _ch.Actual((int)JointId.LHip, _b.Body).x - _ch.Actual((int)JointId.RHip, _b.Body).x;
             float tw = hipDesDiff * 0.3f + hipActDiff;
@@ -213,7 +211,7 @@ namespace Brutality.Euphoria
                 _ch.SetDesired(j, 2, 0.5f * (lo2 + hi2) + Mathf.Clamp(tw * twistGain[i], -0.35f, 0.35f));
             }
 
-            // Bras : contrebalancement des hanches (Delirium nmbb.rs:275-318 : saute les bras occupés par grab/shot).
+            // Arms: hip counterbalancing (Delirium nmbb.rs:275-318: skips arms busy with grab/shot).
             bool grounded = _s.Contact[0] || _s.Contact[1];
             for (int side = 0; side < 2; side++)
             {
@@ -246,8 +244,8 @@ namespace Brutality.Euphoria
                 _ch.SetOpposeGravity((int)sh, 1f);
             }
 
-            // « Moulinet » lié aux vitesses angulaires : Delirium borne chaque rotation au-delà d'un seuil et la
-            // réinjecte dans l'abduction (somersaultAngle / sideSomersaultAngle) quand armsOutOnPush est actif.
+            // "Windmill" tied to angular velocities: Delirium clamps each rotation above a threshold and
+            // feeds it back into abduction (somersaultAngle / sideSomersaultAngle) when armsOutOnPush is active.
             Vector3 w = _b.AngVel;
             float ratePitch = Mathf.Asin(Mathf.Clamp(Vector3.Dot(_b.Part(Seg.Thorax).U, BMath.SafeNormalize(_b.Vel, _b.Fwd)), -1f, 1f)) * Mathf.Rad2Deg;
             float overPitch = Over(ratePitch, 25f);
@@ -257,11 +255,11 @@ namespace Brutality.Euphoria
             if (w.magnitude > 4f) _armsOut = Mathf.Min(1f, _armsOut + dt * 2f);
             else _armsOut = Mathf.Max(0f, _armsOut - dt);
 
-            // Inclinaison latérale imposée : le buste part sur le côté, la chute se fait dans le plan frontal.
+            // Imposed lateral lean: torso goes sideways, fall occurs in the frontal plane.
             if (O.LeanSide != 0)
                 _ch.SetDesired((int)JointId.Lumbar, 1, mid1 + O.LeanSide * 0.22f);
 
-            // Vitesse : blend_to_zero partiel du haut du corps (Delirium nmbb.rs:322 : k ∈ [0.25, 0.53], jamais 1.0).
+            // Speed: partial blend_to_zero of upper body (Delirium nmbb.rs:322: k ∈ [0.25, 0.53], never 1.0).
             float f19 = Mathf.Clamp01(_s.Vel.magnitude);
             float blendK = 0.25f + 0.28f * (1f - f19);
             foreach (var j in DlCharacter.Mask("ub"))
@@ -271,13 +269,13 @@ namespace Brutality.Euphoria
                 _ch.BlendToZero((int)j, blendK);
             }
 
-            // Gestionnaire d'équilibre : pieds, bassin, jambes.
+            // Balance manager: feet, pelvis, legs.
             Legs(ns, t, dt, lean);
         }
 
         private static float Over(float x, float thr) => Mathf.Clamp(Mathf.Abs(x), thr, 60f) - thr;
 
-        // ------------------------------------------------------------------ jambes (nmdbm)
+        // ------------------------------------------------------------------ legs (nmdbm)
 
         private void Legs(NeuralState ns, float t, float dt, float lean)
         {
@@ -287,20 +285,20 @@ namespace Brutality.Euphoria
             float w0 = Mathf.Sqrt(g / Mathf.Max(0.4f, _s.H));
             Vector3 comH = DlBody.Horiz(_s.Com), velH = DlBody.Horiz(_s.Vel);
 
-            // Point de capture : le pied doit se poser là où le centre de masse arrivera pendant le pas.
+            // Capture point: the foot must land where the center of mass will arrive during the step.
             float pred = O.Stagger ? 0.1f : 0f;
             Vector3 apex = comH + velH * (1f / w0 + pred);
-            // Chute latérale : le point de capture est décalé du côté de l'inclinaison, le corps n'a plus d'appui.
+            // Lateral fall: capture point is offset toward the lean side, body loses support.
             if (O.LeanSide != 0) apex += _s.Right * (O.LeanSide * 0.24f);
 
             float giveWay = O.GiveWay * BMath.SmoothStep(0.01f, 0.18f, t - _start);
-            // Dérobement programmé d'une ou deux jambes (toujours mis à jour avant les retours anticipés Sit/FallToKnees).
+            // Scheduled buckling of one or both legs (always updated before Sit/FallToKnees early returns).
             UpdateBuckle(t, giveWay);
 
-            // Effondrement assis : les hanches plient, le bassin descend, les pieds ne bougent plus.
+            // Seated collapse: hips flex, pelvis drops, feet stop moving.
             if (O.Sit && t - _start > 0.1f)
             {
-                if (_bendT < 0f) { _bendT = t; _perf.Log(t, "sitDown : les hanches plient"); }
+                if (_bendT < 0f) { _bendT = t; _perf.Log(t, "sitDown: hips bend"); }
                 Sink = Mathf.Min(0.46f, Sink + 1.1f * dt);
                 float k = Mathf.Clamp01(Sink / 0.46f);
                 for (int sd = -1; sd <= 1; sd += 2)
@@ -316,10 +314,10 @@ namespace Brutality.Euphoria
                 return;
             }
 
-            // shotFallToKnees : flexion progressive, appui sur les genoux, puis effondrement.
+            // shotFallToKnees: progressive flexion, knee support, then collapse.
             if (O.FallToKnees && t - _start > 0.7f)
             {
-                if (_bendT < 0f) { _bendT = t; _perf.Log(t, "shotFallToKnees : flexion"); }
+                if (_bendT < 0f) { _bendT = t; _perf.Log(t, "shotFallToKnees: flexion"); }
                 Sink = Mathf.Min(0.44f, Sink + 0.5f * dt);
                 float kk = 1f - Sink / 0.44f;
                 for (int sd = -1; sd <= 1; sd += 2)
@@ -339,13 +337,13 @@ namespace Brutality.Euphoria
                     MaxTime = Mathf.Max(MaxTime, t - _start + O.KneelHold + 0.1f);
                     _perf.OnKneesImpact(t);
                 }
-                // Force de soutien : les genoux portent le poids au lieu de tomber.
+                // Support force: knees bear weight instead of falling.
                 if (KneesDown) _perf.OnKneeSupport(t, dt, Strength(t) * 0.6f);
-                if (KneesDown && t - _kneelT > O.KneelHold) Fail(t, "genoux");
+                if (KneesDown && t - _kneelT > O.KneelHold) Fail(t, "knees");
                 return;
             }
 
-            // Décision du pas.
+            // Step decision.
             if (_swing == 0 && t - _start >= O.DontStepTime)
             {
                 Vector3 a = DlBody.Horiz(_s.Ankle[0]), c = DlBody.Horiz(_s.Ankle[1]);
@@ -354,7 +352,7 @@ namespace Brutality.Euphoria
                 float dist = Vector3.Distance(apex, a + ac * u01);
                 if (dist > 0.08f || ac.magnitude > 0.23f + 0.45f)
                 {
-                    if (Steps >= MaxSteps) { Fail(t, "pas max"); return; }
+                    if (Steps >= MaxSteps) { Fail(t, "max steps"); return; }
                     float lat = Vector3.Dot(apex - comH, _s.Right);
                     int sw = Mathf.Abs(lat) > 0.06f ? (lat > 0f ? 1 : -1)
                         : (Vector3.Distance(a, apex) > Vector3.Distance(c, apex) ? -1 : 1);
@@ -369,7 +367,7 @@ namespace Brutality.Euphoria
             }
 
             float hipH = _y0 - Sink;
-            // Delirium leanInDirection : inclinaison du vecteur up de référence (ou poussée horizontale si LeanAsForce).
+            // Delirium leanInDirection: tilt of reference up vector (or horizontal push if LeanAsForce).
             if (O.LeanAmount > 0.005f && O.LeanDir.sqrMagnitude > 1e-4f)
             {
                 Vector3 ld = DlBody.Horiz(O.LeanDir);
@@ -398,13 +396,13 @@ namespace Brutality.Euphoria
                         _swing = 0;
                         _planted[k] = true;
                         _ankle[k] = target;
-                        _perf.Log(t, "pas " + Steps + (sd < 0 ? " (G)" : " (D)"));
+                        _perf.Log(t, "step " + Steps + (sd < 0 ? " (L)" : " (R)"));
                         if (O.Stagger && Steps >= 2) LowerK = Mathf.Max(8f - 0.02f, LowerK - O.PerStep);
                     }
                 }
                 else
                 {
-                    // Jambe d'appui : cheville posée, bassin maintenu à hauteur, pied orienté vers l'avant.
+                    // Stance leg: ankle planted, pelvis held at height, foot oriented forward.
                     target = _ankle[k];
                     target.y = _s.Ankle[k].y;
                     _ankle[k] = target;
@@ -412,7 +410,7 @@ namespace Brutality.Euphoria
                 LegTo(sd, target, hipH, dt, LegBuckle[k]);
             }
 
-            // Répartition du déséquilibre latéral entre les deux hanches et le rachis (Delirium : over-range sharing).
+            // Lateral imbalance sharing between both hips and spine (Delirium: over-range sharing).
             float overL = HipOver(-1), overR = HipOver(1);
             float aO = Mathf.Max(overL, -overR), bO = Mathf.Max(overR, -overL);
             if (aO > 0f && bO <= 0f)
@@ -428,8 +426,8 @@ namespace Brutality.Euphoria
                 _ch.SetDesired((int)JointId.Lumbar, 1, _ch.Desired((int)JointId.Lumbar).y - bO);
             }
 
-            // Contrôle du bassin : inclinaison avant/arrière et latérale d'après le déplacement du CdM par rapport
-            // aux appuis (Delirium : pelvis_control), transmise au rachis et à l'inclinaison des hanches.
+            // Pelvis control: forward/back and lateral tilt from CoM offset relative to
+            // supports (Delirium: pelvis_control), forwarded to spine and hip tilt.
             Vector3 support = SupportPoint(comH);
             float ahead = Vector3.Dot(comH - support, _s.Fwd);
             float side = Vector3.Dot(comH - support, _s.Right);
@@ -439,10 +437,10 @@ namespace Brutality.Euphoria
             _p52 = Mathf.Lerp(_p52, leanS, 1f - Mathf.Exp(-dt * 8f));
             _p56 = Mathf.Lerp(_p56, leanF, 1f - Mathf.Exp(-dt * 8f));
             _ch.SetDesired((int)JointId.Lumbar, 1, Mathf.Clamp(_ch.Desired((int)JointId.Lumbar).y + _p52 * 0.5f, -0.5f, 0.5f));
-            // Delirium applique l'inclinaison du bassin au rachis et à la cheville ; sans articulation de cheville
-            // sur le ragdoll EFT, elle va au rachis seul pour ne pas combattre la cinématique inverse des jambes.
+            // Delirium applies pelvis tilt to spine and ankle; without an ankle joint on the EFT
+            // ragdoll, it goes to the spine alone so it doesn't fight leg inverse kinematics.
             _ch.SetDesired((int)JointId.Lumbar, 0, _ch.Desired((int)JointId.Lumbar).x + _p56 * 0.5f);
-            // Ne réécrase pas la raideur des jambes qui se dérobent (LegBuckle / KneeScale).
+            // Do not overwrite the stiffness of buckling legs (LegBuckle / KneeScale).
             for (int sd = -1; sd <= 1; sd += 2)
             {
                 int k = NmCharacter.Si(sd);
@@ -453,7 +451,7 @@ namespace Brutality.Euphoria
                 _ch.SetStiffness(AnatomyData.Knee(sd), Mathf.Max(1.8f, knk), 1f);
             }
 
-            // staggerFall : inclinaison dans le sens de la marche (leanInDirection) et flexion du rachis avec la vitesse.
+            // staggerFall: lean in walking direction (leanInDirection) and spine flexion with speed.
             if (O.Stagger)
             {
                 float vf = Vector3.Dot(velH, _s.Fwd);
@@ -493,15 +491,15 @@ namespace Brutality.Euphoria
                 if (!_buckleLogged && g1 > 0.1f)
                 {
                     _buckleLogged = true;
-                    _perf.Log(t, O.BuckleMode == 1 ? $"dérobement jambe {(firstSide < 0 ? "G" : "D")}"
-                        : O.BuckleMode == 2 ? "dérobement deux jambes" : "dérobement asymétrique (2 temps)");
+                    _perf.Log(t, O.BuckleMode == 1 ? $"leg buckle {(firstSide < 0 ? "L" : "R")}"
+                        : O.BuckleMode == 2 ? "both legs buckle" : "asymmetric buckle (2-step)");
                 }
             }
             LegBuckle[0] = Mathf.Max(_shotCollapsed[0] ? LegBuckle[0] : 0f, b0);
             LegBuckle[1] = Mathf.Max(_shotCollapsed[1] ? LegBuckle[1] : 0f, b1);
         }
 
-        /// <summary>Delirium : reach() borne la cible du pas dans le cône d'amplitude de la hanche.</summary>
+        /// <summary>Delirium: reach() clamps the step target within the hip range cone.</summary>
         private Vector3 ClampReach(int sd, Vector3 target, float clamp)
         {
             int hip = (int)AnatomyData.Hip(sd);
@@ -518,7 +516,7 @@ namespace Brutality.Euphoria
             return h + r;
         }
 
-        /// <summary>Delirium nmdbm.rs:806-810 : dépassement elliptique (flexion + abduction) de la hanche.</summary>
+        /// <summary>Delirium nmdbm.rs:806-810: elliptical over-range (flexion + abduction) of the hip.</summary>
         private float HipOver(int sd)
         {
             var hip = AnatomyData.Hip(sd);
@@ -548,13 +546,13 @@ namespace Brutality.Euphoria
             float knk = LowerK * wk * KneeScale[k] * Mathf.Lerp(1f, 0.22f, buckle);
             _ch.SetStiffness(jm, LowerK * wk, 1f);
             _ch.SetStiffness(km, Mathf.Max(1.8f, knk), 1f);
-            // Quand la jambe se dérobe, le genou se referme franchement et la hanche fléchit sous le poids.
+            // When the leg buckles, the knee closes sharply and the hip flexes under the weight.
             float extraKneeDeg = buckle * 52f;
             float extraHipDeg = buckle * 20f;
             _ch.SetDesired((int)jm, 0, (f + extraHipDeg) * BMath.Deg);
             _ch.SetDesired((int)jm, 1, ab * BMath.Deg);
             _ch.SetDesired((int)km, 0, Mathf.Max(kn + extraKneeDeg, 5f) * BMath.Deg);
-            // Orientation du pied : la cheville suit la direction du déplacement (yaw) et la pente locale.
+            // Foot orientation: ankle follows movement direction (yaw) and local slope.
             Vector3 dir = DlBody.Horiz(_s.Vel);
             float yaw = 0f;
             if (dir.sqrMagnitude > 0.04f)
@@ -568,7 +566,7 @@ namespace Brutality.Euphoria
             _ch.SetDesired((int)jm, 2, cur * 0.5f);
         }
 
-        /// <summary>Point d'appui effectif : projection du CdM sur le segment entre les deux pieds.</summary>
+        /// <summary>Effective support point: projection of CoM onto the segment between both feet.</summary>
         private Vector3 SupportPoint(Vector3 comH)
         {
             Vector3 a = DlBody.Horiz(_s.Ankle[0]), c = DlBody.Horiz(_s.Ankle[1]);
@@ -583,9 +581,9 @@ namespace Brutality.Euphoria
         // ------------------------------------------------------------------ forces (pelvis_control + stabilise)
 
         /// <summary>
-        /// Forces du balancier. Ce sont les jambes (drives + appuis) qui portent le corps : appliquer une poussée
-        /// verticale de corps entier reviendrait à faire léviter le mourant, qui glisserait alors sur place au lieu
-        /// de tomber. Le balancier ne fournit donc qu'un frein horizontal, au contact, et le redressement du tronc.
+        /// Balancer forces. The legs (drives + contacts) support the body: applying a whole-body upward
+        /// push would levitate the dying character, who would slide in place instead of falling.
+        /// The balancer therefore provides only horizontal braking when in contact, and trunk uprighting.
         /// </summary>
         public void Forces(float t, float dt)
         {
@@ -598,7 +596,7 @@ namespace Brutality.Euphoria
             float g = Mathf.Max(1f, -Physics.gravity.y);
             float M = Mathf.Max(20f, body.TotalMass);
 
-            // Vrille de pivot : le corps tourne sur lui-même avant que l'équilibre ne cède.
+            // Pivot spin: body rotates on itself before balance gives way.
             if (O.YawAccel != 0f)
             {
                 float x = t - _start;
@@ -606,15 +604,15 @@ namespace Brutality.Euphoria
                     NmPhysics.BodyAngularAccel(body, Vector3.up * (O.YawAccel * Mathf.Sin(Mathf.PI * x / 0.45f) * s));
             }
 
-            // Effondrement assis : le bassin descend sous le poids du corps pendant que les hanches plient.
+            // Seated collapse: pelvis drops under body weight while hips flex.
             if (O.Sit)
             {
                 float sit = Mathf.Clamp01((t - _start) / 0.5f);
                 if (sit > 0.01f) pelvis.Rb.AddForce(Vector3.down * (0.35f * sit * M * g * s), ForceMode.Force);
             }
 
-            // Dérobement d'une ou deux jambes (balle dans le dos, balle dans la jambe, ou effondrement des genoux) :
-            // le quadriceps n'encaisse plus la charge, le bassin descend et bascule du côté qui cède si asymétrique.
+            // Buckling of one or both legs (shot in back, shot in leg, or knee collapse):
+            // quadriceps no longer hold the load, pelvis drops and rolls toward the yielding side if asymmetric.
             float bMax = Mathf.Max(LegBuckle[0], LegBuckle[1]);
             float bAvg = 0.5f * (LegBuckle[0] + LegBuckle[1]);
             if (bMax > 0.01f)
@@ -629,13 +627,13 @@ namespace Brutality.Euphoria
                 float asym = LegBuckle[1] - LegBuckle[0];
                 if (Mathf.Abs(asym) > 0.1f)
                 {
-                    // Une seule jambe cède : le bassin s'affaisse de ce côté (roulis frontal naturel).
+                    // Only one leg gives way: pelvis drops on that side (natural frontal roll).
                     Vector3 sideRoll = -_s.Fwd * (asym * 28f * s);
                     pelvis.Rb.AddTorque(sideRoll, ForceMode.Force);
                 }
             }
 
-            // Delirium leanInDirection (applyAsForce) : poussée horizontale douce sur le bassin au contact.
+            // Delirium leanInDirection (applyAsForce): gentle horizontal push on the pelvis when in contact.
             if (O.LeanAsForce && LeanVec.sqrMagnitude > 1e-5f && (_s.Contact[0] || _s.Contact[1]))
             {
                 Vector3 uLean = (Vector3.up + DlBody.Horiz(LeanVec)).normalized;
@@ -644,7 +642,7 @@ namespace Brutality.Euphoria
                 pelvis.Rb.AddForce(Vector3.ClampMagnitude(fLean * s, 0.28f * M * g), ForceMode.Force);
             }
 
-            // Stabilisation horizontale (Delirium nmdbm::stabilise) + frein borné, uniquement quand un pied appuie.
+            // Horizontal stabilization (Delirium nmdbm::stabilise) + bounded brake, only when a foot is in contact.
             if (_s.Contact[0] || _s.Contact[1])
             {
                 Vector3 midFoot = 0.5f * (_s.Ankle[0] + _s.Ankle[1]);
@@ -659,8 +657,8 @@ namespace Brutality.Euphoria
                 thorax.Rb.AddForce(fH * 0.3f, ForceMode.Force);
             }
 
-            // Redressement du tronc en couple réel : inertie du haut du corps autour des hanches. Le couple est borné
-            // pour que le tronc puisse réellement basculer quand le balancier renonce.
+            // Trunk uprighting via real torque: upper-body inertia around the hips. Torque is bounded
+            // so the trunk can actually topple when the balancer gives up.
             Vector3 upT = (Vector3.up + LeanVec).normalized;
             float Iub = 0.5f;
             foreach (var id in new[] { Seg.Pelvis, Seg.Thorax, Seg.Head, Seg.LUpperArm, Seg.RUpperArm, Seg.LForearm, Seg.RForearm })

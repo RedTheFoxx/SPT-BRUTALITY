@@ -9,8 +9,8 @@ using UnityEngine;
 namespace Brutality.Neural
 {
     /// <summary>
-    /// « Système nerveux » du mourant : construit la chronologie motrice à partir du contexte de la mort
-    /// (mécanisme, zone, calibre, côté, posture, membres détruits) puis ordonnance l'agonie au hasard.
+    /// "Nervous system" of the dying character: builds the motor timeline from the death context
+    /// (mechanism, zone, caliber, side, posture, destroyed limbs) then schedules agony randomly.
     /// </summary>
     internal sealed class NeuralController
     {
@@ -38,7 +38,7 @@ namespace Brutality.Neural
         private float _agonyDur;
         private DeathSignature _sig;
 
-        /// <summary>Performance Euphoria (comportements NaturalMotion). Null sur un corps en simulation allégée.</summary>
+        /// <summary>Euphoria performance (NaturalMotion behaviors). Null on a lightweight-simulated body.</summary>
         public NmPerformance Nm { get; private set; }
         public float MusclesCap => _musclesCap;
 
@@ -57,7 +57,7 @@ namespace Brutality.Neural
             float reflex = Settings.ReflexIntensity.Value;
             _vigor = Settings.SpasmVigor.Value;
             _variety = Settings.GestureVariety.Value;
-            // Signature de cette mort : palette de gestes, cadence, asymétrie. Deux morts ne partagent pas la même.
+            // Signature of this death: gesture palette, tempo, asymmetry. No two deaths share the same one.
             _sig = VarietyDirector.Draw(rng, _variety);
             VarietyDirector.BeginDeath();
 
@@ -70,8 +70,8 @@ namespace Brutality.Neural
 
             ApplyCapacities();
 
-            // Tonus postural résiduel (dépend de la posture au moment de la mort). Un corps en simulation
-            // allégée n'a aucun programme : il tombe mou, avec les seuls tissus passifs.
+            // Residual postural tone (depends on posture at death). A lightweight-simulated body
+            // has no programs: it collapses limp, with passive tissues only.
             float u0 = ctx.Pose == EPlayerPose.Prone ? 0.25f : (ctx.Pose == EPlayerPose.Duck ? 0.4f : 0.55f);
             InitialTone = u0;
             if (!_light)
@@ -79,7 +79,7 @@ namespace Brutality.Neural
 
             if (!_light && reflex > 0.01f)
             {
-                // Posturing / réponse d'escrime (lésions encéphaliques).
+                // Posturing / fencing response (brain lesions).
                 float roll = (float)rng.NextDouble();
                 float pz = Mathf.Min(1f, _ns.Posturing);
                 float pCor = _profile.DecorticateProb * pz;
@@ -88,7 +88,7 @@ namespace Brutality.Neural
                 else if (roll < pCor + _profile.FencingProb)
                     Add(new Fencing(BMath.Chance(rng, 0.5f) ? 1 : -1, BMath.Range(rng, 0.05f, 0.15f), BMath.Range(rng, 1.5f, 4f), Mathf.Clamp01(0.7f * reflex)));
 
-                // Gels musculaires localisés.
+                // Localized muscle locks.
                 if (_profile.LockProb > 0f)
                 {
                     TryLock(JointId.LElbow, 1.2f); TryLock(JointId.RElbow, 1.2f);
@@ -98,22 +98,22 @@ namespace Brutality.Neural
                 }
             }
 
-            // Réserve une fenêtre de relâchement flasque avant l'arrêt forcé (au moins ~2,4 s sur 10 s,
-            // proportionnel si l'utilisateur réduit MaxMotionSeconds) pour que tous les membres retombent sous leur poids.
+            // Reserve a flaccid relaxation window before forced cutoff (at least ~2.4 s over 10 s,
+            // proportional if the user reduces MaxMotionSeconds) so all limbs fall under their own weight.
             float relaxReserve = Mathf.Clamp(0.25f * _maxDuration, 1.1f, 2.5f);
             _musclesCap = Mathf.Max(0.5f, _maxDuration - relaxReserve);
 
-            // L'agonie au sol est déclenchée par la performance Euphoria (OnNmGround), une fois le corps posé :
-            // d'ici là, seule la chute est jouée et les muscles restent disponibles. Un corps en simulation allégée
-            // (trop loin, ou plafond de cadavres atteint) n'a ni performance ni agonie : tissus passifs seulement.
+            // Ground agony is triggered by the Euphoria performance (OnNmGround) once the body has settled:
+            // until then, only the fall is played and muscles remain available. A lightweight-simulated body
+            // (too far, or corpse cap reached) has neither performance nor agony: passive tissues only.
             _agonyI0 = _light ? 0f : BMath.Range(rng, _profile.AgonyI0) * Settings.AgonyIntensity.Value;
             _agonyDur = _agonyI0 > 0f ? BMath.Range(rng, _profile.AgonyDuration) : 0f;
             AgonyStart = float.PositiveInfinity;
             AgonyEnd = _musclesCap;
-            // Simulation allégée : les muscles lâchent tout de suite (aucun tonus résiduel à entretenir).
+            // Lightweight simulation: muscles release immediately (no residual tone to maintain).
             ActiveEnd = _light ? 0.35f : _musclesCap;
 
-            // Aucun programme initial (escrime, verrouillage, agrippe) ne doit dépasser la coupure musculaire.
+            // No initial program (fencing, lock, clutch) may exceed the muscle cutoff.
             foreach (var p in _programs)
                 p.Duration = Mathf.Max(0.1f, Mathf.Min(p.Duration, _musclesCap - p.Start));
 
@@ -121,17 +121,17 @@ namespace Brutality.Neural
 
             if (Settings.DebugLogging.Value)
             {
-                Journal.Append("programmes initiaux : ");
+                Journal.Append("initial programs: ");
                 foreach (var p in _programs) Journal.Append(p.Name).Append(" @").Append(p.Start.ToString("0.00")).Append(", ");
-                Journal.Append("agonie différée jusqu'au sol, I0=").Append(_agonyI0.ToString("0.00"))
-                       .Append(" fin=").Append(ActiveEnd.ToString("0.0")).Append("s")
-                       .Append(" ; signature : cadence ").Append(_sig.Tempo.ToString("0.00"))
-                       .Append(", asymétrie ").Append(_sig.Asymmetry.ToString("0.00"))
+                Journal.Append("agony deferred until ground, I0=").Append(_agonyI0.ToString("0.00"))
+                       .Append(" end=").Append(ActiveEnd.ToString("0.0")).Append("s")
+                       .Append("; signature: tempo ").Append(_sig.Tempo.ToString("0.00"))
+                       .Append(", asymmetry ").Append(_sig.Asymmetry.ToString("0.00"))
                        .Append(", palette ").Append(PaletteSummary());
             }
         }
 
-        /// <summary>Gestes privilégiés de cette mort, pour le journal de diagnostic.</summary>
+        /// <summary>Favored gestures for this death, for the diagnostic log.</summary>
         private string PaletteSummary()
         {
             var sb = new StringBuilder();
@@ -141,7 +141,7 @@ namespace Brutality.Neural
                 if (m > 1.35f) sb.Append(m > 2.2f ? "++" : "+").Append((AgonyEvent)i).Append(' ');
                 else if (m < 0.7f) sb.Append("-").Append((AgonyEvent)i).Append(' ');
             }
-            return sb.Length == 0 ? "neutre" : sb.ToString().TrimEnd();
+            return sb.Length == 0 ? "neutral" : sb.ToString().TrimEnd();
         }
 
         private void TryLock(JointId j, float weight)
@@ -152,7 +152,7 @@ namespace Brutality.Neural
             Add(new JointLock(j, BMath.Range(rng, 0f, 0.08f), BMath.Range(rng, 0.4f, 2.5f), Mathf.Clamp01(0.85f * _ns.Reflex)));
         }
 
-        /// <summary>Paralysies (niveau médullaire), membres détruits ou blessés, membre touché par le coup fatal.</summary>
+        /// <summary>Paralysis (spinal level), destroyed or injured limbs, limb hit by the fatal blow.</summary>
         private void ApplyCapacities()
         {
             var J = _body.Joints;
@@ -248,7 +248,7 @@ namespace Brutality.Neural
                 }
             }
 
-            // Bras disponibles : pas un bras détruit, et pas le bras blessé pour atteindre sa propre plaie.
+            // Available arms: not a destroyed arm, and not the injured arm trying to reach its own wound.
             var sides = new List<int>(2);
             for (int s = -1; s <= 1; s += 2)
             {
@@ -264,7 +264,7 @@ namespace Brutality.Neural
             if (sides.Count == 0) return null;
             if (sides.Count == 2 && !abdominal && fallback != Seg.Head && BMath.Chance(rng, 0.55f))
             {
-                // Une seule main : de préférence la controlatérale à la plaie, sinon au hasard.
+                // Single hand: preferably contralateral to the wound, otherwise random.
                 int keep = woundSide != 0 ? -woundSide : (BMath.Chance(rng, 0.5f) ? -1 : 1);
                 sides.Clear();
                 sides.Add(keep);
@@ -272,14 +272,14 @@ namespace Brutality.Neural
             return new ClutchWound(wound, fallback, sides.ToArray(), start, duration, u, abdominal);
         }
 
-        /// <summary>Aucun geste ne doit déborder sur la phase d'apaisement qui précède l'arrêt forcé.</summary>
+        /// <summary>No gesture may spill into the calming phase preceding forced cutoff.</summary>
         private void ClampToAgony(MotorProgram p)
         {
             float end = Mathf.Min(AgonyEnd, _musclesCap);
             if (p.Start + p.Duration > end) p.Duration = Mathf.Max(0.15f, end - p.Start);
         }
 
-        /// <summary>Bras capables de bouger (un seul au hasard, ou les deux).</summary>
+        /// <summary>Arms capable of moving (one at random, or both).</summary>
         private int[] AvailableArms(bool both)
         {
             bool l = _body.Joints[(int)JointId.LElbow].Capacity[0] > 0.25f;
@@ -300,9 +300,9 @@ namespace Brutality.Neural
             return null;
         }
 
-        // ------------------------------------------------------------------ boucle
+        // ------------------------------------------------------------------ loop
 
-        /// <summary>La performance Euphoria a posé le corps au sol : l'agonie Brutality commence.</summary>
+        /// <summary>Euphoria performance has settled the body on the ground: Brutality agony begins.</summary>
         public void OnNmGround(float t)
         {
             if (AgonyStart < 1e8f) return;
@@ -337,7 +337,7 @@ namespace Brutality.Neural
         {
             if (_agonyI0 <= 0f || t < AgonyStart || t > AgonyEnd) return 0f;
             float ramp = BMath.SmoothStep(AgonyStart, AgonyStart + 0.35f, t);
-            // Plateau sur ~45 % de la fenêtre, puis extinction progressive.
+            // Plateau over ~45% of the window, then progressive decay.
             float decay = 1f - BMath.SmoothStep(AgonyStart + 0.45f * (AgonyEnd - AgonyStart), AgonyEnd, t);
             return _agonyI0 * ramp * Mathf.Pow(Mathf.Max(0f, decay), 0.8f);
         }
@@ -354,7 +354,7 @@ namespace Brutality.Neural
             if (!_agonyStarted && _agonyI0 > 0f && t >= AgonyStart && (grounded || t >= AgonyStart + 1.2f))
             {
                 _agonyStarted = true;
-                // Si le corps a mis du temps à se poser, on décale la fenêtre d'agonie (sans mordre sur le relâchement).
+                // If the body took a while to settle, shift the agony window (without cutting into relaxation).
                 float shift = t - AgonyStart;
                 AgonyStart = t;
                 AgonyEnd = Mathf.Min(AgonyEnd + shift * 0.5f, Mathf.Max(0.5f, _musclesCap - 0.1f));
@@ -372,11 +372,11 @@ namespace Brutality.Neural
                     Add(new AgonalGasp(gs, Mathf.Max(0.2f, AgonyEnd - gs), rng));
                 }
                 if (_profile.HeadLoll) Add(new HeadLoll(t, len, rng));
-                // Rigidité de posture (décortication) entre les gestes : elle prolonge la posture de la chute.
+                // Postural rigidity (decortication) between gestures: extends the fall posture.
                 if (_ns.Posturing > 0.01f && BMath.Chance(rng, Mathf.Clamp01(_profile.RigidityProb * Mathf.Max(0.5f, _ns.Posturing))))
                 {
                     Add(new PosturalRigidity(t, len, BMath.Range(rng, 0.3f, 0.5f), rng));
-                    if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s rigidité décortiquée");
+                    if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s decorticate rigidity");
                 }
                 if (Settings.VisibleBreathing.Value && BMath.Chance(rng, _profile.BreathingProb) && _body.Joints[(int)JointId.Lumbar].Capacity[0] > 0.2f)
                     Add(new LaboredBreathing(t, len, rng));
@@ -391,7 +391,7 @@ namespace Brutality.Neural
                 {
                     ClampToAgony(first);
                     Add(first);
-                    if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s ").Append(first.Name).Append(" (premier geste)");
+                    if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s ").Append(first.Name).Append(" (first gesture)");
                 }
             }
 
@@ -400,7 +400,7 @@ namespace Brutality.Neural
             {
                 _lastBreathSpawned = true;
                 Add(new LastBreath(t, AgonyEnd - t, _ctx.Rng));
-                if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s dernier soupir");
+                if (Settings.DebugLogging.Value) Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s last breath");
             }
 
             Nm?.Update(_ns, t, dt);
@@ -412,7 +412,7 @@ namespace Brutality.Neural
         private void ScheduleAgony(float t, float dt)
         {
             float I = _ns.Agony;
-            // Ne pas lancer de nouveau geste dans les derniers instants de l'agonie (évite un spasme juste avant le relâchement).
+            // Do not launch a new gesture in the final moments of agony (avoids a spasm right before relaxation).
             if (I <= 0.08f || t >= AgonyEnd - 0.45f || _lastBreathSpawned) return;
             int active = 0;
             MotorGroup busy = MotorGroup.None;
@@ -423,7 +423,7 @@ namespace Brutality.Neural
                 busy |= p.Groups;
             }
             if (active >= 2) return;
-            // Les comportements Euphoria occupent déjà le corps : l'agonie reste plus discrète qu'en chorégraphie seule.
+            // Euphoria behaviors already occupy the body: agony stays more restrained than in standalone choreography.
             float rate = _profile.EventRate * _vigor * _sig.Tempo * Mathf.Clamp01(I) * (active == 0 ? 1f : 0.6f);
             if (!BMath.Chance(_ctx.Rng, rate * dt)) return;
 
@@ -444,7 +444,7 @@ namespace Brutality.Neural
             float supine = _body.SupineScore;
             float sideUp = _body.SideUpScore;
             var w = (float[])_profile.Weights.Clone();
-            // Palette propre à cette mort : certains gestes sont privilégiés, d'autres presqu'absents.
+            // Palette specific to this death: some gestures are favored, others nearly absent.
             for (int i = 0; i < w.Length && i < _sig.Palette.Length; i++) w[i] *= _sig.Palette[i];
             float W(AgonyEvent e) => w[(int)e];
             void Mul(AgonyEvent e, float x) => w[(int)e] *= x;
@@ -458,7 +458,7 @@ namespace Brutality.Neural
             }
             else Mul(AgonyEvent.Curl, 1.5f);
 
-            // Orientation au sol : ramper et se relever sur le ventre, se redresser sur le dos.
+            // Ground orientation: crawl and push-up when prone, sit-up when supine.
             bool prone = supine < -0.45f, onBack = supine > 0.35f;
             if (!prone) { Zero(AgonyEvent.Crawl); Zero(AgonyEvent.PushUp); Zero(AgonyEvent.ElbowDrag); }
             else
@@ -470,7 +470,7 @@ namespace Brutality.Neural
             else { Mul(AgonyEvent.HipBridge, 1.5f); Mul(AgonyEvent.ArmsOverhead, 1.4f); Mul(AgonyEvent.ChestClutch, 1.2f); }
             if (Mathf.Abs(sideUp) > 0.6f) { Mul(AgonyEvent.Rocking, 0.5f); Mul(AgonyEvent.KneeRaise, 1.3f); Mul(AgonyEvent.LegCross, 1.3f); }
 
-            // Gestes élaborés (au-delà des réflexes de base) : réglage « Variété des gestes ».
+            // Elaborate gestures (beyond basic reflexes): "Gesture variety" setting.
             for (int i = (int)AgonyEvent.Lazarus; i < (int)AgonyEvent.Count; i++) w[i] *= _variety;
             float pz = _ns.Posturing;
             Mul(AgonyEvent.Decorticate, pz); Mul(AgonyEvent.Lazarus, pz);
@@ -529,8 +529,8 @@ namespace Brutality.Neural
                 Zero(AgonyEvent.Crawl); Zero(AgonyEvent.SitUp); Zero(AgonyEvent.Rocking);
                 Zero(AgonyEvent.HipBridge); Zero(AgonyEvent.TwistArch); Zero(AgonyEvent.Shudder);
             }
-            // Variété : le même geste deux fois de suite est rare, et un geste déjà vu à la mort précédente le sera
-            // encore moins (mémoire inter-morts).
+            // Variety: the same gesture twice in a row is rare, and a gesture already seen in the previous death
+            // is even less likely (cross-death memory).
             if (_lastEvent != AgonyEvent.Count && W(_lastEvent) > 0f) Mul(_lastEvent, 0.22f);
             for (int i = 0; i < w.Length; i++)
                 if (w[i] > 0f) w[i] *= VarietyDirector.GestureMultiplier((AgonyEvent)i);
@@ -581,7 +581,7 @@ namespace Brutality.Neural
                 {
                     int toward;
                     float sideUp = _body.SideUpScore;
-                    if (Mathf.Abs(sideUp) > 0.5f) toward = sideUp > 0f ? -1 : 1; // déjà sur le flanc : retour vers le dos ou le ventre
+                    if (Mathf.Abs(sideUp) > 0.5f) toward = sideUp > 0f ? -1 : 1; // already on side: roll back toward back or stomach
                     else toward = BMath.Chance(rng, 0.5f) ? -1 : 1;
                     return new Roll(toward, t, BMath.Range(rng, 0.8f, 1.5f), U(0.7f, 0.95f));
                 }

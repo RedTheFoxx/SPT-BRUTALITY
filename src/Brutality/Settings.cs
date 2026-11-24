@@ -3,11 +3,11 @@ using BepInEx.Configuration;
 namespace Brutality
 {
     /// <summary>
-    /// Configuration BepInEx (fichier BepInEx/config/com.brutality.ragdoll.cfg, modifiable en jeu via F12).
+    /// BepInEx configuration (BepInEx/config/com.brutality.ragdoll.cfg, editable in-game via F12).
     /// </summary>
     internal static class Settings
     {
-        // 1. Général
+        // 1. General
         public static ConfigEntry<bool> Enabled;
         public static ConfigEntry<float> MaxMotionSeconds;
         public static ConfigEntry<bool> AffectOwnCorpse;
@@ -17,13 +17,13 @@ namespace Brutality
         public static ConfigEntry<bool> PermanentSimulation;
         public static ConfigEntry<int> MaxPermanentCorpses;
 
-        // 2. Corps
+        // 2. Body
         public static ConfigEntry<float> BodyMassKg;
         public static ConfigEntry<float> BodyMassVariation;
         public static ConfigEntry<bool> IncludeEquipmentMass;
         public static ConfigEntry<float> GroundFriction;
 
-        // 3. Comportement
+        // 3. Behavior
         public static ConfigEntry<float> PostMortemReaction;
         public static ConfigEntry<float> AgonyIntensity;
         public static ConfigEntry<float> ReflexIntensity;
@@ -40,7 +40,7 @@ namespace Brutality
         public static ConfigEntry<float> ExplosionImpulseMultiplier;
         public static ConfigEntry<bool> CancelForeignImpulses;
 
-        // 5. Stabilité numérique
+        // 5. Numerical Stability
         public static ConfigEntry<float> JointMassBalancing;
         public static ConfigEntry<int> SolverIterations;
         public static ConfigEntry<string> DriveConvention;
@@ -51,102 +51,102 @@ namespace Brutality
 
         public static void Bind(ConfigFile cfg)
         {
-            const string g = "1. Général";
-            Enabled = cfg.Bind(g, "Activer Brutality", true,
-                "Remplace la dynamique de mort/ragdoll vanilla par la simulation biomécanique de Brutality. Désactivé : comportement vanilla pour les morts suivantes.");
-            MaxMotionSeconds = cfg.Bind(g, "Durée maximale du mouvement (s)", 10f,
-                new ConfigDescription("Durée de la phase active (chute, agonie), plafonnée à 10 s. Ensuite le corps reste simulé au repos " +
-                                      "(simulation permanente) ou est figé (rigidbodies kinématiques).",
+            const string g = "1. General";
+            Enabled = cfg.Bind(g, "Enable Brutality", true,
+                "Replaces vanilla death/ragdoll dynamics with Brutality's biomechanical simulation. Disabled: vanilla behavior for subsequent deaths.");
+            MaxMotionSeconds = cfg.Bind(g, "Max motion duration (s)", 10f,
+                new ConfigDescription("Duration of the active phase (fall, agony), capped at 10 s. Afterwards the body stays simulated at rest " +
+                                      "(permanent simulation) or is frozen (kinematic rigidbodies).",
                     new AcceptableValueRange<float>(3f, 10f)));
-            PermanentSimulation = cfg.Bind(g, "Simulation permanente des cadavres", true,
-                "Les cadavres ne sont plus jamais figés : ils restent simulés (au repos, ils dorment dans PhysX et ne coûtent presque rien) " +
-                "et bougent quand on leur tire dessus ou qu'on les heurte. Désactivé : figés à la fin du mouvement (vanilla). " +
-                "Ne s'applique pas aux corps observés d'un client Fika (la pose finale reste celle de l'hôte).");
-            MaxPermanentCorpses = cfg.Bind(g, "Cadavres simulés en permanence (max)", 40,
-                new ConfigDescription("Au-delà, les plus anciens sont figés comme en vanilla.", new AcceptableValueRange<int>(5, 150)));
-            AffectOwnCorpse = cfg.Bind(g, "Appliquer à votre propre corps", true,
-                "Votre propre mort utilise aussi la simulation Brutality.");
-            AffectObservedCorpses = cfg.Bind(g, "Appliquer aux corps observés (Fika client)", true,
-                "En coop Fika, anime aussi les corps dont la physique est simulée par l'hôte (la pose finale reste celle de l'hôte).");
-            MaxSimultaneousCorpses = cfg.Bind(g, "Corps simulés simultanément (max)", 12,
-                new ConfigDescription("Au-delà, les nouveaux corps reçoivent seulement la physique passive (tissus, butées, masses), sans agonie.",
+            PermanentSimulation = cfg.Bind(g, "Permanent corpse simulation", true,
+                "Corpses are never frozen: they stay simulated (at rest they sleep in PhysX and cost almost nothing) " +
+                "and react when shot or bumped. Disabled: frozen at the end of motion (vanilla). " +
+                "Does not apply to observed bodies on a Fika client (final pose remains the host's).");
+            MaxPermanentCorpses = cfg.Bind(g, "Max permanently simulated corpses", 40,
+                new ConfigDescription("Beyond this limit, the oldest corpses are frozen as in vanilla.", new AcceptableValueRange<int>(5, 150)));
+            AffectOwnCorpse = cfg.Bind(g, "Apply to your own corpse", true,
+                "Your own death also uses the Brutality simulation.");
+            AffectObservedCorpses = cfg.Bind(g, "Apply to observed corpses (Fika client)", true,
+                "In Fika co-op, also animates bodies whose physics are simulated by the host (final pose remains the host's).");
+            MaxSimultaneousCorpses = cfg.Bind(g, "Max simultaneous simulated corpses", 12,
+                new ConfigDescription("Beyond this limit, new bodies receive only passive physics (tissues, limits, masses), without agony.",
                     new AcceptableValueRange<int>(1, 40)));
-            FullSimulationDistance = cfg.Bind(g, "Distance de simulation complète (m)", 150f,
-                new ConfigDescription("Au-delà de cette distance de la caméra, l'agonie est désactivée (chute et tissus restent simulés).",
+            FullSimulationDistance = cfg.Bind(g, "Full simulation distance (m)", 150f,
+                new ConfigDescription("Beyond this distance from the camera, agony is disabled (fall and passive tissues remain simulated).",
                     new AcceptableValueRange<float>(20f, 1000f)));
 
-            const string b = "2. Corps";
-            BodyMassKg = cfg.Bind(b, "Masse corporelle moyenne (kg)", 80f,
-                new ConfigDescription("Masse moyenne d'un combattant nu, répartie par segment selon de Leva (1996).",
+            const string b = "2. Body";
+            BodyMassKg = cfg.Bind(b, "Average body mass (kg)", 80f,
+                new ConfigDescription("Average mass of an unarmored fighter, distributed per segment according to de Leva (1996).",
                     new AcceptableValueRange<float>(50f, 120f)));
-            BodyMassVariation = cfg.Bind(b, "Variation de masse (écart-type relatif)", 0.10f,
-                new ConfigDescription("Variabilité morphologique (ordre de grandeur ANSUR II).", new AcceptableValueRange<float>(0f, 0.3f)));
-            IncludeEquipmentMass = cfg.Bind(b, "Inclure la masse du matériel porté", true,
-                "Gilet, plaques, sac et casque alourdissent le tronc et la tête et déplacent leur centre de masse.");
-            GroundFriction = cfg.Bind(b, "Friction des tissus au sol", 0.8f,
-                new ConfigDescription("Coefficient de frottement dynamique peau/vêtements contre le sol.", new AcceptableValueRange<float>(0.2f, 1.2f)));
+            BodyMassVariation = cfg.Bind(b, "Body mass variation (relative std dev)", 0.10f,
+                new ConfigDescription("Morphological variability (ANSUR II order of magnitude).", new AcceptableValueRange<float>(0f, 0.3f)));
+            IncludeEquipmentMass = cfg.Bind(b, "Include carried gear mass", true,
+                "Rig, plates, backpack, and helmet add weight to the trunk and head and shift their center of mass.");
+            GroundFriction = cfg.Bind(b, "Tissue ground friction", 0.8f,
+                new ConfigDescription("Dynamic friction coefficient of skin/clothing against the ground.", new AcceptableValueRange<float>(0.2f, 1.2f)));
 
-            const string c = "3. Comportement";
-            PostMortemReaction = cfg.Bind(c, "Réaction des cadavres aux balles", 1f,
-                new ConfigDescription("Impulsion des balles sur un cadavre (amplifiée de 1 + 2 × ce réglage, avec rebond sur le sol) et " +
-                                      "contraction idiomusculaire locale (phénomène de Zsako). 0 = impulsion physique seule.",
+            const string c = "3. Behavior";
+            PostMortemReaction = cfg.Bind(c, "Corpse bullet reaction", 1f,
+                new ConfigDescription("Bullet impulse on a corpse (amplified by 1 + 2 * this setting, with ground bounce) and " +
+                                      "local idiomuscular contraction (Zsako phenomenon). 0 = physical impulse only.",
                     new AcceptableValueRange<float>(0f, 2f)));
-            AgonyIntensity = cfg.Bind(c, "Intensité des agonies", 1f,
-                new ConfigDescription("Multiplie la fréquence et la force des mouvements involontaires au sol (0 = aucune agonie).",
+            AgonyIntensity = cfg.Bind(c, "Agony intensity", 1f,
+                new ConfigDescription("Multiplies frequency and strength of involuntary ground movements (0 = no agony).",
                     new AcceptableValueRange<float>(0f, 2f)));
-            SpasmVigor = cfg.Bind(c, "Vigueur des spasmes", 1f,
-                new ConfigDescription("Force et netteté des gestes involontaires (bras qui se tendent, genoux qui se replient, convulsions) " +
-                                      "et amplitude des contorsions continues. 1 = rendu spectaculaire par défaut, 0,5 = plus sobre.",
+            SpasmVigor = cfg.Bind(c, "Spasm vigor", 1f,
+                new ConfigDescription("Strength and crispness of involuntary gestures (arms extending, knees jerking up, convulsions) " +
+                                      "and amplitude of continuous contortions. 1 = dramatic default, 0.5 = subtler.",
                     new AcceptableValueRange<float>(0.3f, 2f)));
-            FallDrive = cfg.Bind(c, "Force des chutes dirigées", 1f,
-                new ConfigDescription("Perte d'équilibre initiale qui fait basculer le corps (en avant, à la renverse, sur le côté, en pivotant). " +
-                                      "0 = le corps s'effondre seulement sous son poids.", new AcceptableValueRange<float>(0f, 2f)));
-            PosturingIntensity = cfg.Bind(c, "Intensité du posturing cérébral", 1f,
-                new ConfigDescription("Décérébration (membres raides en extension, bras en rotation interne), décortication (bras repliés sur " +
-                                      "la poitrine), signe de Lazare et chutes en planche. 0 = jamais, 2 = plus fréquent et plus marqué.",
+            FallDrive = cfg.Bind(c, "Directional fall drive", 1f,
+                new ConfigDescription("Initial loss-of-balance drive that tips the body (forward, backward, sideways, pivoting). " +
+                                      "0 = body collapses solely under its own weight.", new AcceptableValueRange<float>(0f, 2f)));
+            PosturingIntensity = cfg.Bind(c, "Cerebral posturing intensity", 1f,
+                new ConfigDescription("Decerebration (stiff extended limbs, internally rotated arms), decortication (arms flexed onto " +
+                                      "chest), Lazarus sign, and board falls. 0 = never, 2 = more frequent and pronounced.",
                     new AcceptableValueRange<float>(0f, 2f)));
-            GestureVariety = cfg.Bind(c, "Variété des gestes", 1f,
-                new ConfigDescription("Fréquence des gestes élaborés (ramper, se relever, main tendue, crises, chutes spécifiques à la course, " +
-                                      "à la posture accroupie ou couchée) par rapport aux réflexes simples. 0 = gestes de base uniquement.",
+            GestureVariety = cfg.Bind(c, "Gesture variety", 1f,
+                new ConfigDescription("Frequency of elaborate gestures (crawling, pushing up, reaching hand, seizures, sprint/crouch/prone-specific falls) " +
+                                      "versus basic reflexes. 0 = basic gestures only.",
                     new AcceptableValueRange<float>(0f, 2f)));
-            VisibleBreathing = cfg.Bind(c, "Respiration agonique visible", true,
-                "Soulèvement rythmique du buste pendant l'agonie, qui ralentit jusqu'au dernier soupir.");
-            ReflexIntensity = cfg.Bind(c, "Intensité des réflexes", 1f,
-                new ConfigDescription("Sursaut, flexion de protection, posturing cérébral, verrouillages articulaires.",
+            VisibleBreathing = cfg.Bind(c, "Visible agonal breathing", true,
+                "Rhythmic rising of the chest during agony, slowing down until the final breath.");
+            ReflexIntensity = cfg.Bind(c, "Reflex intensity", 1f,
+                new ConfigDescription("Flinch, protective flexion, cerebral posturing, joint locks.",
                     new AcceptableValueRange<float>(0f, 2f)));
-            MuscleStrength = cfg.Bind(c, "Force musculaire", 1f,
-                new ConfigDescription("Multiplie les couples maximaux (Anderson 2007).", new AcceptableValueRange<float>(0.2f, 2f)));
-            PassiveStiffness = cfg.Bind(c, "Raideur passive des articulations", 1f,
-                new ConfigDescription("Multiplie le couple passif exponentiel aux butées (Riener & Edrich 1999).",
+            MuscleStrength = cfg.Bind(c, "Muscle strength", 1f,
+                new ConfigDescription("Multiplies peak muscle torques (Anderson 2007).", new AcceptableValueRange<float>(0.2f, 2f)));
+            PassiveStiffness = cfg.Bind(c, "Passive joint stiffness", 1f,
+                new ConfigDescription("Multiplies exponential passive torque at joint limits (Riener & Edrich 1999).",
                     new AcceptableValueRange<float>(0.2f, 3f)));
 
             const string i = "4. Impacts";
-            BulletMomentumMultiplier = cfg.Bind(i, "Multiplicateur de quantité de mouvement des balles", 1f,
-                new ConfigDescription("1 = transfert physique réel (m·v du projectile). Une balle ne projette pas un corps : la chute vient surtout de la perte du tonus.",
+            BulletMomentumMultiplier = cfg.Bind(i, "Bullet momentum multiplier", 1f,
+                new ConfigDescription("1 = real physical transfer (projectile m*v). A bullet does not launch a body: the fall comes mostly from tone loss.",
                     new AcceptableValueRange<float>(0f, 10f)));
-            ExplosionImpulseMultiplier = cfg.Bind(i, "Multiplicateur du souffle des explosions", 1f,
-                new ConfigDescription("Échelle de l'impulsion de souffle répartie sur les segments.", new AcceptableValueRange<float>(0f, 5f)));
-            CancelForeignImpulses = cfg.Bind(i, "Neutraliser les impulsions de mort des autres mods", true,
-                "Annule, au premier pas physique, les forces appliquées au cadavre par d'autres mods au moment de la mort " +
-                "(ex. HollywoodFX « Gore » : jusqu'à 200 N·s) avant d'appliquer l'impulsion balistique réelle.");
+            ExplosionImpulseMultiplier = cfg.Bind(i, "Explosion blast multiplier", 1f,
+                new ConfigDescription("Scale of blast impulse distributed across segments.", new AcceptableValueRange<float>(0f, 5f)));
+            CancelForeignImpulses = cfg.Bind(i, "Neutralize death impulses from other mods", true,
+                "Cancels, on the first physics step, forces applied to the corpse by other mods at death " +
+                "(e.g. HollywoodFX 'Gore': up to 200 N*s) before applying the real ballistic impulse.");
 
-            const string s = "5. Stabilité numérique";
-            JointMassBalancing = cfg.Bind(s, "Équilibrage des masses articulaires", 1f,
-                new ConfigDescription("1 = méthode EFT (stabilité maximale du solveur). 0 = masses brutes (plus exact, moins stable).",
+            const string s = "5. Numerical stability";
+            JointMassBalancing = cfg.Bind(s, "Joint mass balancing", 1f,
+                new ConfigDescription("1 = EFT method (maximum solver stability). 0 = raw masses (more accurate, less stable).",
                     new AcceptableValueRange<float>(0f, 1f)));
-            DriveConvention = cfg.Bind(s, "Convention des drives articulaires", "Auto",
-                new ConfigDescription("Sens de la rotation cible des drives PhysX. Auto = vérifié pendant les premières morts du raid.",
-                    new AcceptableValueList<string>("Auto", "Normale", "Inversée")));
-            SolverIterations = cfg.Bind(s, "Itérations du solveur PhysX", 12,
-                new ConfigDescription("Itérations de position par segment simulé.", new AcceptableValueRange<int>(6, 30)));
+            DriveConvention = cfg.Bind(s, "Joint drive convention", "Auto",
+                new ConfigDescription("Target rotation direction for PhysX drives. Auto = verified during the first deaths of the raid.",
+                    new AcceptableValueList<string>("Auto", "Normal", "Inverted")));
+            SolverIterations = cfg.Bind(s, "PhysX solver iterations", 12,
+                new ConfigDescription("Position iterations per simulated segment.", new AcceptableValueRange<int>(6, 30)));
 
-            DebugLogging = cfg.Bind("6. Debug", "Journalisation détaillée", false,
-                "Écrit le diagnostic de chaque mort (mécanisme, énergie, programmes moteurs, comportements Euphoria) dans LogOutput.log.");
-            EuphoriaForce = cfg.Bind("6. Debug", "Forcer un comportement Euphoria", "Auto",
-                new ConfigDescription("Pour tester : impose le plan de chute Euphoria des morts suivantes (debout).",
-                    new AcceptableValueList<string>("Auto", "Titube", "Chute à genoux", "Équilibre puis effondrement", "Moulinets",
-                        "Effondrement inerte", "Roulade", "Effondrement assis", "Effondrement latéral", "Plongeon", "Chute en planche",
-                        "À quatre pattes", "Glissade sur les genoux", "Pivot", "Vrille")));
+            DebugLogging = cfg.Bind("6. Debug", "Detailed logging", false,
+                "Writes diagnostics for each death (mechanism, energy, motor programs, Euphoria behaviors) to LogOutput.log.");
+            EuphoriaForce = cfg.Bind("6. Debug", "Force Euphoria behavior", "Auto",
+                new ConfigDescription("For testing: forces the Euphoria fall plan on subsequent standing deaths.",
+                    new AcceptableValueList<string>("Auto", "Stagger", "Fall to knees", "Balance then collapse", "Windmill",
+                        "Slack collapse", "Roll", "Seated collapse", "Side collapse", "Dive", "Board fall",
+                        "All fours", "Knee slide", "Pivot", "Spin")));
         }
     }
 }

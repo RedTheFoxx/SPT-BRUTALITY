@@ -1,5 +1,5 @@
-// Shim minimal UnityEngine / EFT / Brutality pour compiler et exécuter les VRAIES classes Delirium hors-jeu,
-// avec un vrai moteur de raycast 3D (sol + boîtes AABB : murs, caisses, rebords) et enregistrement des forces/couples.
+// Minimal UnityEngine / EFT / Brutality shim to compile and run the REAL Delirium classes out-of-game,
+// with a real 3D raycast engine (ground + AABB boxes: walls, crates, ledges) and force/torque recording.
 using System;
 using System.Collections.Generic;
 using Brutality.Anatomy;
@@ -194,7 +194,7 @@ namespace UnityEngine
         public Rigidbody rigidbody;
     }
 
-    /// <summary>Boîte statique du décor pour les tests (mur, caisse, rebord, table).</summary>
+    /// <summary>Static environment box for tests (wall, crate, ledge, table).</summary>
     public struct StaticBox
     {
         public Vector3 Min, Max;
@@ -335,7 +335,7 @@ namespace Brutality.Core
         public Vector3 Direction = new Vector3(0f, 0f, -1f);
         public float ImpactMomentum = 3.2f;
         public float KickScale = 1f;
-        public string KickClass = "intermédiaire";
+        public string KickClass = "intermediate";
         public EPlayerPose Pose = EPlayerPose.Stand;
         public Vector3 Velocity = Vector3.zero;
         public DeathMechanism Mechanism = DeathMechanism.Thoracic;

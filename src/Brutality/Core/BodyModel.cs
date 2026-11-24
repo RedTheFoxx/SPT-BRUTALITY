@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Segment rigide du ragdoll avec son repère anatomique (R = droite, U = proximal/supérieur, F = antérieur).</summary>
+    /// <summary>Rigid ragdoll segment with its anatomical frame (R = right, U = proximal/superior, F = anterior).</summary>
     internal sealed class Segment
     {
         public int Index;
@@ -18,16 +18,16 @@ namespace Brutality.Core
         public RigidbodySpawner Spawner;
         public int Parent;
 
-        public Vector3 RL, UL, FL;   // repère anatomique, coordonnées locales
+        public Vector3 RL, UL, FL;   // anatomical frame, local coordinates
         public float Length;
-        public float BaseMass;       // masse anatomique sans équipement (utilisée pour l'équilibrage des joints)
+        public float BaseMass;       // anatomical mass without equipment (used for joint balancing)
         public float Mass;
         public Vector3 InertiaDiag;
         public Quaternion InertiaRotLocal;
         public readonly List<Collider> Colliders = new List<Collider>();
         public readonly List<PhysicMaterial> OriginalMaterials = new List<PhysicMaterial>();
 
-        // Paramètres d'origine du rigidbody (restaurés à la fin, car le ragdoll est poolé par le jeu).
+        // Original rigidbody parameters (restored at the end, since the ragdoll is pooled by the game).
         public float OrigDrag, OrigAngularDrag, OrigMaxAngularVelocity, OrigSleepThreshold;
         public float OrigMass;
         public Vector3 OrigCenterOfMass, OrigInertiaTensor;
@@ -35,18 +35,18 @@ namespace Brutality.Core
         public int OrigSolverIterations, OrigSolverVelocityIterations;
         public CollisionDetectionMode OrigCollisionMode;
 
-        // État lu avant chaque pas physique.
+        // State read before each physics step.
         public Quaternion Q;
         public Vector3 W, V, Com, Pos;
 
         public Vector3 R => Q * RL;
         public Vector3 U => Q * UL;
         public Vector3 F => Q * FL;
-        /// <summary>Extrémité distale (main, pied, sommet du crâne...).</summary>
+        /// <summary>Distal end (hand, foot, top of skull...).</summary>
         public Vector3 DistalWorld => Pos - U * Length;
     }
 
-    /// <summary>Articulation : angles anatomiques ISB-like, gradients, activations musculaires.</summary>
+    /// <summary>Joint: ISB-like anatomical angles, gradients, muscle activations.</summary>
     internal sealed class JointModel
     {
         public int Index;
@@ -57,15 +57,15 @@ namespace Brutality.Core
         public Joint UnityJoint;
         public bool[] InSubtree = new bool[AnatomyData.SegCount];
 
-        public JointFrame Frame;       // géométrie figée à la mort (repères, axe de charnière, pose de référence)
-        public DrivenJoint Driven;     // joint PhysX anatomique piloté (null si la conversion a échoué)
+        public JointFrame Frame;       // geometry frozen at death (frames, hinge axis, reference pose)
+        public DrivenJoint Driven;     // driven anatomical PhysX joint (null if conversion failed)
 
         public Vector3 Phi, Phi0, PhiDot;
         public bool HasPrevPhi;
         public readonly float[] Activation = new float[3];
         public readonly float[] Capacity = { 1f, 1f, 1f };
-        public readonly float[] Ref = new float[3], RefV = new float[3]; // trajectoire de référence lissée (rad, rad/s)
-        public Vector3 Ieff = Vector3.one * 0.1f; // inertie effective du sous-arbre autour du pivot (flex, abd, torsion)
+        public readonly float[] Ref = new float[3], RefV = new float[3]; // smoothed reference trajectory (rad, rad/s)
+        public Vector3 Ieff = Vector3.one * 0.1f; // effective subtree inertia around the pivot (flex, abd, twist)
     }
 
     internal sealed class BodyModel
@@ -75,8 +75,8 @@ namespace Brutality.Core
         public float TotalMass;
 
 
-        // Géométrie de la cage thoracique (repère anatomique du thorax, mesurée au moment de la mort)
-        // utilisée pour empêcher les bras et avant-bras de pénétrer dans le thorax.
+        // Ribcage geometry (thorax anatomical frame, measured at death)
+        // used to prevent upper arms and forearms from penetrating the thorax.
         public float ThoraxHalfShoulderW = 0.18f;
         public float ThoraxChestZ = 0.03f;
         public float ThoraxYBot = -0.05f;
@@ -160,7 +160,7 @@ namespace Brutality.Core
             {
                 if (Segs[i] == null || Segs[i].Rb == null)
                 {
-                    error = "segment manquant : " + (Seg)i;
+                    error = "missing segment: " + (Seg)i;
                     return false;
                 }
             }
@@ -179,8 +179,8 @@ namespace Brutality.Core
                 Rb = rb,
                 T = sp.transform,
                 Parent = AnatomyData.Parent[(int)s],
-                // Copie AVANT toute modification anthropométrique : le ragdoll est poolé par EFT et doit être
-                // rendu au jeu exactement dans l'état où il a été emprunté.
+                // Copied BEFORE any anthropometric modification: the ragdoll is pooled by EFT and must be
+                // returned to the game in the exact state it was borrowed.
                 OrigMass = rb.mass,
                 OrigCenterOfMass = rb.centerOfMass,
                 OrigInertiaTensor = rb.inertiaTensor,
@@ -214,7 +214,7 @@ namespace Brutality.Core
             int n = 0;
             foreach (var c in s.T.GetComponentsInChildren<Collider>(false))
             {
-                // Un collider désactivé renvoie des bounds vides centrées sur l'origine du monde.
+                // A disabled collider returns empty bounds centered at world origin.
                 if (c == null || c.isTrigger || !c.enabled) continue;
                 if (c.GetComponentInParent<Rigidbody>() != s.Rb) continue;
                 center += c.bounds.center;
@@ -243,18 +243,18 @@ namespace Brutality.Core
             Vector3 wristL = PalmOr(player != null && player.PlayerBones != null ? player.PlayerBones.LeftPalm : null, this[Seg.LForearm], elL - shL);
             Vector3 wristR = PalmOr(player != null && player.PlayerBones != null ? player.PlayerBones.RightPalm : null, this[Seg.RForearm], elR - shR);
 
-            // Bassin : axe des hanches + direction lombaire.
+            // Pelvis: hip axis + lumbar direction.
             BMath.OrthoFrame(lumbar - pelvis.position, hipR - hipL, Vector3.forward, out var pr, out var pu, out var pf);
             if ((lumbar - pelvis.position).sqrMagnitude < 1e-4f)
                 BMath.OrthoFrame(neck - pelvis.position, hipR - hipL, Vector3.forward, out pr, out pu, out pf);
             SetFrame(this[Seg.Pelvis], pr, pu, pf, Mathf.Max(0.1f, (lumbar - pelvis.position).magnitude));
 
-            // Thorax : axe des épaules + direction cervicale.
+            // Thorax: shoulder axis + cervical direction.
             BMath.OrthoFrame(neck - lumbar, shR - shL, pf, out var tr, out var tu, out var tf);
             SetFrame(this[Seg.Thorax], tr, tu, tf, Mathf.Max(0.2f, (neck - lumbar).magnitude));
 
 
-            // Enveloppe thoracique mesurée sur le squelette réel (évite la pénétration bras/avant-bras ↔ thorax).
+            // Thoracic envelope measured on the actual skeleton (prevents upper arm / forearm ↔ thorax penetration).
             Vector3 shMid = 0.5f * (shL + shR);
             ThoraxHalfShoulderW = Mathf.Clamp(0.5f * Mathf.Abs(Vector3.Dot(shR - shL, tr)), 0.14f, 0.24f);
             float shY = Vector3.Dot(shMid - lumbar, tu);
@@ -267,7 +267,7 @@ namespace Brutality.Core
             ThoraxYTop = Mathf.Max(0.10f, shY - 0.04f);
             ThoraxRx = 0.78f * ThoraxHalfShoulderW;
             ThoraxRz = Mathf.Clamp(0.72f * ThoraxHalfShoulderW, 0.11f, 0.15f);
-            // Tête : vers le centre des colliders crâniens ; antérieur depuis le collider des yeux si présent.
+            // Head: toward cranial colliders center; anterior from eye collider if present.
             Vector3 headTop;
             if (CollidersCenter(this[Seg.Head], out var hc) && (hc - neck).sqrMagnitude > 1e-4f)
                 headTop = neck + (hc - neck).normalized * 0.22f;
@@ -276,11 +276,11 @@ namespace Brutality.Core
             Vector3 headFwd = tf;
             var eyes = FindColliderOfType(player, EBodyPartColliderType.Eyes);
             if (eyes != null) headFwd = eyes.bounds.center - neck;
-            // R = U × F (convention Unity : Cross(up, forward) = right).
+            // R = U × F (Unity convention: Cross(up, forward) = right).
             BMath.OrthoFrame(headTop - neck, Vector3.Cross(headTop - neck, headFwd), headFwd, out var hr, out var hu, out var hf);
             SetFrame(this[Seg.Head], hr, hu, hf, 0.22f);
 
-            // Membres : U = direction proximale.
+            // Limbs: U = proximal direction.
             LimbFrame(this[Seg.LThigh], hipL, kneeL, pr, pf);
             LimbFrame(this[Seg.RThigh], hipR, kneeR, pr, pf);
             LimbFrame(this[Seg.LCalf], kneeL, ankleL, pr, pf);
@@ -335,7 +335,7 @@ namespace Brutality.Core
             s.Length = length;
         }
 
-        // ------------------------------------------------------------------ anthropométrie
+        // ------------------------------------------------------------------ anthropometry
 
         private void ApplyAnthropometry(DeathContext ctx)
         {
@@ -356,14 +356,14 @@ namespace Brutality.Core
 
                 if (p.ComFraction > 0f)
                 {
-                    // CdM et tenseur principal le long de l'axe longitudinal (de Leva 1996).
+                    // CoM and principal tensor along the longitudinal axis (de Leva 1996).
                     Vector3 comWorld = s.T.position - (s.T.rotation * s.UL) * (s.Length * p.ComFraction);
                     s.Rb.centerOfMass = s.T.InverseTransformPoint(comWorld);
                     float L = s.Length;
                     var diag = new Vector3(
-                        m * Sq(p.RTrans * L),  // axe médio-latéral (R)
-                        m * Sq(p.RLong * L),   // axe longitudinal (U)
-                        m * Sq(p.RSag * L));   // axe antéro-postérieur (F)
+                        m * Sq(p.RTrans * L),  // mediolateral axis (R)
+                        m * Sq(p.RLong * L),   // longitudinal axis (U)
+                        m * Sq(p.RSag * L));   // anteroposterior axis (F)
                     diag = Vector3.Max(diag, Vector3.one * 1e-4f);
                     s.Rb.inertiaTensorRotation = Quaternion.LookRotation(s.FL, s.UL);
                     s.Rb.inertiaTensor = diag;
@@ -374,13 +374,13 @@ namespace Brutality.Core
                 }
                 else if (s.Id == Seg.Thorax && (ctx.GearBackKg > 0.1f || ctx.GearThoraxKg > 0.1f))
                 {
-                    // Le sac déplace le CdM du tronc vers l'arrière, les plaques légèrement vers l'avant.
+                    // Backpack shifts trunk CoM backward, armor plates slightly forward.
                     Vector3 com = s.Rb.centerOfMass;
                     com += -s.FL * (0.16f * ctx.GearBackKg / m) + s.FL * (0.06f * ctx.GearThoraxKg / m);
                     s.Rb.centerOfMass = com;
                 }
 
-                // Garde-fou : inerties dégénérées (colliders désactivés).
+                // Safeguard: degenerate inertias (disabled colliders).
                 Vector3 it = s.Rb.inertiaTensor;
                 if (it.x < 1e-4f || it.y < 1e-4f || it.z < 1e-4f || float.IsNaN(it.x))
                 {
@@ -395,7 +395,7 @@ namespace Brutality.Core
 
         private static float Sq(float x) => x * x;
 
-        // ------------------------------------------------------------------ articulations
+        // ------------------------------------------------------------------ joints
 
         private void BuildJoints(DeathContext ctx)
         {
@@ -441,7 +441,7 @@ namespace Brutality.Core
 
                 jm.UnityJoint = sc.T.GetComponent<Joint>();
                 if (jm.UnityJoint != null && jm.UnityJoint.connectedBody != sp.Rb)
-                    Plugin.LogDebug($"  hiérarchie inattendue : {sc.Id} relié à {(jm.UnityJoint.connectedBody != null ? jm.UnityJoint.connectedBody.name : "rien")} (attendu {sp.Id})");
+                    Plugin.LogDebug($"  unexpected hierarchy: {sc.Id} connected to {(jm.UnityJoint.connectedBody != null ? jm.UnityJoint.connectedBody.name : "nothing")} (expected {sp.Id})");
                 Joints[j] = jm;
             }
         }
@@ -460,7 +460,7 @@ namespace Brutality.Core
                 s.OrigSolverVelocityIterations = rb.solverVelocityIterations;
 
                 s.OrigCollisionMode = rb.collisionDetectionMode;
-                // Détection continue spéculative : les membres rapides ne traversent plus murs et sol fins.
+                // Continuous speculative detection: fast limbs no longer tunnel through thin walls and floors.
                 rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rb.maxAngularVelocity = 18f;
                 rb.solverIterations = Mathf.Max(rb.solverIterations, it);
@@ -500,7 +500,7 @@ namespace Brutality.Core
             }
         }
 
-        /// <summary>Restaure tout ce qui appartient à l'objet poolé (colliders, joints, rigidbodies).</summary>
+        /// <summary>Restores everything belonging to the pooled object (colliders, joints, rigidbodies).</summary>
         public void Restore()
         {
             foreach (var s in Segs)
@@ -530,7 +530,7 @@ namespace Brutality.Core
             }
         }
 
-        // ------------------------------------------------------------------ cinématique
+        // ------------------------------------------------------------------ kinematics
 
         public bool IsAlive
         {
@@ -555,13 +555,13 @@ namespace Brutality.Core
             }
         }
 
-        /// <summary>Angles anatomiques (rad) : x = flexion, y = abduction/inclinaison/varus, z = rotation axiale.</summary>
+        /// <summary>Anatomical angles (rad): x = flexion, y = abduction/lateral tilt/varus, z = axial rotation.</summary>
         public Vector3 Evaluate(JointModel jm, Quaternion qP, Quaternion qC, out float sagWeight)
         {
             return JointKinematics.Evaluate(jm.Frame, qP, qC, out sagWeight);
         }
 
-        /// <summary>Met à jour les angles anatomiques et vitesses angulaires (dérivée temporelle filtrée).</summary>
+        /// <summary>Updates anatomical angles and angular velocities (filtered time derivative).</summary>
         public void ComputeKinematics(float dt)
         {
             float invDt = dt > 1e-5f ? 1f / dt : 0f;
@@ -574,7 +574,7 @@ namespace Brutality.Core
                 jm.Phi = phi;
                 if (jm.HasPrevPhi && invDt > 0f)
                 {
-                    // Flexion déroulée : différence directe ; abduction / torsion : différence modulo 2π.
+                    // Unwrapped flexion: direct difference; abduction / twist: difference modulo 2π.
                     float vx = Mathf.Clamp((phi.x - prev.x) * invDt, -25f, 25f);
                     float vy = Mathf.Clamp(BMath.WrapPi(phi.y - prev.y) * invDt, -25f, 25f);
                     float vz = Mathf.Clamp(BMath.WrapPi(phi.z - prev.z) * invDt, -25f, 25f);
@@ -586,9 +586,9 @@ namespace Brutality.Core
                     jm.HasPrevPhi = true;
                 }
 
-                // Inertie effective du sous-arbre autour du pivot articulaire selon les 3 axes anatomiques (kg·m²),
-                // utilisée par les drives en couple (DriveController) pour conserver la même raideur angulaire
-                // qu'un modèle multi-corps complet (Steiner + sous-arbre, et non la seule inertie au CdM du segment).
+                // Effective subtree inertia around the joint pivot along the 3 anatomical axes (kg·m²),
+                // used by torque drives (DriveController) to preserve the same angular stiffness
+                // as a full multi-body model (parallel axis + subtree, not just the segment's CoM inertia).
                 var dj = jm.Driven;
                 if (dj != null)
                 {
@@ -612,12 +612,12 @@ namespace Brutality.Core
                 }
             }
         }
-        // ------------------------------------------------------------------ orientation globale
+        // ------------------------------------------------------------------ global orientation
 
-        /// <summary>+1 sur le dos (face vers le ciel), -1 face contre terre, 0 sur le côté.</summary>
+        /// <summary>+1 supine (face up), -1 prone (face down), 0 on side.</summary>
         public float SupineScore => Vector3.Dot(this[Seg.Thorax].F, Vector3.up);
 
-        /// <summary>Côté vers le haut quand le corps est sur le flanc : +1 côté droit en haut.</summary>
+        /// <summary>Upward side when the body is on its side: +1 right side up.</summary>
         public float SideUpScore => Vector3.Dot(this[Seg.Thorax].R, Vector3.up);
 
         public float MaxSpeed

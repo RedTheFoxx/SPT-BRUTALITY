@@ -19,7 +19,7 @@ namespace Brutality.Neural
         All = Legs | Arms | Trunk | Neck,
     }
 
-    /// <summary>Programme moteur involontaire : produit des commandes (cible, excitation, raideur) dans le temps.</summary>
+    /// <summary>Involuntary motor program: produces (target, excitation, stiffness) commands over time.</summary>
     internal abstract class MotorProgram
     {
         public string Name;
@@ -49,12 +49,12 @@ namespace Brutality.Neural
         };
     }
 
-    // ===================================================================== tonus et réflexes
+    // ===================================================================== tone and reflexes
 
     /// <summary>
-    /// Tonus postural résiduel : à l'instant de la mort, les muscles maintiennent encore la posture,
-    /// puis le tonus s'éteint par groupes (membres inférieurs, tronc, cou, membres supérieurs) avec
-    /// une latence et une constante de temps propres au mécanisme lésionnel.
+    /// Residual postural tone: at the moment of death, muscles still hold posture, then tone
+    /// fades by group (lower limbs, trunk, neck, upper limbs) with a latency and time constant
+    /// specific to the injury mechanism.
     /// </summary>
     internal sealed class PosturalTone : MotorProgram
     {
@@ -62,15 +62,15 @@ namespace Brutality.Neural
         private readonly float[] _delay = new float[4];
         private readonly float[] _tau = new float[4];
         private float _fallenAt = -1f;
-        // Bras qui retombent : la pose de tir (épaules levées, coudes fléchis sur l'arme) s'affaisse vers des bras
-        // pendants à mesure que le tonus s'éteint, au lieu de rester figée pendant la chute.
+        // Arms dropping down: the firing pose (shoulders raised, elbows flexed on weapon) sags toward hanging
+        // arms as tone fades, instead of remaining frozen during the fall.
         private readonly bool _armSag;
         private readonly float _sagStart, _sagDur;
         private readonly Vector3 _hangShoulder, _hangElbow;
 
         public PosturalTone(float u0, float delay, Vector2[] taus, System.Random rng, bool armSag = false)
         {
-            Name = "Tonus postural";
+            Name = "Postural tone";
             _u0 = u0;
             _armSag = armSag;
             _sagStart = BMath.Range(rng, 0.03f, 0.18f);
@@ -104,8 +104,8 @@ namespace Brutality.Neural
         protected override void Emit(NeuralState ns, float k)
         {
             float t = ns.Time;
-            // Le tonus postural maintient la pose debout/course (Phi0) pendant l'effondrement initial ;
-            // une fois le buste couché au sol, il s'éteint rapidement pour ne pas figer les bras en pose de tir.
+            // Postural tone holds the standing/running pose (Phi0) during the initial collapse;
+            // once the chest is down on the ground, it fades quickly so the arms do not freeze in a firing pose.
             if (_fallenAt < 0f && Vector3.Dot(ns.Body[Seg.Thorax].U, Vector3.up) < 0.5f)
                 _fallenAt = t;
             float fallFade = _fallenAt >= 0f ? Mathf.Exp(-(t - _fallenAt) / 0.25f) : 1f;
@@ -129,7 +129,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Gel musculaire localisé : une articulation reste verrouillée dans sa position (co-contraction tonique).</summary>
+    /// <summary>Localized muscle lock: a joint stays locked in its position (tonic co-contraction).</summary>
     internal sealed class JointLock : MotorProgram
     {
         private readonly JointId _joint;
@@ -139,7 +139,7 @@ namespace Brutality.Neural
 
         public JointLock(JointId joint, float start, float duration, float u)
         {
-            Name = "Verrouillage " + joint;
+            Name = "Lock " + joint;
             _joint = joint;
             Start = start; Duration = duration; Attack = 0.03f; Release = 0.25f;
             _u = u;
@@ -157,8 +157,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Réponse d'escrime (fencing response, Hosseini &amp; Lifshitz 2009) : après traumatisme crânien, un bras
-    /// s'étend vers l'avant pendant que l'autre se fléchit, la tête tournée vers le bras tendu.
+    /// Fencing response (Hosseini &amp; Lifshitz 2009): after head trauma, one arm extends forward
+    /// while the other flexes, with the head turned toward the extended arm.
     /// </summary>
     internal sealed class Fencing : MotorProgram
     {
@@ -167,7 +167,7 @@ namespace Brutality.Neural
 
         public Fencing(int extendedSide, float start, float duration, float u)
         {
-            Name = "Réponse d'escrime";
+            Name = "Fencing response";
             _ext = extendedSide;
             Start = start; Duration = duration; Attack = 0.1f; Release = 0.6f;
             _u = u;
@@ -185,9 +185,9 @@ namespace Brutality.Neural
         }
     }
 
-    // ===================================================================== agonie
+    // ===================================================================== agony
 
-    /// <summary>Porte la main vers la plaie (cinématique inverse), tête fléchie vers elle.</summary>
+    /// <summary>Brings the hand toward the wound (inverse kinematics), head flexed toward it.</summary>
     internal sealed class ClutchWound : MotorProgram
     {
         private readonly WoundRecord _wound;
@@ -198,7 +198,7 @@ namespace Brutality.Neural
 
         public ClutchWound(WoundRecord wound, Seg fallback, int[] sides, float start, float duration, float u, bool abdominal)
         {
-            Name = "Agrippe la plaie";
+            Name = "Clutching wound";
             _wound = wound; _fallbackSeg = fallback; _sides = sides;
             Start = start; Duration = duration; Attack = 0.25f; Release = 0.4f;
             _u = u; _abdominal = abdominal;
@@ -215,7 +215,7 @@ namespace Brutality.Neural
                 target = _wound.CurrentWorldPoint;
             else
                 target = ns.Body[_fallbackSeg].Com;
-            // La main se pose sur la surface extérieure du thorax, jamais à l'intérieur de la cage thoracique.
+            // The hand rests on the outer surface of the thorax, never inside the ribcage.
             var body = ns.Body;
             target += BMath.SafeNormalize(target - thorax.Com, thorax.F) * 0.05f;
             float u = _u * k;
@@ -245,14 +245,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Repli en position fœtale.</summary>
+    /// <summary>Fetal curl.</summary>
     internal sealed class Curl : MotorProgram
     {
         private readonly float _u;
 
         public Curl(float start, float duration, float u)
         {
-            Name = "Repli fœtal";
+            Name = "Fetal curl";
             Start = start; Duration = duration; Attack = 0.35f; Release = 0.5f;
             _u = u; IsAgonyEvent = true;
             Groups = MotorGroup.All;
@@ -273,14 +273,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Extension tonique incontrôlée (opisthotonos) : dos cambré, tête rejetée en arrière, jambes tendues.</summary>
+    /// <summary>Uncontrolled tonic extension (opisthotonus): arched back, head thrown back, legs extended.</summary>
     internal sealed class Opisthotonus : MotorProgram
     {
         private readonly float _u;
 
         public Opisthotonus(float start, float duration, float u)
         {
-            Name = "Extension tonique";
+            Name = "Tonic extension";
             Start = start; Duration = duration; Attack = 0.12f; Release = 0.4f;
             _u = u; IsAgonyEvent = true;
             Groups = MotorGroup.All;
@@ -301,7 +301,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Salve de myoclonies (contractions brèves, souvent bilatérales) : crise anoxique, syncope convulsive.</summary>
+    /// <summary>Myoclonic burst (brief contractions, often bilateral): anoxic seizure, convulsive syncope.</summary>
     internal sealed class ClonicBurst : MotorProgram
     {
         private readonly float _freq;
@@ -311,7 +311,7 @@ namespace Brutality.Neural
 
         public ClonicBurst(float start, int jerks, float freq, float u, System.Random rng)
         {
-            Name = "Myoclonies";
+            Name = "Myoclonus";
             _freq = freq;
             _duty = BMath.Range(rng, 0.25f, 0.4f);
             Start = start; Duration = jerks / freq; Attack = 0f; Release = 0f;
@@ -355,7 +355,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Pédalage agonique : flexion-extension alternée des membres inférieurs.</summary>
+    /// <summary>Agonal pedaling: alternating flexion-extension of the lower limbs.</summary>
     internal sealed class Pedal : MotorProgram
     {
         private readonly float _omega;
@@ -364,7 +364,7 @@ namespace Brutality.Neural
 
         public Pedal(float start, float duration, float freq, float u, int onlySide)
         {
-            Name = "Pédalage";
+            Name = "Pedaling";
             Start = start; Duration = duration; Attack = 0.2f; Release = 0.3f;
             _omega = BMath.TwoPi * freq; _u = u; _onlySide = onlySide;
             IsAgonyEvent = true;
@@ -387,7 +387,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Ruade : flexion puis extension explosive d'un membre inférieur.</summary>
+    /// <summary>Kick: flexion followed by explosive extension of a lower limb.</summary>
     internal sealed class Kick : MotorProgram
     {
         private readonly int _side;
@@ -395,7 +395,7 @@ namespace Brutality.Neural
 
         public Kick(int side, float start, float duration, float u)
         {
-            Name = "Ruade";
+            Name = "Kick";
             _side = side;
             Start = start; Duration = duration; Attack = 0.05f; Release = 0.12f;
             _u = u; IsAgonyEvent = true;
@@ -419,7 +419,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Mouvement de bras incontrôlé / tentative d'agripper (le bras se lève puis retombe).</summary>
+    /// <summary>Uncontrolled arm flail / grasping attempt (the arm rises then drops).</summary>
     internal sealed class ArmFlail : MotorProgram
     {
         private readonly int[] _sides;
@@ -428,7 +428,7 @@ namespace Brutality.Neural
 
         public ArmFlail(int[] sides, float start, float duration, float u, System.Random rng)
         {
-            Name = "Bras incontrôlé";
+            Name = "Arm flail";
             _sides = sides;
             Start = start; Duration = duration; Attack = 0.15f; Release = 0.35f;
             _u = u; IsAgonyEvent = true;
@@ -456,8 +456,8 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Tentative de retournement vers un côté : la jambe et le bras opposés croisent la ligne médiane, le tronc
-    /// et la tête tournent vers le côté de la roulade. Combiné au contact du sol, le corps roule.
+    /// Attempt to roll onto a side: the opposite leg and arm cross the midline, the trunk
+    /// and head turn toward the roll direction. Combined with ground contact, the body rolls.
     /// </summary>
     internal sealed class Roll : MotorProgram
     {
@@ -466,7 +466,7 @@ namespace Brutality.Neural
 
         public Roll(int toward, float start, float duration, float u)
         {
-            Name = "Roulade";
+            Name = "Roll";
             _toward = toward;
             Start = start; Duration = duration; Attack = 0.25f; Release = 0.35f;
             _u = u; IsAgonyEvent = true;
@@ -488,7 +488,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Rotation de la tête (mouvement de recherche, de douleur).</summary>
+    /// <summary>Head turn (searching or pain movement).</summary>
     internal sealed class HeadTurn : MotorProgram
     {
         private readonly float _twist, _lat, _flex;
@@ -496,7 +496,7 @@ namespace Brutality.Neural
 
         public HeadTurn(float start, float duration, float u, System.Random rng)
         {
-            Name = "Rotation de tête";
+            Name = "Head turn";
             Start = start; Duration = duration; Attack = 0.2f; Release = 0.3f;
             _u = u; IsAgonyEvent = true;
             _twist = BMath.Range(rng, -55f, 55f);
@@ -512,19 +512,19 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Bras qui se tendent brusquement (extension réflexe, « grasping » agonique) : montée en ~150 ms vers une
-    /// extension franche, maintien, relâchement. Répété 1 à 3 fois avec des cibles différentes.
+    /// Arms suddenly thrusting outward (reflex extension, agonal "grasping"): ~150 ms rise to
+    /// clear extension, hold, release. Repeated 1 to 3 times with different targets.
     /// </summary>
     internal sealed class ArmThrust : MotorProgram
     {
         private readonly int[] _sides;
         private readonly float _period;
-        private readonly Vector3[,] _targets; // [rep, côté] : (flexion, abduction, coude)
+        private readonly Vector3[,] _targets; // [rep, side]: (flexion, abduction, elbow)
         private readonly float _u;
 
         public ArmThrust(int[] sides, int reps, float start, float period, float u, System.Random rng)
         {
-            Name = "Bras tendus";
+            Name = "Arm thrust";
             _sides = sides;
             _period = period;
             Start = start; Duration = reps * period; Attack = 0f; Release = 0f;
@@ -541,7 +541,7 @@ namespace Brutality.Neural
             float local = ns.Time - Start;
             int rep = Mathf.Clamp((int)(local / _period), 0, _targets.GetLength(0) - 1);
             float x = (local - rep * _period) / _period;
-            // Contraction pendant 35 % du cycle, puis relâchement progressif (le bras retombe sans claquer).
+            // Contraction for 35% of the cycle, then progressive release (the arm drops without snapping).
             float env = x < 0.35f ? 1f : Mathf.Clamp01(1f - (x - 0.35f) / 0.3f);
             if (env <= 0f) return;
             float u = _u * k * env;
@@ -554,7 +554,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Genoux qui se replient par saccades (réflexe de retrait en flexion), parfois en détente.</summary>
+    /// <summary>Knees jerking into flexion (flexion withdrawal reflex), occasionally extending.</summary>
     internal sealed class LegJerk : MotorProgram
     {
         private readonly int[] _sides;
@@ -564,7 +564,7 @@ namespace Brutality.Neural
 
         public LegJerk(int[] sides, int reps, float start, float freq, float u, System.Random rng)
         {
-            Name = "Saccades des jambes";
+            Name = "Leg jerks";
             _sides = sides;
             _freq = freq;
             Start = start; Duration = reps / freq; Attack = 0f; Release = 0f;
@@ -596,7 +596,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Secousse myoclonique globale : tout le corps se contracte d'un coup, en flexion ou en extension (bras projetés).</summary>
+    /// <summary>Global myoclonic jerk: the whole body contracts suddenly, in flexion or extension (thrown arms).</summary>
     internal sealed class Spasm : MotorProgram
     {
         private readonly bool _extensor;
@@ -604,7 +604,7 @@ namespace Brutality.Neural
 
         public Spasm(bool extensor, float start, float duration, float u)
         {
-            Name = extensor ? "Spasme en extension" : "Spasme en flexion";
+            Name = extensor ? "Extensor spasm" : "Flexor spasm";
             _extensor = extensor;
             Start = start; Duration = duration; Attack = 0.03f; Release = 0.12f;
             _u = u; IsAgonyEvent = true;
@@ -641,11 +641,11 @@ namespace Brutality.Neural
         }
     }
 
-    // ===================================================================== couches continues
+    // ===================================================================== continuous layers
 
     /// <summary>
-    /// Contorsions continues : chaque articulation dérive lentement et au hasard autour de sa posture courante.
-    /// C'est ce fond de mouvement qui donne l'impression d'un corps encore « habité » entre les gestes francs.
+    /// Continuous writhing: each joint slowly drifts at random around its current posture.
+    /// This background movement is what makes the body look still "inhabited" between overt gestures.
     /// </summary>
     internal sealed class Writhing : MotorProgram
     {
@@ -655,24 +655,24 @@ namespace Brutality.Neural
         private readonly Vector3[] _baseline = new Vector3[AnatomyData.JointCount];
         private bool _init;
 
-        // Amplitude (degrés) par articulation : flexion, puis abduction / inclinaison / torsion.
+        // Amplitude (degrees) per joint: flexion, then abduction / lateral tilt / twist.
         private static readonly Vector2[] Amp =
         {
-            new Vector2(10f, 8f),  // rachis : flexion, torsion
-            new Vector2(18f, 22f), // cou : flexion, torsion
-            new Vector2(25f, 15f), // épaule G : flexion, abduction
-            new Vector2(30f, 0f),  // coude G
-            new Vector2(25f, 15f), // épaule D
-            new Vector2(30f, 0f),  // coude D
-            new Vector2(20f, 8f),  // hanche G : flexion, abduction
-            new Vector2(30f, 0f),  // genou G
-            new Vector2(20f, 8f),  // hanche D
-            new Vector2(30f, 0f),  // genou D
+            new Vector2(10f, 8f),  // spine: flexion, twist
+            new Vector2(18f, 22f), // neck: flexion, twist
+            new Vector2(25f, 15f), // L shoulder: flexion, abduction
+            new Vector2(30f, 0f),  // L elbow
+            new Vector2(25f, 15f), // R shoulder
+            new Vector2(30f, 0f),  // R elbow
+            new Vector2(20f, 8f),  // L hip: flexion, abduction
+            new Vector2(30f, 0f),  // L knee
+            new Vector2(20f, 8f),  // R hip
+            new Vector2(30f, 0f),  // R knee
         };
 
         public Writhing(float start, float duration, float amplitude, System.Random rng)
         {
-            Name = "Contorsions";
+            Name = "Writhing";
             Start = start; Duration = duration; Attack = 0.4f; Release = 0.8f;
             _amp = amplitude;
             for (int i = 0; i < _seed.Length; i++) _seed[i] = BMath.Range(rng, 0f, 100f);
@@ -685,7 +685,7 @@ namespace Brutality.Neural
             if (a < 0.03f || _amp <= 0f) return;
             float t = ns.Time;
             float lp = 1f - Mathf.Exp(-ns.Dt / 0.8f);
-            // Une rigidité de posture en cours (décortication) bride les contorsions.
+            // Active postural rigidity (decortication) restrains writhing.
             float u = Mathf.Clamp01(0.35f * a * k * (1f - 0.7f * Mathf.Clamp01(Mathf.Max(ns.Rigidity, ns.RigidityPrev))));
             for (int j = 0; j < AnatomyData.JointCount; j++)
             {
@@ -707,7 +707,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Tremblements / fasciculations (6-10 Hz) autour de la posture courante, filtrés par l'inertie.</summary>
+    /// <summary>Tremors / fasciculations (6-10 Hz) around the current posture, filtered by inertia.</summary>
     internal sealed class Tremor : MotorProgram
     {
         private readonly float _amp;
@@ -718,7 +718,7 @@ namespace Brutality.Neural
 
         public Tremor(float start, float duration, float amplitudeDeg, System.Random rng)
         {
-            Name = "Tremblements";
+            Name = "Tremor";
             Start = start; Duration = duration; Attack = 0.3f; Release = 0.6f;
             _amp = amplitudeDeg;
             for (int j = 0; j < _freq.Length; j++)
@@ -749,7 +749,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Gasps agoniques : brèves extensions rythmiques du tronc et du cou (respiration agonique).</summary>
+    /// <summary>Agonal gasps: brief rhythmic extensions of the trunk and neck (agonal breathing).</summary>
     internal sealed class AgonalGasp : MotorProgram
     {
         private readonly float _period;
@@ -779,14 +779,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Ballottement de la tête : dérive lente, faiblement activée.</summary>
+    /// <summary>Head loll: slow drift, weakly activated.</summary>
     internal sealed class HeadLoll : MotorProgram
     {
         private readonly float _seed;
 
         public HeadLoll(float start, float duration, System.Random rng)
         {
-            Name = "Tête ballante";
+            Name = "Head loll";
             Start = start; Duration = duration; Attack = 0.5f; Release = 0.8f;
             _seed = BMath.Range(rng, 0f, 100f);
             Groups = MotorGroup.Neck;
@@ -802,13 +802,13 @@ namespace Brutality.Neural
         }
     }
 
-    // ===================================================================== gestes transversaux
+    // ===================================================================== shared gestures
 
-    // Ces gestes ne dépendent pas d'une lésion précise : ils apparaissent pour tous les mécanismes, mais avec un
-    // poids propre à chacun (MechanismProfile), une palette propre à chaque mort (VarietyDirector) et les capacités
-    // articulaires du moment (NeuralController.PickEvent). Ils multiplient les silhouettes d'agonie au sol.
+    // These gestures do not depend on a specific lesion: they appear across all mechanisms, weighted
+    // per mechanism (MechanismProfile), per death (VarietyDirector), and by current joint capacities
+    // (NeuralController.PickEvent). They multiply the variety of ground agony silhouettes.
 
-    /// <summary>Pontage : le bassin se soulève en arc, appui sur les pieds et les épaules, puis retombe.</summary>
+    /// <summary>Hip bridge: the pelvis arches upward, supported on feet and shoulders, then drops back.</summary>
     internal sealed class HipBridge : MotorProgram
     {
         private readonly int _reps;
@@ -816,7 +816,7 @@ namespace Brutality.Neural
 
         public HipBridge(float start, float duration, int reps, float u)
         {
-            Name = "Pontage";
+            Name = "Hip bridge";
             _reps = Mathf.Max(1, reps);
             _period = duration / _reps;
             _u = u;
@@ -846,9 +846,9 @@ namespace Brutality.Neural
     }
 
     /// <summary>
-    /// Reptation sur les coudes (sur le ventre) : un coude se plante pendant que l'autre tire, le tronc se visse
-    /// légèrement vers le coude d'appui, la tête suit. Donne au corps couché une progression visible, différente du
-    /// ramper sur les mains.
+    /// Elbow drag (prone): one elbow plants while the other pulls, the trunk twists slightly toward
+    /// the supporting elbow, the head follows. Gives the prone body visible progression, distinct from
+    /// crawling on hands.
     /// </summary>
     internal sealed class ElbowDrag : MotorProgram
     {
@@ -857,7 +857,7 @@ namespace Brutality.Neural
 
         public ElbowDrag(float start, float duration, int reps, float u, System.Random rng)
         {
-            Name = "Reptation sur les coudes";
+            Name = "Elbow drag";
             _reps = Mathf.Max(1, reps);
             _period = duration / _reps;
             _lead = BMath.Chance(rng, 0.5f) ? -1 : 1;
@@ -886,7 +886,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>La tête se soulève lentement puis frappe le sol, plusieurs fois (secousse de la nuque au sol).</summary>
+    /// <summary>The head lifts slowly then strikes the ground repeatedly (neck jerk on the ground).</summary>
     internal sealed class HeadBang : MotorProgram
     {
         private readonly int _reps;
@@ -894,7 +894,7 @@ namespace Brutality.Neural
 
         public HeadBang(float start, float duration, float period, float u, System.Random rng)
         {
-            Name = "Tête qui frappe le sol";
+            Name = "Head bang";
             _period = Mathf.Max(0.35f, period);
             _reps = Mathf.Max(1, Mathf.RoundToInt(duration / _period));
             _u = u;
@@ -908,7 +908,7 @@ namespace Brutality.Neural
             float local = ns.Time - Start;
             int rep = Mathf.Clamp((int)(local / _period), 0, _reps - 1);
             float x = (local - rep * _period) / _period;
-            // +1 en extension (tête soulevée), -1 en flexion (front contre le sol).
+            // +1 in extension (head lifted), -1 in flexion (forehead against the ground).
             float swing = Mathf.Sin(BMath.TwoPi * x);
             float u = _u * k * Mathf.Min(1f, Mathf.Sin(Mathf.PI * x) * 3f);
             if (u <= 0.01f) return;
@@ -918,7 +918,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Une jambe se croise par-dessus l'autre, le bassin tourne vers elle, puis elle retombe.</summary>
+    /// <summary>One leg crosses over the other, the pelvis rotates toward it, then it drops back.</summary>
     internal sealed class LegCross : MotorProgram
     {
         private readonly int _cross;
@@ -927,7 +927,7 @@ namespace Brutality.Neural
 
         public LegCross(int cross, float start, float duration, float u, System.Random rng)
         {
-            Name = "Jambes croisées";
+            Name = "Leg cross";
             _cross = cross == 0 ? 1 : cross;
             _reps = 1 + rng.Next(2);
             _period = duration / _reps;
@@ -955,14 +955,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Les deux bras se tendent au-dessus de la tête, tremblants, puis retombent.</summary>
+    /// <summary>Both arms stretch overhead, trembling, then drop back.</summary>
     internal sealed class ArmsOverhead : MotorProgram
     {
         private readonly float _u, _amp, _freq, _phase, _asym;
 
         public ArmsOverhead(float start, float duration, float u, System.Random rng)
         {
-            Name = "Bras au-dessus de la tête";
+            Name = "Arms overhead";
             _u = u;
             _amp = BMath.Range(rng, 2f, 5f);
             _freq = BMath.Range(rng, 3f, 5f);
@@ -989,7 +989,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Les mains pressent la poitrine par instants, comme une tentative de respiration bloquée.</summary>
+    /// <summary>Hands press against the chest intermittently, as if struggling for blocked breath.</summary>
     internal sealed class ChestClutch : MotorProgram
     {
         private readonly int[] _sides;
@@ -997,7 +997,7 @@ namespace Brutality.Neural
 
         public ChestClutch(int[] sides, float start, float duration, float u, System.Random rng)
         {
-            Name = "Mains sur la poitrine";
+            Name = "Chest clutch";
             _sides = sides;
             _u = u;
             _pressFreq = BMath.Range(rng, 0.6f, 1.2f);
@@ -1026,14 +1026,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Torsion axiale continue : le tronc se visse lentement d'un côté à l'autre, hanches en contretorsion.</summary>
+    /// <summary>Continuous axial twisting: the trunk slowly twists from side to side, hips counter-twisting.</summary>
     internal sealed class TwistArch : MotorProgram
     {
         private readonly float _amp, _rate, _phase, _u, _bend;
 
         public TwistArch(float start, float duration, float u, System.Random rng)
         {
-            Name = "Torsion du tronc";
+            Name = "Trunk twist";
             _amp = BMath.Range(rng, 22f, 42f);
             _rate = BMath.Range(rng, 0.22f, 0.5f);
             _phase = BMath.Range(rng, 0f, BMath.TwoPi);
@@ -1058,7 +1058,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Un talon glisse vers la fesse puis retombe (glissement du talon, réflexe de retrait lent).</summary>
+    /// <summary>One heel slides toward the buttock then drops back (heel slide, slow withdrawal reflex).</summary>
     internal sealed class HeelSlide : MotorProgram
     {
         private readonly int _side, _reps;
@@ -1066,7 +1066,7 @@ namespace Brutality.Neural
 
         public HeelSlide(int side, float start, float duration, float u, System.Random rng)
         {
-            Name = "Talon qui glisse";
+            Name = "Heel slide";
             _side = side == 0 ? 1 : side;
             _reps = 1 + rng.Next(3);
             _period = duration / _reps;
@@ -1090,14 +1090,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Les épaules montent vers les oreilles à chaque gaspe (muscles accessoires), puis retombent.</summary>
+    /// <summary>Shoulders hunch toward the ears on each gasp (accessory muscles), then drop back.</summary>
     internal sealed class ShoulderHunch : MotorProgram
     {
         private readonly float _period, _phase, _u, _amp;
 
         public ShoulderHunch(float start, float duration, float period, float u, System.Random rng)
         {
-            Name = "Épaules haussées";
+            Name = "Shoulder hunch";
             _period = Mathf.Max(0.5f, period);
             _phase = BMath.Range(rng, 0f, 1f);
             _amp = BMath.Range(rng, 0.7f, 1.2f);
@@ -1122,14 +1122,14 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>La nuque se cambre en extension forcée, tremble, puis la tête retombe.</summary>
+    /// <summary>The neck arches into forced extension, trembles, then the head drops.</summary>
     internal sealed class NeckArch : MotorProgram
     {
         private readonly float _u, _amp, _freq, _phase;
 
         public NeckArch(float start, float duration, float u, System.Random rng)
         {
-            Name = "Nuque cambrée";
+            Name = "Neck arch";
             _u = u;
             _amp = BMath.Range(rng, 32f, 48f);
             _freq = BMath.Range(rng, 4f, 7f);
@@ -1149,7 +1149,7 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Frisson de tout le corps : bouffée de secousses rapides et fines, puis silence.</summary>
+    /// <summary>Full-body shudder: burst of rapid fine jerks, then stillness.</summary>
     internal sealed class Shudder : MotorProgram
     {
         private readonly float _freq, _amp, _u;
@@ -1157,7 +1157,7 @@ namespace Brutality.Neural
 
         public Shudder(float start, float duration, float freq, float u, System.Random rng)
         {
-            Name = "Frisson";
+            Name = "Shudder";
             _freq = freq;
             _amp = BMath.Range(rng, 2f, 5f);
             _u = u;

@@ -3,23 +3,23 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Repère et paramètres géométriques d'une articulation, figés au moment de la mort.</summary>
+    /// <summary>Frame and geometric parameters of a joint, frozen at the moment of death.</summary>
     internal struct JointFrame
     {
         public JointKind Kind;
-        public int Side;               // -1 gauche, +1 droite, 0 axial
-        public Vector3 PR, PU, PF;     // repère anatomique du parent (local parent)
-        public Vector3 CR, CU;         // axes droit et proximal/supérieur de l'enfant (local enfant)
-        public Vector3 HingeAxisP;     // axe de flexion (genou/coude), local parent
+        public int Side;               // -1 left, +1 right, 0 axial
+        public Vector3 PR, PU, PF;     // parent anatomical frame (parent local)
+        public Vector3 CR, CU;         // child right and proximal/superior axes (child local)
+        public Vector3 HingeAxisP;     // flexion axis (knee/elbow), parent local
         public Quaternion RelRest;     // inv(qP0) * qC0
-        public float TwistOffset;      // rotation axiale absolue à la mort (rachis, cou)
-        public float FlexMid;          // milieu de l'amplitude de flexion (rad), pour le déroulement
+        public float TwistOffset;      // absolute axial rotation at death (spine, neck)
+        public float FlexMid;          // midpoint of flexion range (rad), for unwrapping
     }
 
     /// <summary>
-    /// Angles articulaires anatomiques (inspirés des repères ISB, Wu et al. 2002/2005), en radians :
-    /// x = flexion(+)/extension(-), y = abduction(+) / inclinaison droite(+) / varus, z = rotation axiale.
-    /// Fonctions pures (aucune dépendance au moteur) : testées hors jeu.
+    /// Anatomical joint angles (inspired by ISB frames, Wu et al. 2002/2005), in radians:
+    /// x = flexion(+)/extension(-), y = abduction(+) / right lateral tilt(+) / varus, z = axial rotation.
+    /// Pure functions (no engine dependency): unit-tested outside the game.
     /// </summary>
     internal static class JointKinematics
     {
@@ -32,7 +32,7 @@ namespace Brutality.Core
                 case JointKind.Hip:
                 case JointKind.Shoulder:
                 {
-                    // Segment « descendant » : direction distale de l'enfant dans le repère du parent.
+                    // "Descending" segment: child's distal direction in the parent's frame.
                     Vector3 R = qP * f.PR, U = qP * f.PU, F = qP * f.PF;
                     Vector3 d = qC * -f.CU;
                     float x = Vector3.Dot(d, R), y = Vector3.Dot(d, U), z = Vector3.Dot(d, F);
@@ -45,7 +45,7 @@ namespace Brutality.Core
                 case JointKind.Lumbar:
                 case JointKind.Neck:
                 {
-                    // Segment « montant » : axe supérieur de l'enfant dans le repère du parent.
+                    // "Ascending" segment: child's superior axis in the parent's frame.
                     Vector3 R = qP * f.PR, U = qP * f.PU, F = qP * f.PF;
                     Vector3 d = qC * f.CU;
                     float x = Vector3.Dot(d, R), y = Vector3.Dot(d, U), z = Vector3.Dot(d, F);
@@ -57,7 +57,7 @@ namespace Brutality.Core
                 }
                 default:
                 {
-                    // Charnière : angle entre directions distales autour de l'axe de flexion.
+                    // Hinge: angle between distal directions around the flexion axis.
                     Vector3 a = qP * f.HingeAxisP;
                     Vector3 dP = qP * -f.PU;
                     Vector3 dC = qC * -f.CU;
@@ -69,8 +69,8 @@ namespace Brutality.Core
                     break;
                 }
             }
-            // Déroulement autour du milieu de l'amplitude : la discontinuité ±180° est placée à l'opposé de la zone
-            // physiologique (ex. bras au-dessus de la tête légèrement en arrière = 181° et non -179°).
+            // Unwrap around the midpoint of the range: the ±180° discontinuity is placed opposite the
+            // physiological zone (e.g. arm raised overhead slightly backward = 181°, not -179°).
             flex = f.FlexMid + BMath.WrapPi(flex - f.FlexMid);
             return new Vector3(flex, side, twist);
         }
@@ -78,8 +78,8 @@ namespace Brutality.Core
         private static readonly Vector3[] UnitAxes = { new Vector3(1f, 0f, 0f), new Vector3(0f, 1f, 0f), new Vector3(0f, 0f, 1f) };
 
         /// <summary>
-        /// Gradients angulaires numériques des trois angles par rapport à une petite rotation de l'enfant,
-        /// exprimés dans le repère du parent (rotation relative qRel). g[d] · ω = dφd/dt.
+        /// Numerical angular gradients of the three angles with respect to a small child rotation,
+        /// expressed in the parent's frame (relative rotation qRel). g[d] · ω = dφd/dt.
         /// </summary>
         public static void Gradients(in JointFrame f, Quaternion qRel, out Vector3 phi, out Vector3 g0, out Vector3 g1, out Vector3 g2)
         {
@@ -97,9 +97,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Résout la rotation relative parent→enfant qui produit les angles anatomiques demandés
-        /// (moindres carrés amortis de Levenberg-Marquardt sur le jacobien numérique, départ à chaud).
-        /// Insensible aux conventions de signe : il suffit qu'Evaluate soit cohérent.
+        /// Solves for the parent→child relative rotation that produces the requested anatomical angles
+        /// (Levenberg-Marquardt damped least squares on the numerical Jacobian, warm start).
+        /// Insensitive to sign conventions: it is sufficient that Evaluate be consistent.
         /// </summary>
         public static Quaternion SolvePose(in JointFrame f, Quaternion qStart, Vector3 target, int iterations, out float residualRad)
         {
@@ -108,8 +108,8 @@ namespace Brutality.Core
             for (int it = 0; it < iterations; it++)
             {
                 Gradients(f, q, out Vector3 phi, out Vector3 g0, out Vector3 g1, out Vector3 g2);
-                // Pour la flexion déroulée autour de FlexMid (ex. épaule [-55°, 180°]), on garde la différence directe
-                // bornée à ±π afin d'éviter qu'un bras au-delà de 195° ne reparte en arrière par le chemin le plus court.
+                // For flexion unwrapped around FlexMid (e.g. shoulder [-55°, 180°]), keep the direct difference
+                // clamped to ±π so an arm past 195° does not swing backward via the shortest path.
                 float ex = Mathf.Clamp(target.x - phi.x, -BMath.Pi, BMath.Pi);
                 Vector3 e = new Vector3(ex, BMath.WrapPi(target.y - phi.y), BMath.WrapPi(target.z - phi.z));
                 residualRad = e.magnitude;
@@ -132,7 +132,7 @@ namespace Brutality.Core
             return q;
         }
 
-        /// <summary>Résout un système 3×3 symétrique par la règle de Cramer.</summary>
+        /// <summary>Solves a symmetric 3×3 system using Cramer's rule.</summary>
         private static Vector3 Solve3(float a00, float a01, float a02, float a11, float a12, float a22, Vector3 b)
         {
             float c00 = a11 * a22 - a12 * a12;
@@ -151,8 +151,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Axe de flexion d'une charnière (local parent), orienté pour que la flexion soit positive :
-        /// le genou porte la jambe vers l'arrière, le coude porte l'avant-bras vers l'avant.
+        /// Flexion axis of a hinge (parent local), oriented so flexion is positive:
+        /// the knee swings the calf backward, the elbow swings the forearm forward.
         /// </summary>
         public static Vector3 HingeAxis(JointKind kind, Quaternion qP, Vector3 pR, Vector3 pU, Vector3 pF, Quaternion qC, Vector3 cU)
         {
@@ -161,9 +161,9 @@ namespace Brutality.Core
             Vector3 n;
             if (Vector3.Angle(dP, dC) > 12f)
             {
-                // Un genou ou coude nettement plié à la mort (>12°) est toujours en flexion positive :
-                // Cross(dP, dC) est orthogonal aux deux segments et donne directement le sens positif (SignedAngleOnPlane > 0),
-                // même si l'avant-bras est replié en travers du torse (où pF de l'humérus n'est pas fiable).
+                // A knee or elbow clearly bent at death (>12°) is always in positive flexion:
+                // Cross(dP, dC) is orthogonal to both segments and directly gives the positive direction (SignedAngleOnPlane > 0),
+                // even if the forearm is folded across the chest (where the humerus pF is unreliable).
                 n = Vector3.Cross(dP, dC).normalized;
             }
             else
@@ -177,8 +177,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Repère local enfant (axis = X flexion, secondary = Y abduction/varus) pour configurer un ConfigurableJoint.
-        /// Calculé analytiquement à partir des axes anatomiques (insensible à la singularité d'abduction ±90° de l'épaule).
+        /// Child local frame (axis = X flexion, secondary = Y abduction/varus) to configure a ConfigurableJoint.
+        /// Computed analytically from anatomical axes (immune to the ±90° shoulder abduction singularity).
         /// </summary>
         public static void JointAxes(in JointFrame f, Quaternion qRel0, out Vector3 axis, out Vector3 secondary)
         {
@@ -200,7 +200,7 @@ namespace Brutality.Core
             Quaternion invC = Quaternion.Inverse(qRel0);
             axis = BMath.SafeNormalize(invC * flexP, Vector3.right);
 
-            // Y orthogonal à X et à l'axe longitudinal CU afin que Z = X × Y s'aligne sur la torsion axiale.
+            // Y orthogonal to X and to longitudinal axis CU so that Z = X × Y aligns with axial twist.
             Vector3 sec = Vector3.Cross(f.CU, axis);
             if (sec.sqrMagnitude < 0.01f)
             {
@@ -210,15 +210,15 @@ namespace Brutality.Core
             secondary = BMath.SafeNormalize(sec, Mathf.Abs(axis.y) < 0.9f ? Vector3.up : Vector3.forward);
         }
 
-        /// <summary>Rotation axiale absolue du segment enfant par rapport au parent (rachis, cou).</summary>
+        /// <summary>Absolute axial rotation of the child segment relative to the parent (spine, neck).</summary>
         public static float AbsoluteTwist(Quaternion qP, Vector3 pR, Quaternion qC, Vector3 cR, Vector3 cU)
         {
             return BMath.SignedAngleOnPlane(qP * pR, qC * cR, qC * cU);
         }
 
         /// <summary>
-        /// Cinématique inverse analytique à deux segments : angles d'épaule (mêmes définitions qu'Evaluate)
-        /// et flexion du coude pour amener la main sur une cible.
+        /// Analytical two-segment inverse kinematics: shoulder angles (same definitions as Evaluate)
+        /// and elbow flexion to bring the hand to a target.
         /// </summary>
         public static bool ArmIK(Vector3 shoulder, float upperLen, float foreLen, Vector3 target, int side,
                                  Vector3 thoraxR, Vector3 thoraxU, Vector3 thoraxF,
@@ -237,7 +237,7 @@ namespace Brutality.Core
             float cosA = Mathf.Clamp((L1 * L1 + d * d - L2 * L2) / (2f * L1 * d), -1f, 1f);
             float alpha = Mathf.Acos(cosA);
             Vector3 dn = D / dist;
-            // Pôle : le coude part vers le bas et l'extérieur.
+            // Pole: elbow points downward and outward.
             Vector3 pole = -thoraxU + thoraxR * (0.6f * side);
             Vector3 p = pole - dn * Vector3.Dot(pole, dn);
             p = BMath.SafeNormalize(p, thoraxR * side);
@@ -249,9 +249,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Cinématique inverse analytique de la jambe (hanche → cheville) dans le repère (R, U, F) du bassin :
-        /// flexion et abduction de hanche (mêmes définitions que <see cref="Evaluate"/>) et flexion du genou (≥ 0).
-        /// Le genou part vers l'avant (pôle +F), la jambe fléchie amène donc la cuisse devant la ligne hanche-cheville.
+        /// Analytical leg inverse kinematics (hip → ankle) in the pelvis (R, U, F) frame:
+        /// hip flexion and abduction (same definitions as <see cref="Evaluate"/>) and knee flexion (≥ 0).
+        /// The knee points forward (+F pole), so flexing the leg brings the thigh in front of the hip-ankle line.
         /// </summary>
         public static bool LegIK(Vector3 hip, float thighLen, float calfLen, Vector3 target, int side,
                                  Vector3 pelvisR, Vector3 pelvisU, Vector3 pelvisF,
@@ -279,9 +279,9 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Abduction minimale anatomique de l'épaule (rad) selon la flexion : bras le long du corps ou en arrière
-        /// (flex ≤ 20°), la cage thoracique bloque l'adduction à ~0° ; devant le buste (85°–130°), le bras dégage
-        /// la paroi antérieure et peut croiser jusqu'à ~−22° ; au-dessus de la tête, la tête/cou resserre la borne.
+        /// Minimum anatomical shoulder abduction (rad) by flexion: with the arm at the side or behind
+        /// (flex ≤ 20°), the ribcage blocks adduction at ~0°; in front of the chest (85°–130°), the arm clears
+        /// the anterior wall and can cross up to ~−22°; overhead, the head/neck tightens the bound again.
         /// </summary>
         public static float MinShoulderAbductionRad(float flexRad)
         {
@@ -292,8 +292,8 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Détecte la pénétration d'un point (monde) dans la capsule elliptique du thorax (repère anatomique du thorax).
-        /// Renvoie la profondeur de pénétration (m) et la normale sortante (monde) ; 0 si le point est à l'extérieur.
+        /// Detects penetration of a world-space point into the elliptical thorax capsule (thorax anatomical frame).
+        /// Returns penetration depth (m) and outward normal (world); 0 if the point is outside.
         /// </summary>
         public static bool ThoraxPenetration(
             Vector3 point, Vector3 thoraxPos, Vector3 tR, Vector3 tU, Vector3 tF,
@@ -331,7 +331,7 @@ namespace Brutality.Core
             return depth > 1e-5f;
         }
 
-        /// <summary>Projette une cible (ex. main qui agrippe la plaie) à la surface extérieure du thorax si elle est dedans.</summary>
+        /// <summary>Projects a target (e.g. hand clutching a wound) onto the outer surface of the thorax if inside.</summary>
         public static Vector3 ClampOutsideThorax(
             Vector3 point, Vector3 thoraxPos, Vector3 tR, Vector3 tU, Vector3 tF,
             float chestZ, float yBot, float yTop, float rx, float ryCap, float rz, int side, float margin = 0.015f)

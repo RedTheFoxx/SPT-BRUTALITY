@@ -6,10 +6,10 @@ using UnityEngine;
 namespace Brutality.Euphoria
 {
     /// <summary>
-    /// Contraction idiomusculaire (phénomène de Zsako) : après la mort, le muscle squelettique reste excitable
-    /// mécaniquement pendant plusieurs heures ; un choc sur le muscle déclenche une contraction locale brève
-    /// (Madea, « Estimation of the Time Since Death », 3e éd., CRC 2016, réactions supravitales). Ici : les
-    /// articulations voisines du segment touché se contractent brièvement, puis se relâchent.
+    /// Idiomuscular contraction (Zsako phenomenon): after death, skeletal muscle remains mechanically
+    /// excitable for several hours; a shock to the muscle triggers a brief local contraction
+    /// (Madea, "Estimation of the Time Since Death", 3rd ed., CRC 2016, supravital reactions). Here: the
+    /// joints adjacent to the hit segment contract briefly, then relax.
     /// </summary>
     internal sealed class IdiomuscularTwitch : MotorProgram
     {
@@ -20,7 +20,7 @@ namespace Brutality.Euphoria
 
         public IdiomuscularTwitch(BodyModel body, Seg seg, float t, float gain, System.Random rng)
         {
-            Name = "contraction idiomusculaire";
+            Name = "idiomuscular twitch";
             Start = t;
             Duration = BMath.Range(rng, 0.35f, 0.6f);
             Attack = 0.03f;

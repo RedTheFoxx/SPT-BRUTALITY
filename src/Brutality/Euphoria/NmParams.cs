@@ -1,15 +1,15 @@
 namespace Brutality.Euphoria
 {
     /// <summary>
-    /// Paramètres des comportements NaturalMotion Euphoria, avec leurs noms et valeurs par défaut officiels.
-    /// Source : behaviours.xml de GTA V (données NaturalMotion livrées avec le jeu, common.rpf/data/naturalmotion),
-    /// extrait et publié par alexguirre/GTA-V-Euphoria-Behaviours-Parser (classes Rage.Euphoria de RAGE Plugin Hook).
-    /// Les lois internes de NaturalMotion ne sont pas publiques : Brutality interprète la description de chaque
-    /// paramètre (voir docs/EUPHORIA.md). Quelques valeurs propres à Brutality sont regroupées dans <see cref="NmTune"/>.
+    /// Parameters of NaturalMotion Euphoria behaviors, with their official names and default values.
+    /// Source: GTA V behaviours.xml (NaturalMotion data shipped with the game, common.rpf/data/naturalmotion),
+    /// extracted and published by alexguirre/GTA-V-Euphoria-Behaviours-Parser (Rage.Euphoria classes from RAGE Plugin Hook).
+    /// NaturalMotion's internal laws are not public: Brutality interprets the description of each parameter
+    /// (see docs/EUPHORIA.md). A few Brutality-specific values are grouped in <see cref="NmTune"/>.
     ///
-    /// Unités des effecteurs : « stiffness » = pulsation propre ω (rad/s, plage 6..16), « damping » = rapport
-    /// d'amortissement ζ (1 = critique, d'après configureSoftLimit), « muscleStiffness » = 1,01 − looseness
-    /// (d'après shotFallToKnees.ftkImpactLooseness).
+    /// Effector units: "stiffness" = natural angular frequency ω (rad/s, range 6..16), "damping" = damping
+    /// ratio ζ (1 = critical, per configureSoftLimit), "muscleStiffness" = 1.01 − looseness
+    /// (per shotFallToKnees.ftkImpactLooseness).
     /// </summary>
     internal static class NmShot
     {
@@ -29,7 +29,7 @@ namespace Brutality.Euphoria
         public const bool DoCounterImpulse = false;
         public const float CounterImpulseDelay = 0.03333f, CounterImpulseMag = 0.5f, CounterImpulse2Hips = 1f;
         public const float RbMoment = 1f, RbMaxTwistMomentArm = 0.5f, RbMaxBroomMomentArm = 1f;
-        /// <summary>Couple de fouetté de la tête sur un tir à la tête (rad/s pour une munition de référence).</summary>
+        /// <summary>Head whip torque on a headshot (rad/s for a reference round).</summary>
         public const float HeadWhip = 14f;
     }
 
@@ -130,7 +130,7 @@ namespace Brutality.Euphoria
 
     internal static class NmCharacterDamping
     {
-        // setCharacterDamping : seuils par défaut, amortissements « try 0.45 / try 0.8 » de la documentation.
+        // setCharacterDamping: default thresholds, "try 0.45 / try 0.8" damping values from the documentation.
         public const float SomersaultThresh = 34f, SomersaultDamp = 0.45f, CartwheelThresh = 27f, CartwheelDamp = 0.8f;
     }
 
@@ -142,14 +142,14 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// Réglages propres à Brutality : les préréglages de tir de GTA (physicstasks) ne sont pas publics.
+    /// Brutality-specific settings: GTA's shot presets (physicstasks) are not public.
     /// </summary>
     internal static class NmTune
     {
         public const float ExagDuration = 0.22f, ExagSmooth2Zero = 0.3f, CpainDuration = 0.25f;
-        public const float SpineLeanUnit = 1f;      // rad par unité de « Lean magnitude »
-        public const float AmountUnitSpine = 0.1f;  // rad par unité de sfbSpineAmount
+        public const float SpineLeanUnit = 1f;      // rad per unit of "Lean magnitude"
+        public const float AmountUnitSpine = 0.1f;  // rad per unit of sfbSpineAmount
         public const float AmountUnitNeck = 0.25f, AmountUnitHip = 0.22f, KneeAmountUnit = 4f;
-        public const float ImpulseReductionPerShot = 0.25f, ImpulseRecovery = 0.5f;   // défaut NaturalMotion : 0 / 0
+        public const float ImpulseReductionPerShot = 0.25f, ImpulseRecovery = 0.5f;   // NaturalMotion default: 0 / 0
     }
 }

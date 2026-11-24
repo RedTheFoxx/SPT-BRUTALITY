@@ -6,9 +6,9 @@ using HarmonyLib;
 namespace Brutality
 {
     /// <summary>
-    /// Brutality — remplacement biomécanique du système de ragdolls de SPT.
-    /// La mort est simulée à trois niveaux : tissus passifs (masses, inerties, butées exponentielles),
-    /// muscles (couple-angle-vitesse, activation) et système nerveux (extinction du tonus, réflexes, agonie).
+    /// Brutality — biomechanical replacement for SPT's ragdoll system.
+    /// Death is simulated at three levels: passive tissues (masses, inertias, exponential limits),
+    /// muscles (torque-angle-velocity, activation), and nervous system (tone extinction, reflexes, agony).
     /// </summary>
     [BepInPlugin(Guid, Name, Version)]
     [BepInProcess("EscapeFromTarkov.exe")]
@@ -21,7 +21,7 @@ namespace Brutality
     {
         public const string Guid = "com.brutality.ragdoll";
         public const string Name = "Brutality";
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -30,15 +30,15 @@ namespace Brutality
         private void Awake()
         {
             Log = Logger;
-            Log.LogInfo($"{Name} {Version} : initialisation…");
+            Log.LogInfo($"{Name} {Version}: initializing…");
             try
             {
                 Settings.Bind(Config);
             }
             catch (System.Exception e)
             {
-                // Sans configuration, aucun patch n'est installé : le jeu garde ses ragdolls vanilla.
-                Log.LogError($"{Name} : configuration invalide, plugin désactivé. {e}");
+                // Without valid configuration, no patches are installed: the game keeps vanilla ragdolls.
+                Log.LogError($"{Name}: invalid configuration, plugin disabled. {e}");
                 return;
             }
             try
@@ -48,24 +48,24 @@ namespace Brutality
                 _harmony = new Harmony(Guid);
                 BrutalityPatches.Apply(_harmony);
                 Compat.LogStartup();
-                Log.LogInfo($"{Name} {Version} chargé.");
+                Log.LogInfo($"{Name} {Version} loaded.");
             }
             catch (System.Exception e)
             {
-                Log.LogError($"{Name} : échec de l'initialisation. {e}");
+                Log.LogError($"{Name}: initialization failed. {e}");
             }
         }
 
         private void Update()
         {
-            // La sonde est un diagnostic : une exception ne doit jamais interrompre la boucle du jeu, mais
-            // elle est signalée une fois (au lieu d'être avalée silencieusement).
+            // The probe is diagnostic only: an exception must never break the game loop,
+            // but it is reported once instead of being silently swallowed.
             try { Core.PhysxProbe.Tick(); }
             catch (System.Exception e)
             {
                 if (_probeErrorLogged) return;
                 _probeErrorLogged = true;
-                Log?.LogWarning($"{Name} : sonde PhysX interrompue ({e.Message}) ; conventions par défaut appliquées.");
+                Log?.LogWarning($"{Name}: PhysX probe interrupted ({e.Message}); default conventions applied.");
             }
         }
 

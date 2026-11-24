@@ -13,56 +13,55 @@ namespace Brutality.Euphoria
     internal enum NmPlanKind
     {
         Auto, Stagger, FallToKnees, Collapse, Windmill, Relax, RollDownStairs,
-        /// <summary>Effondrement assis : les hanches plient, le bassin descend, puis le buste part en arrière.</summary>
+        /// <summary>Seated collapse: hips flex, pelvis drops, then torso falls backward.</summary>
         SitBack,
-        /// <summary>Effondrement latéral : le corps part sur le côté, dans le plan frontal.</summary>
+        /// <summary>Side collapse: body falls sideways in the frontal plane.</summary>
         SideCrumple,
-        /// <summary>Plongeon : le buste pique en avant, les bras cherchent le sol.</summary>
+        /// <summary>Dive: torso pitches forward, arms reach for the ground.</summary>
         Dive,
-        /// <summary>Chute en planche : corps raide et rachis cambré (posturing), chute à la renverse.</summary>
+        /// <summary>Board fall: stiff body and arched spine (posturing), falling backward.</summary>
         ArchFall,
-        /// <summary>Chute à quatre pattes : genoux puis mains, avant de s'aplatir.</summary>
+        /// <summary>All-fours fall: knees then hands, before flattening out.</summary>
         HandsKnees,
-        /// <summary>Glissade sur les genoux : genoux au sol et élan conservé, puis face contre terre.</summary>
+        /// <summary>Knee slide: knees on the ground with preserved momentum, then face-first.</summary>
         KneeSlide,
-        /// <summary>Pivot : le corps tourne sur lui-même avant que l'équilibre ne cède.</summary>
+        /// <summary>Pivot: body spins on itself before balance gives way.</summary>
         Pivot,
-        /// <summary>Vrille : le tronc se visse, le corps spirale vers le sol.</summary>
+        /// <summary>Spin: torso twists, body spirals toward the ground.</summary>
         TwistDown,
     }
 
-    /// <summary>Plan de la performance, choisi à la mort selon le mécanisme, la posture, la vitesse et la direction du tir.</summary>
+    /// <summary>Performance plan, chosen at death based on mechanism, posture, velocity, and shot direction.</summary>
     internal sealed class NmPlan
     {
         public NmPlanKind Kind;
         public bool Conscious, LegsDead, Reach, Fling, ShotFromBehind, ShotInGuts, WindmillBack = true, Snap, ShockSpin;
-        /// <summary>La victime avait de l'élan au moment de la mort : seule une chute en mouvement peut rouler.</summary>
+        /// <summary>The victim had momentum at the time of death: only a moving fall can roll.</summary>
         public bool Moving;
-        /// <summary>Les bras cherchent le sol pendant la chute (catchFall).</summary>
+        /// <summary>Arms reach for the ground during the fall (catchFall).</summary>
         public bool Catch = true;
-        /// <summary>Chute en planche : le corps reste raide et le rachis cambré (posturing).</summary>
+        /// <summary>Board fall: body stays stiff and spine arched (posturing).</summary>
         public bool StiffFall;
-        /// <summary>Azimut de la bascule dans le repère du bassin : 0 = avant, +π/2 = droite, π = arrière.</summary>
+        /// <summary>Topple azimuth in the pelvis frame: 0 = forward, +π/2 = right, π = backward.</summary>
         public float ToppleAzimuth;
-        /// <summary>Intensité de la bascule (couple de perte d'équilibre).</summary>
+        /// <summary>Topple intensity (loss-of-balance torque).</summary>
         public float ToppleGain = 3f;
-        /// <summary>Retard de la bascule : le corps s'affaisse d'abord, puis bascule.</summary>
+        /// <summary>Topple delay: body slumps first, then topples.</summary>
         public float ToppleDelay;
-        /// <summary>Modulation propre à cette mort (0,8 à 1,25).</summary>
+        /// <summary>Per-death modulation (0.8 to 1.25).</summary>
         public float Signature = 1f;
         public float RelaxTime = 0.08f, RbVel;
         public DlBalanceOptions Balance;
     }
 
     /// <summary>
-    /// Performance Euphoria : orchestre les comportements du portage Delirium dans l'ordre où Delirium les enchaîne
-    /// (<c>bodyBalance</c> → chute <c>catchFall</c> / <c>rollDownStairs</c> → <c>injuredOnGround</c>,
-    /// <c>bodyWrithe</c>, <c>bodyFoetal</c>), applique les impulsions balistiques et les forces correctrices, et
-    /// transmet une fois par pas les effecteurs aux drives PhysX de Brutality.
+    /// Euphoria performance: orchestrates the Delirium port behaviors in the order Delirium chains them
+    /// (<c>bodyBalance</c> → fall <c>catchFall</c> / <c>rollDownStairs</c> → <c>injuredOnGround</c>,
+    /// <c>bodyWrithe</c>, <c>bodyFoetal</c>), applies ballistic impulses and corrective forces, and
+    /// flushes effectors once per step to Brutality's PhysX drives.
     ///
-    /// Elle cohabite avec les programmes Brutality (posturing cérébral, verrouillages, agonie, respiration), qui
-    /// écrivent dans le même tampon de commandes : Delirium fournit le squelette comportemental, Brutality la
-    /// chronologie lésionnelle.
+    /// It coexists with Brutality programs (cerebral posturing, locks, agony, breathing), which write into
+    /// the same command buffer: Delirium provides the behavioral skeleton, Brutality the lesion timeline.
     /// </summary>
     internal sealed class NmPerformance
     {
@@ -75,7 +74,7 @@ namespace Brutality.Euphoria
         public readonly List<NmHit> Wounds = new List<NmHit>(4);
         public readonly StringBuilder Journal = new StringBuilder();
 
-        /// <summary>Corps et effecteurs Delirium (nmdbm::Body / nmrs::Character).</summary>
+        /// <summary>Delirium body and effectors (nmdbm::Body / nmrs::Character).</summary>
         public readonly DlBody Dl;
         public readonly DlCharacter Eff;
 
@@ -107,10 +106,10 @@ namespace Brutality.Euphoria
         private DlFoetal _foetal;
         private float _leak = 1f, _lastBulletT = -1f, _nextGrabProbe;
         private bool _lastStandLogged;
-        // shotSnap et setCharacterDamping
+        // shotSnap and setCharacterDamping
         private float _snapT0 = -1f, _injArmT0 = -1f, _injArmSign, _toppleT0 = -1f, _toppleGain;
         private Vector3 _snapAxis, _toppleAxis;
-        // Retournement au sol : le corps roule sur le flanc ou sur le dos pendant l'agonie.
+        // Ground roll-over: body rolls onto its side or back during agony.
         private float _turnT0 = -1f, _turnDur = 1f, _turnGain;
         private Vector3 _turnAxis;
         private bool _snapDone, _unsnapDone;
@@ -127,7 +126,7 @@ namespace Brutality.Euphoria
             Eff = new DlCharacter(body);
             Impulses = new NmImpulseQueue(body, Ch);
             Plan = ChoosePlan();
-            Log(0f, "plan " + Plan.Kind + " (bascule " + Mathf.RoundToInt(Plan.ToppleAzimuth * Mathf.Rad2Deg) + "°, force "
+            Log(0f, "plan " + Plan.Kind + " (topple " + Mathf.RoundToInt(Plan.ToppleAzimuth * Mathf.Rad2Deg) + "°, force "
                 + Plan.ToppleGain.ToString("0.0") + ")");
             Ch.Sense(0f);
 
@@ -148,7 +147,7 @@ namespace Brutality.Euphoria
                 StartGround(0f);
             }
             else if (Plan.Balance != null) _balance = new DlBalance(this, 0f, Plan.Balance);
-            else StartFall(0f, "pas d'équilibre");
+            else StartFall(0f, "no balance");
         }
 
         public void Log(float t, string s)
@@ -157,7 +156,7 @@ namespace Brutality.Euphoria
             Journal.Append("\n  t=").Append(t.ToString("0.00")).Append("s Euphoria : ").Append(s);
         }
 
-        /// <summary>Force globale (setCharacterHealth) : la vie s'éteint jusqu'à la fin de l'agonie.</summary>
+        /// <summary>Global strength (setCharacterHealth): life fades until the end of agony.</summary>
         public float U(float t)
         {
             if (!Plan.Conscious) return Mathf.Max(0f, 1f - t / Mathf.Max(0.05f, Plan.RelaxTime));
@@ -185,19 +184,19 @@ namespace Brutality.Euphoria
             bool fromBehind = hasDir && Vector3.Dot(d, fwd) > 0.4f;
             plan.Conscious = m != DeathMechanism.Cerebral && m != DeathMechanism.CervicalCord && m != DeathMechanism.Blast && m != DeathMechanism.FallTrauma;
             plan.LegsDead = m == DeathMechanism.CervicalCord || m == DeathMechanism.ThoracicCord || m == DeathMechanism.LumbarCord;
-            // Encéphale détruit : le tonus tombe en quelques dizaines de ms — blackout puis chute instantanée.
+            // Brain destroyed: tone drops in a few tens of ms — blackout then instant collapse.
             plan.RelaxTime = m == DeathMechanism.Cerebral ? BMath.Range(rng, 0.02f, 0.06f) : 0.08f;
             plan.Reach = plan.Conscious && c.BodyPart != EBodyPart.Head && BMath.Chance(rng, 0.85f);
             plan.Fling = plan.Conscious && BMath.Chance(rng, 0.55f + 0.2f * Mathf.Min(1f, c.KickScale - 1f));
-            // La réaction « tir dans le dos » est physique, pas un tirage : elle décide du repli du rachis, du pas
-            // bloqué et des genoux qui cèdent, qui doivent être les mêmes à chaque balle dans le dos.
+            // The "shot from behind" reaction is physical, not a roll: it governs spine curl, blocked step,
+            // and buckling knees, which must be consistent on every back shot.
             plan.ShotFromBehind = plan.Conscious && fromBehind && torso;
             plan.Moving = speed > 0.8f;
             plan.ShotInGuts = m == DeathMechanism.Abdominal;
             int legHit = LegHit(c.ColliderType);
 
-            // Azimut de la poussée du projectile dans le plan horizontal : un corps qui perd son tonus tombe dans
-            // l'axe du tir. C'est la direction de chute de référence, que chaque plan incline ou contredit.
+            // Azimuth of the projectile push in the horizontal plane: a body losing tone falls along the
+            // shot axis. This is the reference fall direction, which each plan tilts or overrides.
             float pushAz = hasDir ? Mathf.Atan2(Vector3.Dot(d, NmCharacter.Flat(th.R)), Vector3.Dot(d, fwd)) : 0f;
             float jitter = BMath.Range(rng, -0.55f, 0.55f);
             int side = BMath.Chance(rng, 0.5f) ? -1 : 1;
@@ -212,16 +211,16 @@ namespace Brutality.Euphoria
                 else if (speed > 1.8f) kind = NmPlanKind.Collapse;
                 else
                 {
-                    // La roulade n'était accessible qu'en course : sur une mort debout, le corps a encore l'élan du tir
-                    // et peut rouler. Delirium ne décide pas du message (c'est la tâche « shot » qui le choisit) : c'est
-                    // donc bien un réglage de plan, pas une loi.
+                    // Rolling was previously only reachable while running: on a standing death, the body still has shot
+                    // momentum and can roll. Delirium does not decide the message (the "shot" task chooses it): so this
+                    // is indeed a plan setting, not a physical law.
                     float v = Settings.GestureVariety.Value;
-                    // Plans de base.
+                    // Base plans.
                     float wS = 2.4f, wF = 1.7f, wC = 1.1f, wW = 0.75f * v, wR = 0.65f * v;
-                    // Plans ajoutés : la chute couvre les trois plans anatomiques et les positions intermédiaires.
-                    // L'effondrement assis reste rare : le bassin lâche sur un tir au ventre, il ne s'assoit pas à chaque mort.
+                    // Added plans: falls cover all three anatomical planes and intermediate positions.
+                    // Seated collapse stays rare: the pelvis gives way on a gut shot, it shouldn't sit down every death.
                     float wSit = 0.55f, wSide = 1.5f, wDive = 1.1f;
-                    // La planche est une chute de posturing : hors encéphale détruit, elle doit rester exceptionnelle.
+                    // Board fall is a posturing fall: outside destroyed brain, it must remain exceptional.
                     float wArch = (m == DeathMechanism.Cerebral ? 1.5f : 0.35f) * Mathf.Clamp(Settings.PosturingIntensity.Value, 0.4f, 2f);
                     float wKnees = 1.2f, wSlide = 0.85f * v, wPivot = 1f, wTwist = 1f;
                     if (m == DeathMechanism.Abdominal) { wF *= 1.5f; wSit *= 1.8f; }
@@ -230,12 +229,12 @@ namespace Brutality.Euphoria
                     if (legHit != 0) { wC *= 2f; wS *= 0.7f; wR *= 0.4f; wSide *= 1.8f; wSit *= 0.7f; }
                     if (hasDir && Vector3.Dot(d, fwd) < -0.4f) { wW *= 2f; wR *= 1.4f; wArch *= 1.6f; }
                     if (hasDir && Vector3.Dot(d, fwd) > 0.4f) { wDive *= 1.5f; wKnees *= 1.4f; wSlide *= 1.3f; }
-                    // Un projectile lourd fait basculer et rouler plus volontiers (poussée « corps rigide »).
+                    // Heavy projectiles topple and roll more readily ("rigid body" push).
                     if (c.KickScale > 1.2f) { wR *= 1.5f; wDive *= 1.2f; wPivot *= 1.2f; }
-                    // Le corps en mouvement piville plus volontiers qu'il ne s'effondre sur place.
+                    // A moving body pivots more readily than collapsing in place.
                     if (plan.Moving) { wPivot *= 1.6f; wTwist *= 1.5f; wSlide *= 1.3f; }
-                    // Une balle dans le dos ne fait pas faire une roulade à un corps debout : la chute est une bascule
-                    // sur les genoux, pas un somersault. La roulade reste possible si la cible courait déjà.
+                    // A shot in the back does not make a standing body roll: the fall is a topple
+                    // onto the knees, not a somersault. Rolling remains possible if the target was already running.
                     if (plan.ShotFromBehind && !plan.Moving) wR = 0f;
 
                     var kinds = new[]
@@ -248,8 +247,8 @@ namespace Brutality.Euphoria
                     float sum = 0f;
                     for (int i = 0; i < weights.Length; i++)
                     {
-                        // Mémoire des morts : un plan déjà vu récemment pèse beaucoup moins, et une chute dans la même
-                        // direction que la mort précédente encore moins (sinon tous les corps basculent du même côté).
+                        // Death memory: a recently seen plan weighs much less, and a fall in the same
+                        // direction as the previous death even less (otherwise all bodies topple the same way).
                         weights[i] = Mathf.Max(0f, weights[i] * VarietyDirector.PlanMultiplier((int)kinds[i])
                             * VarietyDirector.SectorMultiplier(BaseAzimuth(kinds[i], pushAz, side)));
                         sum += weights[i];
@@ -275,7 +274,7 @@ namespace Brutality.Euphoria
                     plan.Balance.GiveWay = 1f;
                     if (plan.Balance.BuckleMode == 0)
                     {
-                        plan.Balance.BuckleMode = 3; // dérobement asymétrique des deux jambes sur balle dans le dos
+                        plan.Balance.BuckleMode = 3; // asymmetric buckling of both legs on a shot from behind
                         plan.Balance.BuckleLeg = side;
                         plan.Balance.BuckleDelay = 0.05f;
                         plan.Balance.BuckleStaggerDelay = BMath.Range(rng, 0.08f, 0.16f);
@@ -283,12 +282,12 @@ namespace Brutality.Euphoria
                 }
                 else if (legHit != 0 && plan.Balance.BuckleMode == 0)
                 {
-                    // Balle dans une jambe : dérobement franc de la jambe touchée (1 jambe qui cède).
+                    // Leg shot: clean buckling of the hit leg (1 leg gives way).
                     plan.Balance.BuckleMode = 1;
                     plan.Balance.BuckleLeg = legHit;
                     plan.Balance.BuckleDelay = 0.06f;
                 }
-                // Delirium leanInDirection : l'inclinaison du balancier oriente les pas de titubation dans l'axe du plan.
+                // Delirium leanInDirection: balancer lean steers stagger steps along the plan axis.
                 if (plan.Balance.LeanAmount <= 0f && !plan.Balance.Sit)
                 {
                     plan.Balance.LeanDir = ToppleDir(plan.ToppleAzimuth);
@@ -304,7 +303,7 @@ namespace Brutality.Euphoria
             plan.RbVel = kindScale * Mathf.Clamp(0.25f + 0.12f * Mathf.Max(1f, c.ImpactMomentum), 0.3f, 1.4f) * c.KickScale * Settings.FallDrive.Value;
             if (kind == NmPlanKind.Windmill) plan.RbVel = Mathf.Max(plan.RbVel, 0.9f * Settings.FallDrive.Value);
             string kc = c.KickClass ?? string.Empty;
-            bool heavy = kc.Contains("chevrotine") || kc.Contains("slug") || kc.Contains("gros");
+            bool heavy = kc.Contains("buckshot") || kc.Contains("slug") || kc.Contains("heavy");
             plan.Snap = c.KickScale > 1.35f || heavy;
             plan.ShockSpin = heavy && torso;
             VarietyDirector.RecordPlan((int)kind, plan.ToppleAzimuth);
@@ -312,8 +311,8 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// Azimut de chute nominal d'un plan (sans le tirage propre à ConfigurePlan), dans le repère du corps :
-        /// 0 = avant, ±π/2 = côté, π = arrière. Sert à écarter les plans qui rejouent la direction de la mort précédente.
+        /// Nominal fall azimuth of a plan (without ConfigurePlan's random jitter), in the body frame:
+        /// 0 = forward, ±π/2 = side, π = backward. Used to avoid plans that replay the previous death's direction.
         /// </summary>
         private static float BaseAzimuth(NmPlanKind kind, float pushAz, int side)
         {
@@ -338,9 +337,9 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// Réglages propres à chaque plan : options du balancier, direction et force de la bascule, recherche du sol
-        /// par les bras, raideur de planche. C'est ici que la chute est orientée dans le plan frontal, sagittal ou
-        /// transverse, au lieu d'être toujours la même bascule en avant.
+        /// Per-plan configuration: balancer options, topple direction and strength, arm ground-reach,
+        /// board stiffness. This is where the fall is oriented in the frontal, sagittal, or transverse
+        /// plane, instead of always being the same forward topple.
         /// </summary>
         private void ConfigurePlan(NmPlan plan, NmPlanKind kind, float pushAz, float jitter, int legHit, int side, System.Random rng, bool duck)
         {
@@ -351,7 +350,7 @@ namespace Brutality.Euphoria
             switch (kind)
             {
                 case NmPlanKind.Relax:
-                    // Corps déjà mort : il s'affaisse dans l'axe de la poussée, puis bascule doucement.
+                    // Already dead body: slumps along the push axis, then topples gently.
                     plan.ToppleAzimuth = pushAz + R(-0.7f, 0.7f);
                     plan.ToppleGain = R(1.4f, 3.2f);
                     plan.ToppleDelay = plan.RelaxTime + R(0.02f, 0.12f);
@@ -384,7 +383,7 @@ namespace Brutality.Euphoria
                     break;
 
                 case NmPlanKind.KneeSlide:
-                    // Genoux au sol, élan conservé : le corps glisse puis pique du nez.
+                    // Knees on ground, momentum preserved: body slides then pitches face-first.
                     plan.Balance = new DlBalanceOptions
                     {
                         FallToKnees = true, MaxSteps = 3, MaxTime = R(1.5f, 2.4f), KneelHold = R(0.12f, 0.4f),
@@ -409,7 +408,7 @@ namespace Brutality.Euphoria
                     plan.Balance = new DlBalanceOptions
                     {
                         MaxSteps = rng.Next(1, 3), MaxTime = R(0.6f, 1.4f),
-                        BuckleMode = rng.Next(1, 4), // 1 jambe, 2 jambes ensemble ou 2 jambes en décalé
+                        BuckleMode = rng.Next(1, 4), // 1 leg, 2 legs together, or 2 legs staggered
                         BuckleLeg = legHit != 0 ? legHit : side,
                         BuckleDelay = R(0.05f, 0.18f),
                         BuckleStaggerDelay = R(0.10f, 0.22f),
@@ -425,14 +424,14 @@ namespace Brutality.Euphoria
                     break;
 
                 case NmPlanKind.RollDownStairs:
-                    // Un court instant d'équilibre : le corps s'incline sous le choc, puis la roulade prend le relais.
+                    // Brief moment of balance: body leans under the impact, then rolling takes over.
                     plan.Balance = new DlBalanceOptions { MaxSteps = 1, MaxTime = R(0.12f, 0.35f) };
                     plan.ToppleAzimuth = R(-0.3f, 0.3f);
                     plan.ToppleGain = R(3.8f, 5f);
                     break;
 
                 case NmPlanKind.SitBack:
-                    // Le bassin lâche : le corps s'assoit, puis bascule sur le dos.
+                    // Pelvis gives way: body sits down, then topples onto its back.
                     plan.Balance = new DlBalanceOptions { Sit = true, MaxSteps = 1, MaxTime = R(0.4f, 0.85f), BuckleMode = 2, BuckleDelay = 0.06f };
                     plan.ToppleAzimuth = Mathf.PI + R(-0.5f, 0.5f);
                     plan.ToppleGain = R(2f, 3.4f);
@@ -444,7 +443,7 @@ namespace Brutality.Euphoria
                         MaxSteps = rng.Next(1, 3), MaxTime = R(0.55f, 1.1f), Sink0 = 0.1f,
                         LeanSide = legHit != 0 ? legHit : side,
                         InjuredLeg = legHit != 0 ? legHit : side,
-                        BuckleMode = 1, // une jambe cède du côté de la bascule
+                        BuckleMode = 1, // one leg gives way on the topple side
                         BuckleLeg = legHit != 0 ? legHit : side,
                         BuckleDelay = R(0.04f, 0.14f),
                     };
@@ -454,18 +453,18 @@ namespace Brutality.Euphoria
                     break;
 
                 case NmPlanKind.Dive:
-                    // Pas de phase d'équilibre : le buste pique en avant et les bras cherchent le sol.
+                    // No balance phase: torso pitches forward and arms reach for the ground.
                     plan.ToppleAzimuth = R(-0.28f, 0.28f);
                     plan.ToppleGain = R(6f, 8f);
                     break;
 
                 case NmPlanKind.ArchFall:
-                    // Chute en planche : le rachis se cambre et le corps tombe à la renverse, raide.
+                    // Board fall: spine arches and body falls backward, stiff.
                     plan.ToppleAzimuth = Mathf.PI + R(-0.3f, 0.3f);
                     plan.ToppleGain = R(2.8f, 4f);
                     plan.StiffFall = true;
                     plan.Catch = false;
-                    plan.WindmillBack = false; // une planche ne bat pas des bras
+                    plan.WindmillBack = false; // a stiff board does not windmill its arms
                     break;
 
                 case NmPlanKind.Pivot:
@@ -490,7 +489,7 @@ namespace Brutality.Euphoria
             }
 
             if (duck && plan.Balance != null && plan.Balance.Sink0 < 0.25f) plan.Balance.Sink0 = 0.2f;
-            // La bascule suit le réglage « Force des chutes dirigées » et la signature propre à cette mort.
+            // Topple follows the "Directed fall drive" setting and this death's unique signature.
             plan.ToppleGain = Mathf.Max(0f, plan.ToppleGain * Settings.FallDrive.Value * plan.Signature);
         }
 
@@ -498,20 +497,20 @@ namespace Brutality.Euphoria
         {
             switch (v)
             {
-                case "Titube": return NmPlanKind.Stagger;
-                case "Chute à genoux": return NmPlanKind.FallToKnees;
-                case "Équilibre puis effondrement": return NmPlanKind.Collapse;
-                case "Moulinets": return NmPlanKind.Windmill;
-                case "Effondrement inerte": return NmPlanKind.Relax;
-                case "Roulade": return NmPlanKind.RollDownStairs;
-                case "Effondrement assis": return NmPlanKind.SitBack;
-                case "Effondrement latéral": return NmPlanKind.SideCrumple;
-                case "Plongeon": return NmPlanKind.Dive;
-                case "Chute en planche": return NmPlanKind.ArchFall;
-                case "À quatre pattes": return NmPlanKind.HandsKnees;
-                case "Glissade sur les genoux": return NmPlanKind.KneeSlide;
+                case "Stagger": return NmPlanKind.Stagger;
+                case "Fall to knees": return NmPlanKind.FallToKnees;
+                case "Balance then collapse": return NmPlanKind.Collapse;
+                case "Windmill": return NmPlanKind.Windmill;
+                case "Slack collapse": return NmPlanKind.Relax;
+                case "Roll": return NmPlanKind.RollDownStairs;
+                case "Seated collapse": return NmPlanKind.SitBack;
+                case "Side collapse": return NmPlanKind.SideCrumple;
+                case "Dive": return NmPlanKind.Dive;
+                case "Board fall": return NmPlanKind.ArchFall;
+                case "All fours": return NmPlanKind.HandsKnees;
+                case "Knee slide": return NmPlanKind.KneeSlide;
                 case "Pivot": return NmPlanKind.Pivot;
-                case "Vrille": return NmPlanKind.TwistDown;
+                case "Spin": return NmPlanKind.TwistDown;
                 default: return NmPlanKind.Auto;
             }
         }
@@ -526,12 +525,12 @@ namespace Brutality.Euphoria
             return 0;
         }
 
-        // ------------------------------------------------------------------ balles
+        // ------------------------------------------------------------------ bullets
 
         /// <summary>
-        /// Nouveau projectile : impulsion balistique étalée, part « corps rigide », réaction shot Delirium (relâchement,
-        /// réaction, main sur la plaie, bras projeté, jambe qui se dérobe, vrille), et sous une rafale le dernier
-        /// carré (stayUpright lastStandMode).
+        /// New projectile: spread ballistic impulse, "rigid body" share, Delirium shot reaction (looseness,
+        /// react, reach for wound, fling arm, collapse leg, shock spin), and under burst fire the last
+        /// stand (stayUpright lastStandMode).
         /// </summary>
         public void OnBullet(float t, NmHit hit)
         {
@@ -547,9 +546,9 @@ namespace Brutality.Euphoria
             rbDir = BMath.SafeNormalize(rbDir, Ch.Fwd);
             Vector3 rb = rbDir * (Body.TotalMass * Plan.RbVel * leak * (Wounds.Count == 1 ? 1f : 0.6f) * (falling ? 0.5f : 1f));
             Impulses.Queue(t, hit.Part, hit.World, hit.Dir * hit.P, rb);
-            // Tir à la tête : le projectile imprime à la tête un couple autour du cou, pas seulement une translation.
-            // Sans ce couple, le tronc part avant la tête et la nuque relâchée la laisse en arrière (extension), comme
-            // si la balle venait de face. Le couple se referme sur le thorax : aucun moment angulaire n'est ajouté.
+            // Headshot: the projectile imparts a torque to the head around the neck, not just translation.
+            // Without this torque, the trunk moves before the head and the relaxed neck leaves it behind (extension),
+            // as if the bullet came from the front. The torque closes on the thorax: no net angular momentum is added.
             if (hit.Part.Id == Seg.Head)
             {
                 Vector3 ax = Vector3.Cross(hit.Part.U, hit.Dir);
@@ -580,7 +579,7 @@ namespace Brutality.Euphoria
                 _balance.Sink = Mathf.Min(0.3f, _balance.Sink + 0.024f);
                 if (!_lastStandLogged) { _lastStandLogged = true; Log(t, "stayUpright (lastStandMode)"); }
             }
-            // upperBodyFlinch (Delirium nmfl) : réflexe protecteur devant le visage/poitrine sur tir frontal ou rafale.
+            // upperBodyFlinch (Delirium nmfl): protective reflex in front of face/chest on frontal shot or burst.
             bool frontal = Vector3.Dot(hit.Dir, Ch.Fwd) < -0.25f;
             if (_flinch == null && Plan.Conscious && !Plan.StiffFall && Phase != NmPhase.Ground && frontal
                 && (Wounds.Count > 1 || BMath.Chance(Rng, 0.25f * Mathf.Clamp01(Settings.GestureVariety.Value))))
@@ -590,9 +589,9 @@ namespace Brutality.Euphoria
             }
         }
 
-        public void OnKneesImpact(float t) => Log(t, "genoux au sol");
+        public void OnKneesImpact(float t) => Log(t, "knees on ground");
 
-        /// <summary>Force de soutien supplémentaire quand les genoux portent le poids (shotFallToKnees).</summary>
+        /// <summary>Additional support force when the knees bear the weight (shotFallToKnees).</summary>
         public void OnKneeSupport(float t, float dt, float s)
         {
             if (s <= 0.01f) return;
@@ -616,21 +615,21 @@ namespace Brutality.Euphoria
             if (Phase != NmPhase.Balance) return;
             Phase = NmPhase.Fall;
             FallT = t;
-            Log(t, "chute (" + why + ")");
+            Log(t, "fall (" + why + ")");
             _balance?.Fail(t, why);
-            // Delirium enchaîne bodyBalance → chute : le sous-comportement fall du shot commence ici.
+            // Delirium chains bodyBalance → fall: the shot fall sub-behavior starts here.
             _shot.Fallen = true;
 
-            // Chaque plan tombe dans son plan anatomique : avant, arrière, côté ou diagonale. La bascule est un couple
-            // de corps entier borné, appliqué sur 0,45 s. C'est elle qui décide de la direction de la chute, au lieu
-            // d'une bascule en avant identique à chaque mort.
+            // Each plan falls in its anatomical plane: forward, backward, side, or diagonal. The topple is a bounded
+            // whole-body torque applied over 0.45 s. It decides the fall direction, instead of an identical
+            // forward topple on every death.
             Vector3 dir = ToppleDir(Plan.ToppleAzimuth);
             StartTopple(t + Plan.ToppleDelay, dir, Plan.ToppleGain);
 
             Vector3 vH = NmCharacter.Flat(Ch.Vel);
             bool back = Vector3.Dot(dir, BMath.SafeNormalize(NmCharacter.Flat(Ch.Fwd), Vector3.forward)) < -0.35f;
-            // Une chute debout qui bascule ne devient pas une roulade : il faut de l'élan au moment de la mort.
-            // Une chute debout qui bascule ne devient pas une roulade : il faut de l'élan (et un plongeon reste un catchFall).
+            // A standing fall that topples does not become a roll: momentum at death is required.
+            // A standing fall that topples does not become a roll: momentum is required (and a dive stays a catchFall).
             if (Plan.Kind == NmPlanKind.RollDownStairs || (Plan.Kind != NmPlanKind.Dive && Plan.Moving && vH.magnitude > 1.6f))
             {
                 Vector3 rollDir = vH.sqrMagnitude > 0.04f ? vH.normalized : dir;
@@ -639,9 +638,9 @@ namespace Brutality.Euphoria
             else
             {
                 if (back && Plan.WindmillBack && Plan.Conscious) StartWindmill(t);
-                // Sonde immédiatement le décor autour (mur, caisse, rebord) pour s'y agripper avant de tomber.
+                // Immediately probes surrounding scenery (wall, crate, ledge) to grab before falling.
                 if (Plan.Conscious && !Plan.StiffFall) TryStartGrab(t, dir);
-                // Un corps conscient se rattrape ; un corps déjà mort tombe mou (catchFall n'écrit alors qu'à U≈0).
+                // A conscious body catches itself; an already-dead body falls limp (catchFall only writes at U≈0).
                 if (Plan.Conscious && !Plan.LegsDead && Plan.Catch) _catchFall = new DlCatchFall(this, t);
             }
         }
@@ -655,11 +654,11 @@ namespace Brutality.Euphoria
                 _grab = new DlGrab(this, t, target,
                     DlCfg.GrabStrength * BMath.Range(Rng, 0.8f, 1.25f),
                     BMath.Range(Rng, 0.9f, DlCfg.GrabHoldMaxTime));
-                Log(t, $"grab détecté ({(target.IsLedge ? "rebord" : "mur/obstacle")})");
+                Log(t, $"grab detected ({(target.IsLedge ? "ledge" : "wall/obstacle")})");
             }
         }
 
-        /// <summary>Direction de bascule dans le plan horizontal : azimut 0 = avant, +π/2 = droite, π = arrière.</summary>
+        /// <summary>Topple direction in the horizontal plane: azimuth 0 = forward, +π/2 = right, π = backward.</summary>
         private Vector3 ToppleDir(float azimuth)
         {
             Vector3 f = NmCharacter.Flat(Ch.Fwd), r = NmCharacter.Flat(Ch.Right);
@@ -668,7 +667,7 @@ namespace Brutality.Euphoria
             return BMath.SafeNormalize(f * Mathf.Cos(azimuth) + r * Mathf.Sin(azimuth), f);
         }
 
-        /// <summary>Arme la bascule de perte d'équilibre autour de l'axe perpendiculaire à la direction choisie.</summary>
+        /// <summary>Arms the loss-of-balance topple around the axis perpendicular to the chosen direction.</summary>
         private void StartTopple(float t, Vector3 dir, float gain)
         {
             Vector3 h = NmCharacter.Flat(dir);
@@ -683,12 +682,12 @@ namespace Brutality.Euphoria
             if (Phase == NmPhase.Ground) return;
             Phase = NmPhase.Ground;
             GroundT = t;
-            Log(t, "au sol");
+            Log(t, "on ground");
             _catchFall?.Stop(t);
             _windmill?.Stop(t);
             _balance?.Stop(t);
             _pedal?.Stop(t);
-            // Roulade : Delirium garde rollDownStairs tant que le corps tourne, au lieu de l'arrêter à l'impact.
+            // Roll: Delirium keeps rollDownStairs active as long as the body is spinning, instead of stopping at impact.
             if (_rds == null && Plan.Conscious)
             {
                 Vector3 vH = NmCharacter.Flat(Ch.Vel);
@@ -696,7 +695,7 @@ namespace Brutality.Euphoria
                 if (tumble)
                 {
                     _rds = new DlRollDownStairs(this, t, vH.sqrMagnitude > 0.01f ? vH.normalized : Ch.Fwd, 2.4f);
-                    Log(t, "roulade au sol (élan)");
+                    Log(t, "ground roll (momentum)");
                 }
             }
             var m = Ctx.Mechanism;
@@ -712,8 +711,8 @@ namespace Brutality.Euphoria
             _toppleT0 = -1f;
             _neural.OnNmGround(t);
 
-            // Signature de sol : le corps peut rouler sur le flanc ou se retourner pendant l'agonie, au lieu de
-            // rester dans l'orientation qu'il avait en touchant le sol.
+            // Ground signature: body can roll onto its side or turn over during agony, instead of
+            // remaining in the orientation it had when touching the ground.
             if (Plan.Conscious && BMath.Chance(Rng, 0.3f + 0.25f * Mathf.Clamp01(Settings.GestureVariety.Value)))
             {
                 _turnT0 = t + BMath.Range(Rng, 0.25f, 1.6f);
@@ -729,24 +728,24 @@ namespace Brutality.Euphoria
             Ch.Sense(t);
             float w = U(t);
 
-            // Ordre exact d'exécution de Delirium (nm.rs:1449-1824) :
-            //   1. DynamicBalanceManager + BodyBalance (jambes + balancier haut du corps)
-            //   2. Shot (relâchement, douleur du rachis, main sur la plaie, bras projeté, jambe qui se dérobe)
-            //      → s'exécute APRÈS Balance afin que Balance n'écrase jamais les effecteurs de Shot !
-            //   3. UpperBodyFlinch / comportements de chute (catchFall, rollDownStairs+rollUp, armsWindmill, pedalLegs)
-            //   4. Grab (prise sur le décor, prioritaire sur les bras qu'il verrouille via Ch.Busy)
-            //   5. Comportements au sol (injuredOnGround, bodyWrithe, bodyFoetal, rollDownStairs résiduel)
+            // Exact Delirium execution order (nm.rs:1449-1824):
+            //   1. DynamicBalanceManager + BodyBalance (legs + upper-body balancer)
+            //   2. Shot (looseness, spine pain, reach for wound, fling arm, collapse leg)
+            //      → runs AFTER Balance so Balance never overwrites Shot effectors!
+            //   3. UpperBodyFlinch / fall behaviors (catchFall, rollDownStairs+rollUp, armsWindmill, pedalLegs)
+            //   4. Grab (scenery grip, takes priority over arms it locks via Ch.Busy)
+            //   5. Ground behaviors (injuredOnGround, bodyWrithe, bodyFoetal, residual rollDownStairs)
             if (Phase == NmPhase.Balance)
             {
                 if (_balance == null || !_balance.Active || _balance.Failed)
-                    StartFall(t, _balance != null ? (_balance.Why.Length > 0 ? _balance.Why : "fin") : "relâchement");
+                    StartFall(t, _balance != null ? (_balance.Why.Length > 0 ? _balance.Why : "end") : "relaxation");
                 else
                 {
                     _balance.Tick(ns, t, dt);
-                    if (_balance.Failed) StartFall(t, _balance.Why.Length > 0 ? _balance.Why : "déséquilibre");
+                    if (_balance.Failed) StartFall(t, _balance.Why.Length > 0 ? _balance.Why : "imbalance");
                 }
                 if (Phase == NmPhase.Balance && Plan.Kind == NmPlanKind.Windmill && t > 0.08f) StartWindmill(t);
-                // Sonde le décor pendant la titubation/dérobement ou dès que le buste penche pour s'agripper à un mur ou une caisse proche.
+                // Probe scenery during stagger/buckling or as soon as torso leans to grab a nearby wall or crate.
                 if (Phase == NmPhase.Balance && t >= _nextGrabProbe && (_balance != null && (_balance.Steps > 0 || _balance.LegBuckle[0] > 0.2f || _balance.LegBuckle[1] > 0.2f || Ch.Vel.magnitude > 0.7f || Ch.Hip2HeadUp < 0.96f)))
                 {
                     _nextGrabProbe = t + 0.14f;
@@ -759,7 +758,7 @@ namespace Brutality.Euphoria
             if (_flinch != null && _flinch.Active && Phase != NmPhase.Ground)
                 _flinch.Tick(t, dt, w);
 
-            // armsWindmill peut démarrer dès Balance (plan Moulinets) et continue pendant Fall.
+            // armsWindmill can start during Balance (Windmill plan) and continues during Fall.
             if (Phase == NmPhase.Balance && _windmill != null && _windmill.Active)
                 _windmill.Tick(t, dt, Mathf.Max(w, 0.2f));
 
@@ -784,7 +783,7 @@ namespace Brutality.Euphoria
                 if (((Ch.Lying || low) && slow) || t - FallT > (_rds != null ? 3.5f : 2.6f)) StartGround(t);
             }
 
-            // Grab tourne après catchFall / shot (comme nm.rs:1816-1820) et peut glisser brièvement jusqu'au sol.
+            // Grab runs after catchFall / shot (like nm.rs:1816-1820) and can slide briefly onto the ground.
             if (_grab != null && _grab.Active)
             {
                 if (Phase == NmPhase.Ground && t - GroundT > 0.65f) _grab.Stop(t);
@@ -799,14 +798,14 @@ namespace Brutality.Euphoria
                 _iog?.Tick(t, ig, w);
                 _writhe?.Tick(t, dt, ig * 0.7f, _iog != null ? 0.4f : 1f);
                 _foetal?.Tick(t, ig * 0.45f, w);
-                // La roulade passe en dernier : tant qu'elle tourne, elle porte la posture du corps entier.
+                // Roll runs last: as long as it spins, it drives the whole-body posture.
                 if (_rds != null && _rds.Active) _rds.Tick(t, dt, w);
             }
 
-            // Chute en planche (posturing) : le corps reste raide et le rachis cambré, il tombe comme une planche.
+            // Board fall (posturing): body stays stiff and spine arched, falling like a plank.
             if (Plan.StiffFall && Phase == NmPhase.Fall)
             {
-                // Raideur de planche, fondue sur la fin de la chute pour que le corps ne redevienne pas mou d'un coup.
+                // Board stiffness, faded out at the end of the fall so the body doesn't go limp all at once.
                 float k = Mathf.Clamp01((1.5f - (t - FallT)) / 0.5f);
                 if (k > 0.01f)
                 {
@@ -814,14 +813,14 @@ namespace Brutality.Euphoria
                     for (int j = 0; j < DlCharacter.NJ; j++) Eff.SetMuscleStiffness(j, Mathf.Lerp(0.6f, 0.95f, k));
                     Eff.BlendDesired((int)JointId.Lumbar, 0, -0.22f, 0.85f * k);
                     Eff.BlendDesired((int)JointId.Neck, 0, -0.3f, 0.85f * k);
-                    // Pronation tonique (décérébration) des avant-bras pendant la chute en planche.
+                    // Tonic pronation (decerebration) of forearms during the board fall.
                     Eff.BlendDesired((int)JointId.LElbow, 2, 1.0f * Motor.InternalRotSign(-1), 0.85f * k);
                     Eff.BlendDesired((int)JointId.RElbow, 2, 1.0f * Motor.InternalRotSign(1), 0.85f * k);
                     Eff.SetOpposeGravity((int)JointId.Lumbar, 0f);
                 }
             }
 
-            // Les effecteurs Delirium sont la seule source de commande des comportements Euphoria : une fois par pas.
+            // Delirium effectors are the sole command source for Euphoria behaviors: once per step.
             Eff.Flush(ns, Body, w);
         }
 
@@ -831,7 +830,7 @@ namespace Brutality.Euphoria
         {
             float w = U(t);
             _balance?.Forces(t, dt);
-            // oppose_gravity : les effecteurs Delirium compensent une part du couple de gravité.
+            // oppose_gravity: Delirium effectors compensate part of the gravity torque.
             DlPhys.OpposeGravity(Eff, Body, w);
             if (_rds != null && _rds.Active) _rds.Forces(t, dt, w);
             if (_grab != null && _grab.Active) _grab.Forces(t, dt, w);
@@ -842,15 +841,15 @@ namespace Brutality.Euphoria
                 if (x > 0.45f || Phase == NmPhase.Ground) _toppleT0 = -1f;
                 else if (x >= 0f && _toppleAxis.sqrMagnitude > 1e-6f)
                 {
-                    // Un corps déjà mort n'a plus de tonus, mais il tombe encore : la bascule ne s'éteint pas avec w.
+                    // An already-dead body has no tone left, but it still falls: the topple does not fade with w.
                     float wt = Plan.Conscious ? w : 0.6f;
                     NmPhysics.BodyAngularAccel(Body, _toppleAxis * (_toppleGain * Mathf.Sin(Mathf.PI * x / 0.45f) * wt));
                 }
             }
             if (_turnT0 >= 0f)
             {
-                // Retournement au sol : rotation du corps entier autour de son axe long (rouler sur le flanc) ou de
-                // la verticale (se retourner), sans écrire de pose : l'agonie continue par-dessus.
+                // Ground roll-over: whole-body rotation around its long axis (rolling onto side) or
+                // vertical (turning over), without writing a pose: agony continues underneath.
                 float x = t - _turnT0;
                 if (x > _turnDur) _turnT0 = -1f;
                 else if (x >= 0f)

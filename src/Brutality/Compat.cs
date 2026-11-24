@@ -4,7 +4,7 @@ using BepInEx.Configuration;
 
 namespace Brutality
 {
-    /// <summary>Détection des mods qui touchent aussi aux cadavres et conseils de configuration (journal BepInEx).</summary>
+    /// <summary>Detects other mods that also touch corpses and logs configuration advice (BepInEx log).</summary>
     internal static class Compat
     {
         public const string SmoothieGuid = "com.tominocz.smoothie";
@@ -20,16 +20,16 @@ namespace Brutality
         public static void LogStartup()
         {
             if (Has(SmoothieGuid))
-                Plugin.Log.LogInfo("Brutality : Smoothie détecté — son arrêt anticipé des cadavres est neutralisé pour les corps gérés par Brutality (aucun réglage requis).");
+                Plugin.Log.LogInfo("Brutality: Smoothie detected — its early corpse freeze is neutralized for Brutality-managed bodies (no setting change required).");
             if (Has(FikaGuid))
-                Plugin.Log.LogInfo("Brutality : Fika détecté — l'hôte simule la mort, la pose finale est synchronisée par Fika.");
+                Plugin.Log.LogInfo("Brutality: Fika detected — host simulates death, final pose is synchronized by Fika.");
             if (Has(ReClassicGuid))
-                Plugin.Log.LogInfo("Brutality : ReClassic détecté — les corps inconscients qui meurent sont repris par Brutality.");
+                Plugin.Log.LogInfo("Brutality: ReClassic detected — unconscious bodies that die are taken over by Brutality.");
             if (Has(RuptureGuid))
-                Plugin.Log.LogWarning("Brutality : Rupture est installé. Les deux mods pilotent les ragdolls : désactivez Rupture pour éviter des conflits.");
+                Plugin.Log.LogWarning("Brutality: Rupture is installed. Both mods drive ragdolls: disable Rupture to avoid conflicts.");
         }
 
-        /// <summary>Les autres plugins lient leur configuration tardivement : on vérifie au premier décès.</summary>
+        /// <summary>Other plugins bind their config lazily: check on the first death.</summary>
         public static void OnFirstDeath()
         {
             if (_firstDeathChecked) return;
@@ -39,18 +39,18 @@ namespace Brutality
                 if (TryGetValue(SmoothieGuid, "3. Other fixes", "Corpses stop moving after (s)", out object v) && v is float f)
                 {
                     if (f < Settings.MaxMotionSeconds.Value)
-                        Plugin.Log.LogInfo($"Brutality : Smoothie fige les cadavres après {f:0} s ; Brutality prolonge ses propres corps jusqu'à {Settings.MaxMotionSeconds.Value:0} s maximum. " +
-                                           "Optionnel : régler Smoothie « Corpses stop moving after (s) » sur 10 pour aligner les corps non gérés.");
+                        Plugin.Log.LogInfo($"Brutality: Smoothie freezes corpses after {f:0} s; Brutality extends its own bodies up to {Settings.MaxMotionSeconds.Value:0} s max. " +
+                                           "Optional: set Smoothie 'Corpses stop moving after (s)' to 10 to align unmanaged bodies.");
                 }
                 if (TryGetValue(HollywoodFxGuid, "08. Ragdoll Effects (DISABLED BY VISCERAL COMBAT)", "Enable Ragdoll Effects (RESTART)", out object hv) && hv is bool hb && hb)
                 {
-                    Plugin.Log.LogWarning("Brutality : HollywoodFX « Enable Ragdoll Effects » est activé. Il réanime les cadavres figés quand on leur tire dessus " +
-                                          "et ajoute des impulsions irréalistes. Recommandé : le désactiver (et « Enable Cinematic Ragdolls »), puis redémarrer le jeu.");
+                    Plugin.Log.LogWarning("Brutality: HollywoodFX 'Enable Ragdoll Effects' is enabled. It reanimates frozen corpses when shot " +
+                                          "and adds unrealistic impulses. Recommended: disable it (and 'Enable Cinematic Ragdolls'), then restart the game.");
                 }
             }
             catch (Exception e)
             {
-                Plugin.LogDebug("Compat : " + e.Message);
+                Plugin.LogDebug("Compat: " + e.Message);
             }
         }
 

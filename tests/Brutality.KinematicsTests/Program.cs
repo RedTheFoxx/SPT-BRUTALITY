@@ -1,5 +1,5 @@
-// Banc de test hors jeu : vérifie les conventions de signe et la cohérence des angles anatomiques de Brutality.
-// Lancer : dotnet run --project tests/Brutality.KinematicsTests
+// Out-of-game test bench: verifies sign conventions and consistency of Brutality's anatomical angles.
+// Run: dotnet run --project tests/Brutality.KinematicsTests
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -15,7 +15,7 @@ internal static class Program
     private sealed record CheckRecord(int Index, string Domain, string Name, string Detail, bool Passed);
 
     private static int _fail, _pass;
-    private static string _domain = "Général";
+    private static string _domain = "General";
     private static readonly List<CheckRecord> _records = new List<CheckRecord>();
     private static readonly Random Rng = new Random(1234);
 
@@ -34,7 +34,7 @@ internal static class Program
         return Quaternion.AngleAxis((float)Rng.NextDouble() * 360f, axis);
     }
 
-    /// <summary>Segment de test : orientation d'os arbitraire + repère anatomique stocké en local (comme BodyModel).</summary>
+    /// <summary>Test segment: arbitrary bone orientation + anatomical frame stored in local space (like BodyModel).</summary>
     private sealed class S
     {
         public Quaternion Q;
@@ -70,8 +70,8 @@ internal static class Program
     private static Vector3 Eval(in JointFrame f, S p, Quaternion qC) => JointKinematics.Evaluate(f, p.Q, qC, out _);
 
     /// <summary>
-    /// BepInEx refuse certains caractères dans les sections et clés de configuration (exception dans Awake :
-    /// le plugin ne s'installe pas). Vérifie toutes les chaînes passées à cfg.Bind dans Settings.cs.
+    /// BepInEx rejects certain characters in configuration sections and keys (exception in Awake:
+    /// the plugin fails to load). Verifies all strings passed to cfg.Bind in Settings.cs.
     /// </summary>
     private static void CheckConfigKeys()
     {
@@ -82,7 +82,7 @@ internal static class Program
             string candidate = System.IO.Path.Combine(dir, "src", "Brutality", "Settings.cs");
             if (System.IO.File.Exists(candidate)) { path = candidate; break; }
         }
-        if (path == null) { Check("configuration : Settings.cs introuvable", false); return; }
+        if (path == null) { Check("configuration: Settings.cs not found", false); return; }
         string src = System.IO.File.ReadAllText(path);
         char[] forbidden = { '=', '\n', '\t', '\\', '"', '\'', '[', ']' };
         var names = new System.Collections.Generic.List<string>();
@@ -93,8 +93,8 @@ internal static class Program
         foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(src, @"\.Bind\(""([^""]*)"""))
             names.Add(m.Groups[1].Value);
         var bad = names.FindAll(n => n.IndexOfAny(forbidden) >= 0 || n.Trim() != n || n.Length == 0);
-        Check("configuration : sections et clés valides pour BepInEx", names.Count >= 20 && bad.Count == 0,
-            $"({names.Count} noms{(bad.Count > 0 ? ", invalides : " + string.Join(" | ", bad) : "")})");
+        Check("configuration: valid sections and keys for BepInEx", names.Count >= 20 && bad.Count == 0,
+            $"({names.Count} names{(bad.Count > 0 ? ", invalid: " + string.Join(" | ", bad) : "")})");
     }
 
     private static void Main(string[] args)
@@ -107,7 +107,7 @@ internal static class Program
             else if (args[i] == "--append-report" && i + 1 < args.Length) appendPath = args[++i];
         }
 
-        // Personnage debout, face à +Z (convention Unity : X droite, Y haut, Z avant).
+        // Standing character, facing +Z (Unity convention: X right, Y up, Z forward).
         Vector3 R = Vector3.right, U = Vector3.up, F = Vector3.forward;
         var pelvis = S.Make(U, R, F);
         var thorax = S.Make(U, R, F);
@@ -117,105 +117,105 @@ internal static class Program
         var upperR = S.Make(U, R, F);  var foreR = S.Make(U, R, F);
         var upperL = S.Make(U, R, F);
 
-        // --- Genou
-        _domain = "Genou";
+        // --- Knee
+        _domain = "Knee";
         var knee = Frame(JointKind.Knee, 1, thighR, calfR);
-        Check("genou droit tendu = 0°", Near(Eval(knee, thighR, calfR.Q).x, 0f, 0.5f));
-        var calfBack = Quaternion.AngleAxis(60f, R) * calfR.Q; // la jambe part vers l'arrière
-        Check("genou : jambe vers l'arrière = flexion +60°", Near(Eval(knee, thighR, calfBack).x, 60f * BMath.Deg, 0.5f),
+        Check("straight right knee = 0°", Near(Eval(knee, thighR, calfR.Q).x, 0f, 0.5f));
+        var calfBack = Quaternion.AngleAxis(60f, R) * calfR.Q; // lower leg moves backward
+        Check("knee: lower leg backward = flexion +60°", Near(Eval(knee, thighR, calfBack).x, 60f * BMath.Deg, 0.5f),
             $"({Eval(knee, thighR, calfBack).x / BMath.Deg:0.0}°)");
         var calfFwd = Quaternion.AngleAxis(-5f, R) * calfR.Q;
-        Check("genou : hyperextension = négatif", Eval(knee, thighR, calfFwd).x < 0f);
+        Check("knee: hyperextension = negative", Eval(knee, thighR, calfFwd).x < 0f);
 
-        // Genou fléchi à 60° au moment de la mort (axe déduit du plan cuisse-jambe).
+        // Knee flexed at 60° at time of death (axis inferred from thigh-calf plane).
         var calfBent = new S { Q = calfBack, RL = calfR.RL, UL = calfR.UL, FL = calfR.FL };
         var kneeBent = Frame(JointKind.Knee, 1, thighR, calfBent);
-        Check("genou fléchi à la mort : 60° relu", Near(Eval(kneeBent, thighR, calfBent.Q).x, 60f * BMath.Deg, 0.5f));
-        Check("genou fléchi : +10° vers l'arrière = 70°",
+        Check("knee flexed at death: 60° read back", Near(Eval(kneeBent, thighR, calfBent.Q).x, 60f * BMath.Deg, 0.5f));
+        Check("flexed knee: +10° backward = 70°",
             Near(Eval(kneeBent, thighR, Quaternion.AngleAxis(10f, R) * calfBent.Q).x, 70f * BMath.Deg, 0.5f));
 
-        // --- Coude
-        _domain = "Coude";
+        // --- Elbow
+        _domain = "Elbow";
         var elbow = Frame(JointKind.Elbow, 1, upperR, foreR);
-        var foreUp = Quaternion.AngleAxis(-90f, R) * foreR.Q; // l'avant-bras monte vers l'avant
-        Check("coude : avant-bras vers l'avant = flexion +90°", Near(Eval(elbow, upperR, foreUp).x, 90f * BMath.Deg, 0.5f),
+        var foreUp = Quaternion.AngleAxis(-90f, R) * foreR.Q; // forearm rises forward
+        Check("elbow: forearm forward = flexion +90°", Near(Eval(elbow, upperR, foreUp).x, 90f * BMath.Deg, 0.5f),
             $"({Eval(elbow, upperR, foreUp).x / BMath.Deg:0.0}°)");
         var pron = Quaternion.AngleAxis(40f, foreR.Q * foreR.UL) * foreR.Q;
-        Check("coude : prono-supination lue sur la torsion", MathF.Abs(MathF.Abs(Eval(elbow, upperR, pron).z) - 40f * BMath.Deg) < 0.01f);
+        Check("elbow: pronation-supination read on twist", MathF.Abs(MathF.Abs(Eval(elbow, upperR, pron).z) - 40f * BMath.Deg) < 0.01f);
 
-        // --- Hanche
-        _domain = "Hanche";
+        // --- Hip
+        _domain = "Hip";
         var hipR = Frame(JointKind.Hip, 1, pelvis, thighR);
         var hipL = Frame(JointKind.Hip, -1, pelvis, thighL);
-        Check("hanche neutre = 0/0/0", Eval(hipR, pelvis, thighR.Q).magnitude < 0.01f);
+        Check("neutral hip = 0/0/0", Eval(hipR, pelvis, thighR.Q).magnitude < 0.01f);
         var thighFwd = Quaternion.AngleAxis(-45f, R) * thighR.Q;
-        Check("hanche : cuisse vers l'avant = flexion +45°", Near(Eval(hipR, pelvis, thighFwd).x, 45f * BMath.Deg, 0.5f));
-        var thighOutR = Quaternion.AngleAxis(30f, F) * thighR.Q; // pied droit vers +X
-        Check("hanche droite : écartement = abduction +30°", Near(Eval(hipR, pelvis, thighOutR).y, 30f * BMath.Deg, 0.5f),
+        Check("hip: thigh forward = flexion +45°", Near(Eval(hipR, pelvis, thighFwd).x, 45f * BMath.Deg, 0.5f));
+        var thighOutR = Quaternion.AngleAxis(30f, F) * thighR.Q; // right foot toward +X
+        Check("right hip: spread outward = abduction +30°", Near(Eval(hipR, pelvis, thighOutR).y, 30f * BMath.Deg, 0.5f),
             $"({Eval(hipR, pelvis, thighOutR).y / BMath.Deg:0.0}°)");
-        var thighOutL = Quaternion.AngleAxis(-30f, F) * thighL.Q; // pied gauche vers -X
-        Check("hanche gauche : écartement = abduction +30°", Near(Eval(hipL, pelvis, thighOutL).y, 30f * BMath.Deg, 0.5f),
+        var thighOutL = Quaternion.AngleAxis(-30f, F) * thighL.Q; // left foot toward -X
+        Check("left hip: spread outward = abduction +30°", Near(Eval(hipL, pelvis, thighOutL).y, 30f * BMath.Deg, 0.5f),
             $"({Eval(hipL, pelvis, thighOutL).y / BMath.Deg:0.0}°)");
         var thighBack = Quaternion.AngleAxis(15f, R) * thighR.Q;
-        Check("hanche : cuisse vers l'arrière = extension (négatif)", Eval(hipR, pelvis, thighBack).x < 0f);
+        Check("hip: thigh backward = extension (negative)", Eval(hipR, pelvis, thighBack).x < 0f);
 
-        // --- Épaule (déroulement au-delà de 180°)
-        _domain = "Épaule";
+        // --- Shoulder (unwrapping beyond 180°)
+        _domain = "Shoulder";
         var shR = Frame(JointKind.Shoulder, 1, thorax, upperR);
         var armUp = Quaternion.AngleAxis(-170f, R) * upperR.Q;
-        Check("épaule : bras levé devant à 170°", Near(Eval(shR, thorax, armUp).x, 170f * BMath.Deg, 0.5f));
+        Check("shoulder: arm raised forward to 170°", Near(Eval(shR, thorax, armUp).x, 170f * BMath.Deg, 0.5f));
         var armOver = Quaternion.AngleAxis(-190f, R) * upperR.Q;
         float over = Eval(shR, thorax, armOver).x / BMath.Deg;
-        Check("épaule : 190° lu 190° (pas -170°)", MathF.Abs(over - 190f) < 0.5f, $"({over:0.0}°)");
+        Check("shoulder: 190° read as 190° (not -170°)", MathF.Abs(over - 190f) < 0.5f, $"({over:0.0}°)");
         var armSide = Quaternion.AngleAxis(60f, F) * upperR.Q;
-        Check("épaule droite : abduction +60°", Near(Eval(shR, thorax, armSide).y, 60f * BMath.Deg, 0.5f));
+        Check("right shoulder: abduction +60°", Near(Eval(shR, thorax, armSide).y, 60f * BMath.Deg, 0.5f));
         var shL = Frame(JointKind.Shoulder, -1, thorax, upperL);
-        var armAcrossL = Quaternion.AngleAxis(20f, F) * upperL.Q; // bras gauche vers +X = adduction
-        Check("épaule gauche : bras vers la ligne médiane = adduction (négatif)", Eval(shL, thorax, armAcrossL).y < 0f);
+        var armAcrossL = Quaternion.AngleAxis(20f, F) * upperL.Q; // left arm toward +X = adduction
+        Check("left shoulder: arm toward midline = adduction (negative)", Eval(shL, thorax, armAcrossL).y < 0f);
 
-        // --- Rotation interne (posturing)
-        _domain = "Rotation interne & pronation";
+        // --- Internal rotation (posturing)
+        _domain = "Internal rotation & pronation";
         float irR = Eval(shR, thorax, Quaternion.AngleAxis(-30f, U) * upperR.Q).z;
         float irL = Eval(shL, thorax, Quaternion.AngleAxis(30f, U) * upperL.Q).z;
-        Check("épaule droite : rotation interne lue ±30°", MathF.Abs(MathF.Abs(irR) - 30f * BMath.Deg) < 0.01f, $"({irR / BMath.Deg:0.0}°)");
-        Check("rotation interne : signe = -côté (droite -, gauche +)", irR < 0f && irL > 0f,
-            $"(D {irR / BMath.Deg:0.0}°, G {irL / BMath.Deg:0.0}°)");
+        Check("right shoulder: internal rotation read ±30°", MathF.Abs(MathF.Abs(irR) - 30f * BMath.Deg) < 0.01f, $"({irR / BMath.Deg:0.0}°)");
+        Check("internal rotation: sign = -side (right -, left +)", irR < 0f && irL > 0f,
+            $"(R {irR / BMath.Deg:0.0}°, L {irL / BMath.Deg:0.0}°)");
         float irHipR = Eval(hipR, pelvis, Quaternion.AngleAxis(-30f, U) * thighR.Q).z;
         float irHipL = Eval(hipL, pelvis, Quaternion.AngleAxis(30f, U) * thighL.Q).z;
-        Check("hanche : rotation interne, même convention que l'épaule", irHipR < 0f && irHipL > 0f,
-            $"(D {irHipR / BMath.Deg:0.0}°, G {irHipL / BMath.Deg:0.0}°)");
+        Check("hip: internal rotation, same convention as shoulder", irHipR < 0f && irHipL > 0f,
+            $"(R {irHipR / BMath.Deg:0.0}°, L {irHipL / BMath.Deg:0.0}°)");
         float pronR = Eval(elbow, upperR, Quaternion.AngleAxis(-40f, U) * foreR.Q).z;
-        Check("coude droit : pronation (paume vers l'intérieur puis l'arrière) = négatif", pronR < 0f, $"({pronR / BMath.Deg:0.0}°)");
+        Check("right elbow: pronation (palm inward then backward) = negative", pronR < 0f, $"({pronR / BMath.Deg:0.0}°)");
 
-        // --- Rachis lombaire
-        _domain = "Rachis lombaire";
+        // --- Lumbar spine
+        _domain = "Lumbar spine";
         var lumbar = Frame(JointKind.Lumbar, 0, pelvis, thorax);
-        Check("rachis neutre = 0/0/0", Eval(lumbar, pelvis, thorax.Q).magnitude < 0.01f);
+        Check("neutral spine = 0/0/0", Eval(lumbar, pelvis, thorax.Q).magnitude < 0.01f);
         var bendFwd = Quaternion.AngleAxis(30f, R) * thorax.Q;
-        Check("rachis : penché en avant = flexion +30°", Near(Eval(lumbar, pelvis, bendFwd).x, 30f * BMath.Deg, 0.5f));
+        Check("spine: leaned forward = flexion +30°", Near(Eval(lumbar, pelvis, bendFwd).x, 30f * BMath.Deg, 0.5f));
         var bendRight = Quaternion.AngleAxis(-20f, F) * thorax.Q;
-        Check("rachis : inclinaison à droite = +20°", Near(Eval(lumbar, pelvis, bendRight).y, 20f * BMath.Deg, 0.5f));
+        Check("spine: right lateral bend = +20°", Near(Eval(lumbar, pelvis, bendRight).y, 20f * BMath.Deg, 0.5f));
         var twist = Quaternion.AngleAxis(25f, U) * thorax.Q;
-        Check("rachis : torsion +25° lue +25°", Near(Eval(lumbar, pelvis, twist).z, 25f * BMath.Deg, 0.5f));
+        Check("spine: twist +25° read +25°", Near(Eval(lumbar, pelvis, twist).z, 25f * BMath.Deg, 0.5f));
         Vector3 leftShoulder = Quaternion.AngleAxis(25f, U) * new Vector3(-1, 0, 0);
-        Check("torsion positive = épaule gauche vers l'avant (roulade vers la droite)", leftShoulder.z > 0f);
+        Check("positive twist = left shoulder forward (roll to the right)", leftShoulder.z > 0f);
 
-        // Torsion absolue présente à la mort (le tronc était déjà tourné de 20°).
+        // Absolute twist present at death (trunk was already twisted by 20°).
         var thoraxTw = new S { Q = Quaternion.AngleAxis(20f, U) * thorax.Q, RL = thorax.RL, UL = thorax.UL, FL = thorax.FL };
         var lumbarTw = Frame(JointKind.Lumbar, 0, pelvis, thoraxTw);
-        Check("rachis : torsion à la mort relue (20°)", Near(Eval(lumbarTw, pelvis, thoraxTw.Q).z, 20f * BMath.Deg, 0.5f));
+        Check("spine: twist at death read back (20°)", Near(Eval(lumbarTw, pelvis, thoraxTw.Q).z, 20f * BMath.Deg, 0.5f));
 
-        // --- Cou
-        _domain = "Cou";
+        // --- Neck
+        _domain = "Neck";
         var neck = Frame(JointKind.Neck, 0, thorax, head);
         var lookRight = Quaternion.AngleAxis(40f, U) * head.Q;
-        Check("cou : torsion +40° = regard vers la droite", Near(Eval(neck, thorax, lookRight).z, 40f * BMath.Deg, 0.5f)
+        Check("neck: twist +40° = looking right", Near(Eval(neck, thorax, lookRight).z, 40f * BMath.Deg, 0.5f)
               && (lookRight * head.FL).x > 0f);
         var chin = Quaternion.AngleAxis(30f, R) * head.Q;
-        Check("cou : menton vers la poitrine = flexion +30°", Near(Eval(neck, thorax, chin).x, 30f * BMath.Deg, 0.5f));
+        Check("neck: chin toward chest = flexion +30°", Near(Eval(neck, thorax, chin).x, 30f * BMath.Deg, 0.5f));
 
-        // --- Gradients numériques (comme BodyModel.ComputeKinematics) : dφ ≈ g·ω dt
-        _domain = "Gradients numériques";
+        // --- Numerical gradients (like BodyModel.ComputeKinematics): dφ ≈ g·ω dt
+        _domain = "Numerical gradients";
         int gradOk = 0, gradN = 0;
         var frames = new (JointFrame f, S p, S c)[] { (knee, thighR, calfR), (elbow, upperR, foreR), (hipR, pelvis, thighR), (shR, thorax, upperR), (lumbar, pelvis, thorax), (neck, thorax, head) };
         Vector3[] axes = { Vector3.right, Vector3.up, Vector3.forward };
@@ -251,20 +251,20 @@ internal static class Program
                 if (ok) gradOk++;
             }
         }
-        Check("gradients numériques cohérents (dφ = g·ω dt)", gradOk >= gradN - 2, $"({gradOk}/{gradN})");
+        Check("consistent numerical gradients (dφ = g·ω dt)", gradOk >= gradN - 2, $"({gradOk}/{gradN})");
 
-        // --- Cinématique inverse du bras
-        _domain = "Cinématique inverse";
+        // --- Arm inverse kinematics
+        _domain = "Inverse kinematics";
         Vector3 shoulderPos = new Vector3(0.2f, 1.5f, 0f);
-        Vector3 target = new Vector3(0.05f, 1.15f, 0.15f); // main sur l'abdomen
+        Vector3 target = new Vector3(0.05f, 1.15f, 0.15f); // hand on abdomen
         bool ik = JointKinematics.ArmIK(shoulderPos, 0.30f, 0.33f, target, 1, R, U, F, out float fl, out float ab, out float el, out Vector3 ud);
         Vector3 recon = (R * (MathF.Sin(ab * BMath.Deg))) + (-U * MathF.Cos(fl * BMath.Deg) + F * MathF.Sin(fl * BMath.Deg)) * MathF.Cos(ab * BMath.Deg);
-        Check("IK : angles d'épaule ↔ direction du bras", ik && (recon - ud).magnitude < 0.02f, $"(flex {fl:0}°, abd {ab:0}°, coude {el:0}°)");
+        Check("IK: shoulder angles ↔ arm direction", ik && (recon - ud).magnitude < 0.02f, $"(flex {fl:0}°, abd {ab:0}°, elbow {el:0}°)");
         Vector3 elbowPos = shoulderPos + ud * 0.30f;
-        Check("IK : l'avant-bras atteint la cible", MathF.Abs((target - elbowPos).magnitude - 0.33f) < 0.01f);
-        Check("IK : coude fléchi pour une cible proche", el > 30f && el < 160f);
+        Check("IK: forearm reaches target", MathF.Abs((target - elbowPos).magnitude - 0.33f) < 0.01f);
+        Check("IK: elbow flexed for close target", el > 30f && el < 160f);
 
-        // --- Cinématique inverse de la jambe
+        // --- Leg inverse kinematics
         foreach (int legSide in new[] { -1, 1 })
         {
             Vector3 hipPos = new Vector3(0.1f * legSide, 0.94f, 0f);
@@ -272,17 +272,17 @@ internal static class Program
             bool lik = JointKinematics.LegIK(hipPos, 0.44f, 0.44f, stepTarget, legSide, R, U, F, out float hf, out float ha, out float kf);
             Vector3 thighDir = R * (legSide * MathF.Sin(ha * BMath.Deg)) + (-U * MathF.Cos(hf * BMath.Deg) + F * MathF.Sin(hf * BMath.Deg)) * MathF.Cos(ha * BMath.Deg);
             Vector3 kneePos = hipPos + thighDir * 0.44f;
-            Check($"IK jambe {(legSide < 0 ? "G" : "D")} : la jambe atteint la cheville cible", lik && MathF.Abs((stepTarget - kneePos).magnitude - 0.44f) < 0.01f,
-                $"(hanche {hf:0}°/{ha:0}°, genou {kf:0}°)");
-            Check($"IK jambe {(legSide < 0 ? "G" : "D")} : genou fléchi vers l'avant, cuisse fléchie", kf > 5f && hf > 20f && kneePos.z > stepTarget.z * 0.5f);
+            Check($"leg IK {(legSide < 0 ? "L" : "R")}: leg reaches ankle target", lik && MathF.Abs((stepTarget - kneePos).magnitude - 0.44f) < 0.01f,
+                $"(hip {hf:0}°/{ha:0}°, knee {kf:0}°)");
+            Check($"leg IK {(legSide < 0 ? "L" : "R")}: knee flexed forward, thigh flexed", kf > 5f && hf > 20f && kneePos.z > stepTarget.z * 0.5f);
         }
         {
             bool lik = JointKinematics.LegIK(new Vector3(0.1f, 0.94f, 0f), 0.44f, 0.44f, new Vector3(0.1f, 0.06f, 0f), 1, R, U, F, out float hf, out float ha, out float kf);
-            Check("IK jambe : appui vertical = jambe presque tendue", lik && MathF.Abs(hf) < 7f && MathF.Abs(ha) < 1f && kf < 14f, $"({hf:0.0}°, {ha:0.0}°, {kf:0.0}°)");
+            Check("leg IK: vertical stance = nearly straight leg", lik && MathF.Abs(hf) < 7f && MathF.Abs(ha) < 1f && kf < 14f, $"({hf:0.0}°, {ha:0.0}°, {kf:0.0}°)");
         }
 
-        // --- Solveur de pose
-        _domain = "Solveur de pose";
+        // --- Pose solver
+        _domain = "Pose solver";
         int solved = 0, total = 0;
         float worst = 0f;
         foreach (var (f, p, c) in frames)
@@ -307,7 +307,7 @@ internal static class Program
                 if (err < 0.5f * BMath.Deg) solved++;
             }
         }
-        Check("solveur de pose : cibles anatomiques atteintes (< 0,5°)", solved >= total - 2, $"({solved}/{total}, pire {worst:0.00}°)");
+        Check("pose solver: anatomical targets reached (< 0.5°)", solved >= total - 2, $"({solved}/{total}, worst {worst:0.00}°)");
 
         bool centersOk = true;
         foreach (var (f, p, c) in frames)
@@ -316,12 +316,12 @@ internal static class Program
             var center = new Vector3();
             for (int d = 0; d < 3; d++) center[d] = 0.5f * (spec.Dofs[d].MinDeg + spec.Dofs[d].MaxDeg) * BMath.Deg;
             Quaternion q = JointKinematics.SolvePose(f, Quaternion.Inverse(p.Q) * c.Q, center, 40, out float res);
-            if (res > 1f * BMath.Deg) { centersOk = false; Console.WriteLine($"      centre {f.Kind} : résidu {res / BMath.Deg:0.00}°"); }
+            if (res > 1f * BMath.Deg) { centersOk = false; Console.WriteLine($"      center {f.Kind}: residual {res / BMath.Deg:0.00}°"); }
         }
-        Check("solveur de pose : pose centrale de chaque articulation", centersOk);
+        Check("pose solver: center pose for every joint", centersOk);
 
-        // --- Régressions stabilité / physique ---
-        _domain = "Stabilité, axes & enveloppe thoracique";
+        // --- Stability / physics regressions ---
+        _domain = "Stability, axes & thorax envelope";
         {
             Vector3 shPos = new Vector3(0.2f, 1.4f, 0f);
             Vector3 elPos = new Vector3(0.25f, 1.15f, 0.10f);
@@ -330,7 +330,7 @@ internal static class Program
             var fArm = S.Make(elPos - wrPos, R, F);
             var elCross = Frame(JointKind.Elbow, 1, uArm, fArm);
             float flexDeg = Eval(elCross, uArm, fArm.Q).x / BMath.Deg;
-            Check("coude replié en travers du torse : flexion positive", flexDeg > 90f && flexDeg < 140f, $"({flexDeg:0.0}°)");
+            Check("elbow folded across torso: positive flexion", flexDeg > 90f && flexDeg < 140f, $"({flexDeg:0.0}°)");
         }
 
         {
@@ -356,7 +356,7 @@ internal static class Program
             JointKinematics.JointAxes(shR, qRelAbd, out Vector3 shAx, out Vector3 shSec);
             Vector3 worldAx = qAbd * shAx;
             bool noSingularity = MathF.Abs(Vector3.Dot(worldAx, -R)) > 0.999f && MathF.Abs(Vector3.Dot(shAx, shSec)) < 1e-4f;
-            Check("JointAxes analytiques : sens flexion + orthogonalité + épaule 89,5°", axesOk && noSingularity, badDetail);
+            Check("analytic JointAxes: flexion direction + orthogonality + shoulder 89.5°", axesOk && noSingularity, badDetail);
         }
 
         {
@@ -373,7 +373,7 @@ internal static class Program
                 prevFlex = curFlex;
             }
             float qNorm = MathF.Sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-            Check("SolvePose : épaule à 200° revient par l'avant + quaternion normalisé",
+            Check("SolvePose: shoulder at 200° returns through the front + normalized quaternion",
                 wentForward && MathF.Abs(prevFlex - 15f) < 1f && MathF.Abs(qNorm - 1f) < 1e-4f,
                 $"(final {prevFlex:0.0}°, |q|={qNorm:0.00000})");
         }
@@ -391,7 +391,7 @@ internal static class Program
                 }
                 if (MathF.Abs(x - goal) > 0.01f) stable = false;
             }
-            Check("StepCriticallyDamped : stable et sans dépassement de 60 Hz à 4 Hz", stable);
+            Check("StepCriticallyDamped: stable and overshoot-free from 60 Hz to 4 Hz", stable);
         }
 
         {
@@ -399,7 +399,7 @@ internal static class Program
             float aBack = JointKinematics.MinShoulderAbductionRad(-30f * BMath.Deg) / BMath.Deg;
             float a90 = JointKinematics.MinShoulderAbductionRad(90f * BMath.Deg) / BMath.Deg;
             float a175 = JointKinematics.MinShoulderAbductionRad(175f * BMath.Deg) / BMath.Deg;
-            Check("épaule : adduction bloquée à 0° le long du thorax, ouverte devant (~-22°), resserrée près de la tête",
+            Check("shoulder: adduction clamped at 0° along thorax, open in front (~-22°), tightened near head",
                 MathF.Abs(a0) < 0.1f && MathF.Abs(aBack) < 0.1f && a90 < -20f && a90 > -25f && a175 > a90 + 5f,
                 $"(0°:{a0:0.0}°, -30°:{aBack:0.0}°, 90°:{a90:0.0}°, 175°:{a175:0.0}°)");
         }
@@ -412,16 +412,16 @@ internal static class Program
             bool inFront = JointKinematics.ThoraxPenetration(tPos + new Vector3(0.0f, 0.15f, chestZ + 0.05f), tPos, R, U, F, chestZ, yBot, yTop, rx, ryCap, rz, -1, out float dFront, out Vector3 nFront);
             Vector3 clamped = JointKinematics.ClampOutsideThorax(tPos + new Vector3(0.02f, 0.15f, chestZ), tPos, R, U, F, chestZ, yBot, yTop, rx, ryCap, rz, 1, 0.015f);
             bool clampedClear = !JointKinematics.ThoraxPenetration(clamped, tPos, R, U, F, chestZ, yBot, yTop, rx, ryCap, rz, 1, out _, out _);
-            Check("enveloppe thoracique : détection, normales sortantes et projection extérieure",
+            Check("thorax envelope: detection, outward normals, and exterior projection",
                 outClear && inSide && MathF.Abs(dSide - 0.055f) < 0.002f && nSide.x > 0.99f
                 && inFront && MathF.Abs(dFront - 0.105f) < 0.002f && nFront.z > 0.99f && clampedClear,
                 $"(dSide={dSide * 100f:0.1}cm, dFront={dFront * 100f:0.1}cm)");
         }
 
-        _domain = "Configuration BepInEx";
+        _domain = "BepInEx Configuration";
         CheckConfigKeys();
 
-        Console.WriteLine($"\n{_pass} réussis, {_fail} échoués");
+        Console.WriteLine($"\n{_pass} passed, {_fail} failed");
 
         if (!string.IsNullOrWhiteSpace(appendPath)) AppendToReport(appendPath);
         if (!string.IsNullOrWhiteSpace(reportPath)) WriteStandaloneReport(reportPath);
@@ -434,16 +434,16 @@ internal static class Program
 
     private static void AppendTable(StringBuilder sb)
     {
-        sb.AppendLine("## Niveau 4 — Cinématique, anatomie ISB et configuration BepInEx");
+        sb.AppendLine("## Level 4 — Kinematics, ISB Anatomy, and BepInEx Configuration");
         sb.AppendLine();
-        sb.AppendLine("Tests exécutés sur `Core/BMath.cs`, `Core/JointKinematics.cs`, `Anatomy/AnatomyData.cs` et `Settings.cs` sans aucune dépendance EFT/SPT.");
+        sb.AppendLine("Tests executed on `Core/BMath.cs`, `Core/JointKinematics.cs`, `Anatomy/AnatomyData.cs`, and `Settings.cs` with zero EFT/SPT dependencies.");
         sb.AppendLine();
-        sb.AppendLine("| # | Domaine | Vérification | Mesure observée | Statut |");
+        sb.AppendLine("| # | Domain | Check | Observed measurement | Status |");
         sb.AppendLine("|---:|---|---|---|---|");
         foreach (var r in _records)
         {
             string status = r.Passed ? "`PASS`" : "`FAIL`";
-            string detail = string.IsNullOrWhiteSpace(r.Detail) ? "conforme" : Esc(r.Detail);
+            string detail = string.IsNullOrWhiteSpace(r.Detail) ? "compliant" : Esc(r.Detail);
             sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
                 $"| {r.Index} | {Esc(r.Domain)} | {Esc(r.Name)} | `{detail}` | {status} |"));
         }
@@ -452,23 +452,23 @@ internal static class Program
 
     private static void AppendVisualAndTransparencySections(StringBuilder sb)
     {
-        sb.AppendLine("## Vérifier de ses propres yeux dans le studio 3D (`demo/banc-essai.html`)");
+        sb.AppendLine("## See It Yourself in the 3D Studio (`demo/test-bench.html`)");
         sb.AppendLine();
-        sb.AppendLine("Le studio 3D embarqué dans le dépôt permet de reproduire visuellement chaque comportement ci-dessus dans un navigateur, avec la même logique que la version `0.3.0` :");
+        sb.AppendLine("The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `0.4.0`:");
         sb.AppendLine();
-        sb.AppendLine("1. **Agrippement au mur + rupture (`DlGrab`)** — Choisir le décor **`Mur proche à droite (grab)`**, posture **`Debout`**, comportement **`Auto`** (ou **`Effondrement latéral`**), puis cliquer sur le flanc gauche du mannequin pour le projeter vers la droite : le bras droit se tend vers le mur, l'avant-bras effectue une pronation paume vers la paroi, un point d'ancrage jaune apparaît au contact puis cède lorsque la charge dépasse le seuil.");
-        sb.AppendLine("2. **Agrippement à une caisse / rebord (`GrabHelper`)** — Choisir **`Caisse / rebord devant (grab)`**, posture **`Debout`**, et tirer dans le dos ou le thorax pour basculer vers l'avant : les sondes détectent l'arête supérieure de la caisse devant le corps et verrouillent une prise.");
-        sb.AppendLine("3. **Dérobement 1 ou 2 jambes & balle dans le dos (`GiveWay`)** — Choisir **`Pièce standard`**, tourner la caméra derrière le mannequin, et tirer dans le dos ou dans une cuisse : le bassin s'affaisse sans raidir les jambes, avec flexion visible d'un genou (tir jambe) ou des deux jambes (simultané ou décalé).");
-        sb.AppendLine("4. **Réflexe de garde (`upperBodyFlinch`) & « dernier carré »** — Choisir **`Pièce standard`**, posture **`Debout`**, et cliquer **`Rafale ×5`** (touche **`B`**) de face : les bras montent protéger le haut du corps avec pronation des avant-bras tandis que le tronc résiste brièvement avant de céder.");
-        sb.AppendLine("5. **Roulade d'élan (`rollDownStairs` / `bodyRollUp`) et comparaison vanilla** — Passer la posture sur **`En course (3,5 m/s)`** ou **`Sprint (5,5 m/s)`**, réduire **`Vitesse de simulation`** à **`0,25×`** et tirer dans le thorax pour observer la roulade et l'agonie au sol ; activer **`Pose visée par les muscles (fantôme)`** ou cocher **`Ragdoll inerte, sans Brutality (comparaison)`** puis cliquer **`Rejouer`** sur la même graine pour comparer directement avec le ragdoll inerte.");
+        sb.AppendLine("1. **Wall grab + break (`DlGrab`)** — Choose the **`Close right wall (grab)`** scene, **`Standing`** posture, **`Auto`** behaviour (or **`Side collapse`**), then click the mannequin's left flank to throw it toward the right: the right arm reaches toward the wall, the forearm pronates palm toward the surface, a yellow anchor point appears on contact, then snaps when the load exceeds the threshold.");
+        sb.AppendLine("2. **Crate / ledge grab (`GrabHelper`)** — Choose **`Crate / ledge ahead (grab)`**, **`Standing`** posture, and shoot the back or thorax to topple forward: probes detect the top edge of the crate in front of the body and lock a grip.");
+        sb.AppendLine("3. **1- or 2-leg buckling & back shot (`GiveWay`)** — Choose **`Standard room`**, orbit the camera behind the mannequin, and shoot the back or a thigh: the pelvis sinks without stiffening the legs, with visible flexion of one knee (leg shot) or both knees (simultaneous or staggered).");
+        sb.AppendLine("4. **Guard reflex (`upperBodyFlinch`) & \"last stand\"** — Choose **`Standard room`**, **`Standing`** posture, and click **`Burst ×5`** (**`B`** key) from the front: the arms rise to shield the upper body with forearm pronation while the trunk briefly resists before giving way.");
+        sb.AppendLine("5. **Momentum roll (`rollDownStairs` / `bodyRollUp`) and vanilla comparison** — Switch posture to **`Running (3.5 m/s)`** or **`Sprinting (5.5 m/s)`**, lower **`Simulation speed`** to **`0.25×`** and shoot the thorax to observe the roll and ground agony; enable **`Muscle target pose (ghost)`** or check **`Inert ragdoll, no Brutality (comparison)`** then click **`Replay`** on the same seed to compare directly against the inert ragdoll.");
         sb.AppendLine();
-        sb.AppendLine("## Périmètre des preuves et transparence");
+        sb.AppendLine("## Proof Scope and Transparency");
         sb.AppendLine();
-        sb.AppendLine("| Ce qui est prouvé formellement hors jeu | Ce qui reste à valider en jeu (Unity / PhysX / SPT) |");
+        sb.AppendLine("| Formally proven out-of-game | Remaining to validate in-game (Unity / PhysX / SPT) |");
         sb.AppendLine("|---|---|");
-        sb.AppendLine("| Toutes les lois mathématiques Delirium (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nm.rs`) exécutées directement sur les vrais `.cs` du plugin. | Calibrage des ordres de grandeur sur les squelettes réels de Tarkov (`PhysxProbe` de sens des drives/butées en début de raid). |");
-        sb.AppendLine("| Boucle fermée physique 60 Hz (`Shot`, `Balance`, `Grab`, `CatchFall`, `RollDownStairs`/`RollUp`, `Windmill`, `Writhe`, `Foetal`, `Flinch`). | Interactions sur géométrie complexe des cartes SPT (escaliers, portes, mobilier) et masses complètes d'équipement porté. |");
-        sb.AppendLine("| Conventions ISB de tous les joints, IK bras/jambes, solveur de pose `SolvePose`, enveloppe thoracique, et validité de toutes les clés BepInEx. | Cohabitation en raid avec les mods tiers (`Smoothie`, `HollywoodFX`, `Fika`, `ReClassic`) et performance multi-corps. |");
+        sb.AppendLine("| All Delirium mathematical laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nm.rs`) executed directly on the plugin's real `.cs` files. | Calibration of magnitudes on real Tarkov skeletons (`PhysxProbe` for drive/limit directions at raid start). |");
+        sb.AppendLine("| 60 Hz closed-loop physics (`Shot`, `Balance`, `Grab`, `CatchFall`, `RollDownStairs`/`RollUp`, `Windmill`, `Writhe`, `Foetal`, `Flinch`). | Interactions on complex SPT map geometry (stairs, doors, furniture) and full carried equipment masses. |");
+        sb.AppendLine("| ISB conventions for all joints, arm/leg IK, `SolvePose` solver, thorax envelope, and validity of all BepInEx keys. | In-raid coexistence with third-party mods (`Smoothie`, `HollywoodFX`, `Fika`, `ReClassic`) and multi-body performance. |");
     }
 
     private static void AppendToReport(string reportPath)
@@ -491,13 +491,13 @@ internal static class Program
 
         string kinStatus = _fail == 0 ? "PASS" : "FAIL";
         string kinRow = string.Create(CultureInfo.InvariantCulture,
-            $"| `tests/Brutality.KinematicsTests` | Anatomie ISB, IK, solveur de pose, enveloppe thoracique, clés BepInEx | **{_pass} / {_records.Count}** | `{kinStatus}` |");
+            $"| `tests/Brutality.KinematicsTests` | ISB anatomy, IK, pose solver, thorax envelope, BepInEx keys | **{_pass} / {_records.Count}** | `{kinStatus}` |");
 
         int totPass = dlPass + _pass;
         int totCount = dlTotal + _records.Count;
         string totStatus = _fail == 0 && dlPass == dlTotal && dlTotal > 0 ? "PASS" : "FAIL";
         string totRow = string.Create(CultureInfo.InvariantCulture,
-            $"| **Total vérifié** | **Preuves formelles complètes hors jeu** | **{totPass} / {totCount}** | `{totStatus}` |");
+            $"| **Verified total** | **Complete out-of-game formal proofs** | **{totPass} / {totCount}** | `{totStatus}` |");
 
         existing = existing.Replace("<!-- KINEMATICS_SUMMARY_ROW -->", kinRow);
         existing = existing.Replace("<!-- TOTAL_SUMMARY_ROW -->", totRow);
@@ -519,10 +519,10 @@ internal static class Program
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
         var sb = new StringBuilder();
-        sb.AppendLine("# Brutality — Rapport Cinématique & Anatomie");
+        sb.AppendLine("# Brutality — Kinematics & Anatomy Report");
         sb.AppendLine();
         sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-            $"> Généré automatiquement par `tests/Brutality.KinematicsTests` le `{DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC` — **{_pass} / {_records.Count}** réussis."));
+            $"> Automatically generated by `tests/Brutality.KinematicsTests` on `{DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC` — **{_pass} / {_records.Count}** passed."));
         sb.AppendLine();
         AppendTable(sb);
         AppendVisualAndTransparencySections(sb);

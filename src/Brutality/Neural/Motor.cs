@@ -4,26 +4,26 @@ using UnityEngine;
 
 namespace Brutality.Neural
 {
-    /// <summary>Commande motrice résolue pour un degré de liberté.</summary>
+    /// <summary>Resolved motor command for a degree of freedom.</summary>
     internal struct MotorCommand
     {
-        public float Target;            // angle cible (rad)
+        public float Target;            // target angle (rad)
         public float U;                 // excitation 0..1
-        public float Omega;             // pulsation propre du muscle (rad/s) = « stiffness » NaturalMotion
-        public float Zeta;              // rapport d'amortissement (1 = critique) = « damping » NaturalMotion
-        public float MuscleStiffness;   // 1,01 − looseness (NaturalMotion) ; multiplie la raideur, pas l'amortissement
-        public float RefOmega;          // pulsation du filtre de la trajectoire de référence (rad/s)
-        public float Stiffness01;       // raideur ramenée à 0..1 (ancienne échelle Brutality)
+        public float Omega;             // muscle natural frequency (rad/s) = NaturalMotion "stiffness"
+        public float Zeta;              // damping ratio (1 = critical) = NaturalMotion "damping"
+        public float MuscleStiffness;   // 1.01 - looseness (NaturalMotion); scales stiffness, not damping
+        public float RefOmega;          // reference trajectory filter frequency (rad/s)
+        public float Stiffness01;       // stiffness normalized to 0..1 (legacy Brutality scale)
     }
 
     /// <summary>
-    /// Tampon de commandes motrices : chaque programme y dépose (cible, excitation, raideur) par degré de liberté.
-    /// Deux couches : premier plan (chorégraphies, réflexes, agonie, comportements Euphoria) et arrière-plan (tonus
-    /// postural résiduel). Sur un DDL commandé activement au premier plan, le tonus de fond s'efface proportionnellement
-    /// à (1 - u_fg) (inhibition réciproque) afin que la pose figée à la mort ne dilue pas les gestes.
-    /// Chaque commande porte une raideur ω, un amortissement ζ, une muscleStiffness et la pulsation du filtre de
-    /// référence : les programmes Brutality passent une raideur 0..1 (ω = 10..34 rad/s, ζ = 0,95) ; les comportements
-    /// Euphoria passent directement les unités NaturalMotion (stiffness, damping, muscleStiffness).
+    /// Motor command buffer: each program submits (target, excitation, stiffness) per degree of freedom.
+    /// Two layers: foreground (choreographies, reflexes, agony, Euphoria behaviors) and background (residual
+    /// postural tone). On a DOF actively driven in the foreground, background tone fades proportionally to
+    /// (1 - u_fg) (reciprocal inhibition) so the frozen death pose does not dilute gestures.
+    /// Each command carries stiffness ω, damping ζ, muscleStiffness, and reference filter frequency:
+    /// Brutality programs pass a 0..1 stiffness (ω = 10..34 rad/s, ζ = 0.95); Euphoria behaviors
+    /// pass NaturalMotion units directly (stiffness, damping, muscleStiffness).
     /// </summary>
     internal sealed class MotorCommandBuffer
     {
@@ -71,18 +71,18 @@ namespace Brutality.Neural
             _bg.Add(joint * 3 + dof, targetRad, Mathf.Clamp01(u), Mathf.Lerp(LegacyOmegaMin, LegacyOmegaMax, s), LegacyZeta, 1f, Mathf.Lerp(RefOmegaMin, RefOmegaMax, s));
         }
 
-        /// <summary>Effecteur NaturalMotion : stiffness ω (rad/s), damping ζ, muscleStiffness (1,01 − looseness).</summary>
+        /// <summary>NaturalMotion effector: stiffness ω (rad/s), damping ζ, muscleStiffness (1.01 - looseness).</summary>
         public void AddNm(int joint, int dof, float targetRad, float weight, float stiffness, float damping, float muscleStiffness)
         {
             if (!(weight > 1e-4f) || float.IsNaN(targetRad)) return;
             float k = Mathf.Clamp(stiffness, 1f, 30f);
-            // Pas de lissage de consigne marqué : la souplesse NaturalMotion vient de la raideur elle-même.
+            // No heavy target smoothing: NaturalMotion compliance comes from the stiffness itself.
             _fg.Add(joint * 3 + dof, targetRad, Mathf.Clamp01(weight), k, Mathf.Clamp(damping, 0.05f, 4f), Mathf.Clamp(muscleStiffness, 0f, 1.5f), Mathf.Clamp(2.5f * k, 10f, 40f));
         }
 
         /// <summary>
-        /// Effecteur Delirium : les raideurs sont déjà des unités NaturalMotion (ω, ζ), avec un plancher plus bas que
-        /// les comportements car Delirium distingue un membre « mou » (strength faible) d'un membre éteint.
+        /// Delirium effector: stiffnesses are already in NaturalMotion units (ω, ζ), with a lower floor than
+        /// behaviors because Delirium distinguishes a "soft" limb (low strength) from a powered-off limb.
         /// </summary>
         public void AddEffector(int joint, int dof, float targetRad, float weight, float stiffness, float damping, float muscleStiffness)
         {
@@ -116,19 +116,19 @@ namespace Brutality.Neural
         }
     }
 
-    /// <summary>Ce que voient les programmes moteurs à chaque pas.</summary>
+    /// <summary>What motor programs see at each step.</summary>
     internal sealed class NeuralState
     {
         public BodyModel Body;
         public DeathContext Ctx;
         public System.Random Rng;
-        public float Time;          // secondes depuis la mort
+        public float Time;          // seconds since death
         public float Dt;
-        public float Agony;         // intensité instantanée de l'agonie (0..1+)
-        public float Reflex;        // échelle des réflexes (config)
-        public float Posturing;     // échelle du posturing cérébral (config)
-        public float Rigidity;      // rigidité de posture en cours (0..1), remise à 0 à chaque pas
-        public float RigidityPrev;  // rigidité du pas précédent (lue par les couches exécutées avant les crises)
+        public float Agony;         // instantaneous agony intensity (0..1+)
+        public float Reflex;        // reflex scale (config)
+        public float Posturing;     // cerebral posturing scale (config)
+        public float Rigidity;      // active postural rigidity (0..1), reset to 0 each step
+        public float RigidityPrev;  // previous step rigidity (read by layers executed before seizures)
         public MotorCommandBuffer Buffer;
     }
 
@@ -136,7 +136,7 @@ namespace Brutality.Neural
     {
         public const float NoChange = float.NaN;
 
-        /// <summary>Cible absolue en degrés (NaN = ne pas commander ce DDL).</summary>
+        /// <summary>Absolute target in degrees (NaN = do not drive this DOF).</summary>
         public static void Pose(NeuralState ns, JointId j, float flexDeg, float sideDeg, float twistDeg, float u, float s)
         {
             int ji = (int)j;
@@ -145,7 +145,7 @@ namespace Brutality.Neural
             if (!float.IsNaN(twistDeg)) ns.Buffer.Add(ji, 2, twistDeg * BMath.Deg, u, s);
         }
 
-        /// <summary>Cible absolue en degrés sur la couche de fond (effacée par toute commande de premier plan).</summary>
+        /// <summary>Absolute target in degrees on the background layer (masked by any foreground command).</summary>
         public static void PoseBg(NeuralState ns, JointId j, float flexDeg, float sideDeg, float twistDeg, float u, float s)
         {
             int ji = (int)j;
@@ -155,16 +155,16 @@ namespace Brutality.Neural
         }
 
         /// <summary>
-        /// Signe de la rotation interne (épaule, hanche) et de la pronation (avant-bras) dans la convention des
-        /// angles articulaires : torsion négative à droite, positive à gauche (vérifié par le banc de test).
-        /// La torsion des membres est relative à la pose de la mort.
+        /// Sign of internal rotation (shoulder, hip) and pronation (forearm) in the joint angle
+        /// convention: negative twist on the right, positive on the left (verified by the test rig).
+        /// Limb twist is relative to the death pose.
         /// </summary>
         public static float InternalRotSign(int side) => side < 0 ? 1f : -1f;
 
-        /// <summary>Petite oscillation (tremblement d'effort, clonus) en degrés, déterministe.</summary>
+        /// <summary>Small deterministic oscillation (effort tremor, clonus) in degrees.</summary>
         public static float Shake(float t, float freq, float phase) => Mathf.Sin(BMath.TwoPi * freq * t + phase);
 
-        /// <summary>Cible relative à un angle de référence (rad) + décalage en degrés.</summary>
+        /// <summary>Target relative to a reference angle (rad) + offset in degrees.</summary>
         public static void Offset(NeuralState ns, JointId j, int dof, float baseRad, float offsetDeg, float u, float s)
         {
             ns.Buffer.Add((int)j, dof, baseRad + offsetDeg * BMath.Deg, u, s);
@@ -190,8 +190,8 @@ namespace Brutality.Neural
         public static Vector3 Phi0(NeuralState ns, JointId j) => ns.Body.Joints[(int)j].Phi0;
 
         /// <summary>
-        /// Cinématique inverse analytique à deux segments (bras + avant-bras/main) : angles d'épaule (flexion,
-        /// abduction, mêmes définitions que BodyModel.Evaluate) et flexion du coude pour amener la main sur une cible.
+        /// Analytical two-segment inverse kinematics (upper arm + forearm/hand): shoulder angles (flexion,
+        /// abduction, matching BodyModel.Evaluate definitions) and elbow flexion to bring the hand to a target.
         /// </summary>
         public static bool ArmIK(NeuralState ns, int side, Vector3 target, out float flexDeg, out float abdDeg, out float elbowDeg)
         {

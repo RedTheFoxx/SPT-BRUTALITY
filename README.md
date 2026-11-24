@@ -1,15 +1,15 @@
-# Brutality 0.3.0 — ragdolls biomécaniques pour SPT
+# Brutality 0.4.0 — Biomechanical Ragdolls for SPT
 
-[![Preuves formelles Brutality](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml/badge.svg)](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml)
+[![Brutality Formal Proofs](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml/badge.svg)](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml)
 
-Plugin client BepInEx pour SPT 4.1.x qui remplace la dynamique de mort vanilla de Tarkov par une
-simulation biomécanique fondée sur le corpus scientifique du projet
-(`Corpus scientifique — biomécanique pour un ragdoll ultra réaliste.md`).
+Client-side BepInEx plugin for SPT 4.1.x that replaces Tarkov's vanilla death dynamics with a
+biomechanical simulation grounded in the project's scientific corpus
+(`Scientific Corpus — Biomechanics for an Ultra-Realistic Ragdoll.md`).
 
-Le ragdoll vanilla est un pantin inerte que le jeu propulse avec une impulsion fixe de 150 N·s.
-Brutality le transforme en **corps qui meurt**. Le système nerveux s'éteint selon la lésion, les
-muscles perdent leur tonus, se contractent ou se figent, et les tissus résistent aux amplitudes
-extrêmes. Tout s'arrête au plus tard **10 secondes** après la mort.
+The vanilla ragdoll is an inert puppet that the game launches with a fixed 150 N·s impulse.
+Brutality turns it into a **dying body**. The nervous system shuts down according to the lesion,
+muscles lose tone, contract, or lock, and tissues resist extreme ranges of motion. Everything settles
+no later than **10 seconds** after death.
 
 ---
 
@@ -19,313 +19,318 @@ extrêmes. Tout s'arrête au plus tard **10 secondes** après la mort.
 dotnet build src/Brutality/Brutality.csproj -c Release -p:Install=true
 ```
 
-Cette commande compile et copie `Brutality.dll` dans `SPT_4.1.6/BepInEx/plugins/Brutality/`.
-Le chemin du jeu est défini dans `Directory.Build.props`. Pour une autre installation :
-`-p:SptGame=/chemin/vers/SPT`.
+This command builds and copies `Brutality.dll` into `BepInEx/plugins/Brutality/`.
+The game path is configured in `Directory.Build.props`. For a custom installation path:
+`-p:SptGame=/path/to/SPT`.
 
-Installation manuelle : copier `src/Brutality/bin/Release/Brutality.dll` dans `BepInEx/plugins/Brutality/`.
+Manual installation: copy `src/Brutality/bin/Release/Brutality.dll` into `BepInEx/plugins/Brutality/`.
 
-Il n'y a rien à installer côté serveur : le plugin est 100 % client. Avec Fika, il doit être
-installé sur **l'hôte** (et idéalement sur les clients).
+Nothing needs to be installed server-side: the plugin is 100% client-side. With Fika, it should be
+installed on the **host** (and ideally on clients).
 
 ---
 
-## Ce qui est simulé
+## What Is Simulated
 
-### 1. Tissus passifs (le corps est mort, mais reste un corps)
-- **Masses et inerties par segment** d'après de Leva (1996) : centres de masse et rayons de
-  giration orientés sur l'axe longitudinal réel de chaque os. La masse corporelle varie d'un
-  individu à l'autre (80 kg ± 10 % par défaut).
-- **Équipement** : gilet, plaques, chargeurs et sac alourdissent le thorax et déplacent son
-  centre de masse (le sac vers l'arrière). Casque et casque audio alourdissent la tête.
-- **Amplitudes articulaires anatomiques** (NASA Source Book, Norkin & White, Panjabi & White).
-  Elles sont exprimées dans des repères articulaires de type ISB (Wu 2002/2005) calculés sur le
-  squelette au moment de la mort. Les limites vanilla sont en effet relatives à la pose de la
-  mort, donc anatomiquement fausses.
-- **Joints anatomiques PhysX** : les joints d'EFT sont remplacés à la mort par des
-  `ConfigurableJoint` dont les butées sont les vraies amplitudes. La butée de flexion est exacte
-  et asymétrique (un genou ne part pas en hyperextension). Son sens, comme celui des drives, est
-  **mesuré en jeu** au début de chaque raid par une sonde PhysX invisible créée sous la carte. Elles
-  sont « molles » (ressort amorti, raideur dérivée du couple passif
-  exponentiel de Yoon & Mansour / Riener & Edrich) : la résistance monte au-delà de l'amplitude
-  au lieu d'un arrêt sec.
-- **Couplage bi-articulaire** : ischio-jambiers (hanche ↔ genou) et droit fémoral. Une jambe
-  tendue ne peut pas monter au-delà d'environ 80°.
-- **Viscosité articulaire** et **friction peau/vêtements** contre le sol (le corps ne glisse plus
-  comme sur de la glace).
+### 1. Passive Tissues (the body is dead, yet remains a body)
+- **Per-segment masses and inertias** from de Leva (1996): centers of mass and radii of gyration
+  aligned to each bone's true longitudinal axis. Body mass varies from individual to individual
+  (80 kg ± 10% by default).
+- **Gear**: rig, armor plates, magazines, and backpack add weight to the thorax and shift its
+  center of mass (backpack shifts it backward). Helmet and headset add weight to the head.
+- **Anatomical ranges of motion** (NASA Source Book, Norkin & White, Panjabi & White).
+  Expressed in ISB-style joint coordinate frames (Wu 2002/2005) computed on the skeleton at the
+  moment of death. Vanilla limits are relative to the death pose and therefore anatomically wrong.
+- **PhysX anatomical joints**: EFT's joints are replaced at death with `ConfigurableJoint`s whose
+  limits match true anatomical ranges. The flexion limit is exact and asymmetric (a knee cannot
+  hyperextend backward). Its sign, as well as the drives' sign, is **measured in-game** at the start
+  of each raid by an invisible PhysX probe spawned under the map. Limits are "soft" (damped spring,
+  stiffness derived from the exponential passive torque of Yoon & Mansour / Riener & Edrich):
+  resistance ramps up past the range instead of hitting a hard stop.
+- **Biarticular coupling**: hamstrings (hip ↔ knee) and rectus femoris. A straight leg cannot
+  lift past roughly 80°.
+- **Joint viscosity** and **skin/clothing ground friction** (bodies no longer slide as if on ice).
 
 ### 2. Muscles
-- Actionneurs **couple-angle-vitesse** par degré de liberté (Anderson et al. 2007), avec relation
-  force-vitesse de **Hill**, des couples maximaux distincts en flexion et en extension, et une
-  **dynamique d'activation** de 15 ms à l'activation et 50 ms à la désactivation (Zajac, Thelen).
-- Les muscles sont des **drives PhysX** (en accélération, donc indépendants des masses), intégrés
-  implicitement par le solveur : aucune vibration numérique (Yeo et al. 2023). Les poses cibles
-  anatomiques sont converties en rotation par un solveur de pose (moindres carrés amortis).
-- **Collisions** : détection continue spéculative et vitesse angulaire bornée, pour que les membres
-  ne traversent plus murs et sol.
-- **Réponse localisée aux dégâts** : un membre détruit est flasque, un membre blessé est affaibli
-  proportionnellement à sa vie restante. Le membre touché par le coup fatal lâche immédiatement.
-- **Paralysies médullaires** : une balle dans la nuque (`NeckBack`) rend les quatre membres
-  flasques. `SpineTop` paralyse les jambes et le tronc, `SpineDown` paralyse les jambes.
+- **Torque-angle-velocity** actuators per degree of freedom (Anderson et al. 2007), with **Hill**
+  force-velocity relation, distinct peak torques in flexion and extension, and **activation
+  dynamics** of 15 ms activation and 50 ms deactivation (Zajac, Thelen).
+- Muscles are **PhysX acceleration drives** (mass-independent), implicitly integrated by the
+  solver: zero numerical jitter (Yeo et al. 2023). Anatomical target poses are converted into joint
+  rotations by a damped least-squares pose solver.
+- **Collisions**: speculative continuous collision detection and bounded angular velocity so limbs
+  no longer clip through walls and floors.
+- **Localized damage response**: a destroyed limb goes limp; an injured limb is weakened
+  proportionally to its remaining health. The limb hit by the fatal blow gives way immediately.
+- **Spinal cord paralyses**: a shot to the nape (`NeckBack`) renders all four limbs flaccid.
+  `SpineTop` paralyzes legs and trunk; `SpineDown` paralyzes the legs.
 
-### 3. Système nerveux : chute et agonie
-**Chutes Euphoria.** La chute n'est plus une chorégraphie figée : elle est jouée par les
-comportements NaturalMotion du portage Delirium (`docs/EUPHORIA.md`). Le plan est choisi à la mort
-d'après le mécanisme, la posture, la vitesse et la direction du tir :
+### 3. Nervous System: Fall and Agony
+**Euphoria falls.** The fall is no longer a canned choreography: it is driven by the NaturalMotion
+behaviors from the Delirium port (`docs/EUPHORIA.md`). The plan is selected at death from the injury
+mechanism, posture, velocity, and shot direction:
 
-| Plan | Ce qui se passe |
+| Plan | What happens |
 |---|---|
-| Titube (`staggerFall`) | 2 à 5 pas réels sur le point de capture, genoux qui cèdent un peu plus à chaque appui, puis effondrement |
-| Chute à genoux (`shotFallToKnees`) | le corps se dérobe sur les genoux, s'y maintient un instant, puis bascule |
-| Glissade sur les genoux | genoux au sol et élan conservé : le corps glisse sur les genoux puis pique du nez |
-| Quatre pattes | genoux puis mains, un temps d'appui, puis aplatissement |
-| Effondrement | équilibre perdu très vite : le corps s'affaisse sur place |
-| Effondrement assis | les hanches plient, le bassin tombe sous le poids, le buste part en arrière |
-| Effondrement latéral | le corps part sur le côté, dans le plan frontal, du côté touché quand c'est possible |
-| Plongeon | le buste pique en avant, les bras cherchent le sol |
-| Chute en planche | rachis cambré et corps raide (posturing) : chute à la renverse, comme une planche |
-| Moulinets (`armsWindmill`) | tir venu de face : les bras battent l'air, le buste part en arrière |
-| Pivot | le corps tourne sur lui-même avant que l'équilibre ne cède |
-| Vrille | le tronc se visse et le corps spirale vers le sol |
-| Roulade (`rollDownStairs`) | élan au moment de la mort : bascule, roulé-boulé, puis agonie au sol |
-| Relâchement | mort encéphalique, souffle, chute mortelle ou membre détruit : le tonus s'éteint, le corps tombe mou |
+| Stagger (`staggerFall`) | 2 to 5 real steps on the capture point, knees buckling a little more on each step, then collapse |
+| Fall to knees (`shotFallToKnees`) | body drops onto its knees, holds briefly, then tips over |
+| Knee slide | knees hit the ground with preserved momentum: the body slides on its knees then pitches forward |
+| All fours | knees then hands, a brief support pause, then flattening out |
+| Collapse | balance lost very quickly: body slumps in place |
+| Seated collapse | hips flex, pelvis drops under body weight, torso leans back |
+| Side collapse | body falls sideways in the frontal plane, toward the struck side when possible |
+| Dive | torso pitches forward, arms reach for the ground |
+| Board fall | arched spine and stiff body (posturing): falls backward like a plank |
+| Windmill (`armsWindmill`) | frontal hit: arms flail through the air, torso pitches backward |
+| Pivot | body spins around before balance gives way |
+| Spin | trunk twists and body spirals down to the ground |
+| Roll (`rollDownStairs`) | momentum at death: tip, tumble-roll, then agony on the ground |
+| Slack | brain death, blast, fatal fall, or destroyed limb: tone cuts off, body drops limp |
 
-Chaque plan est en outre **orienté**. La bascule de perte d'équilibre est un couple de corps entier qui
-part dans la direction du tir, à l'opposé, sur le côté ou en diagonale, selon le plan et un azimut tiré
-à chaque mort : le corps tombe donc en avant, à la renverse, sur le flanc gauche ou droit, et jamais
-toujours dans le même axe. Même le relâchement (balle à la tête, souffle, section médullaire) reçoit une
-direction et une intensité de bascule propres : un corps sans tonus ne s'affaisse plus deux fois de la
-même façon. Au sol, l'agonie peut faire rouler le corps sur le flanc ou le retourner.
+Every plan is also **directional**. The loss-of-balance tip is a whole-body torque directed along
+the shot, opposite, sideways, or diagonally depending on the plan and an azimuth drawn per death:
+the body therefore falls forward, backward, onto its left or right flank, and never always along
+the same axis. Even slackening (headshot, blast, spinal cord transection) receives its own tip
+direction and strength: a toneless body no longer collapses the same way twice. On the ground, agony
+can roll the body onto its side or flip it over.
 
-**Mémoire des morts.** Un directeur de variété retient les plans des dernières morts et les pénalise
-fortement : un même plan ne revient pas avant plusieurs corps, et chaque mort reçoit sa propre
-signature (force de bascule, cadence des gestes, asymétrie du corps).
+**Death memory.** A variety director remembers the plans of recent deaths and strongly penalizes
+them: the same plan does not repeat for several bodies, and each death gets its own signature (tip
+force, gesture cadence, body asymmetry).
 
-La réaction au tir est celle du comportement `shot` : relâchement, douleur du rachis, main sur la
-plaie, bras projeté, jambe qui se dérobe, vrille de choc, et « dernier carré » quand une rafale
-atteint un corps encore debout. Les muscles suivent les effecteurs Delirium ; la physique garde le
-dernier mot sur les contacts au sol.
+Hit reaction follows the `shot` behavior: looseness, spine pain, hand on wound, flung arm, leg
+give-way, shock spin, and "last stand" when a burst hits a body still on its feet. Muscles track
+Delirium effectors; physics has the final say on ground contacts.
 
-Chaque mort est classée selon son **mécanisme lésionnel** : zone exacte du collider, type de
-dégât, calibre. Ce mécanisme fixe la chronologie de la mort :
+Each death is classified by its **injury mechanism**: exact collider zone, damage type, caliber.
+This mechanism sets the death timeline:
 
-| Mécanisme | Déclencheur | Chute | Agonie |
+| Mechanism | Trigger | Fall | Agony |
 |---|---|---|---|
-| Encéphalique | tête (crâne, yeux, oreilles, mâchoire) | blackout et chute instantanés : tonus éteint en 20-50 ms, sans posturing ni rigidité | myoclonies rares, faible |
-| Médullaire cervical | nuque | tétraplégie flasque immédiate | tête seulement |
-| Vasculaire cervical | gorge | sursaut, effondrement, mains à la gorge | intense, 5-8,5 s |
-| Thoracique | cage thoracique haute | sursaut, genoux qui cèdent | myoclonies anoxiques, gasps, agrippe la poitrine |
-| Abdominal | abdomen, bassin | défense, flexion du tronc | repli fœtal, roulades, mains sur la plaie |
-| Membre | bras / jambe | chute du côté lésé | agrippe le membre, ruades de la jambe saine |
-| Souffle | explosion | flaccidité immédiate, corps projeté | myoclonies |
-| Syncope | hémorragie, épuisement, toxiques | affaissement progressif | myoclonies de syncope convulsive |
-| Chute | dégâts de chute | inerte | quasi nulle |
-| Brûlure | feu | sursaut | violente : roulades, repli, membres battants |
+| Brain | head (skull, eyes, ears, jaw) | instant blackout and drop: tone off in 20–50 ms, no posturing or rigidity | rare myoclonus, weak |
+| Cervical spinal | nape | immediate flaccid quadriplegia | head only |
+| Cervical vascular | throat | flinch, collapse, hands to throat | intense, 5–8.5 s |
+| Thoracic | upper ribcage | flinch, knees buckling | anoxic myoclonus, gasps, clutches chest |
+| Abdominal | abdomen, pelvis | guarding, trunk flexion | fetal curl, rolls, hands on wound |
+| Limb | arm / leg | fall toward injured side | clutches limb, kicks with healthy leg |
+| Blast | explosion | immediate flaccidity, body launched | myoclonus |
+| Syncope | hemorrhage, exhaustion, toxins | progressive slump | convulsive syncope myoclonus |
+| Fall | fall damage | inert | almost none |
+| Burn | fire | flinch | violent: rolls, curl, flailing limbs |
 
-**Programmes moteurs involontaires.** Ils sont tirés au hasard et pondérés par le mécanisme,
-l'orientation du corps au sol (sur le dos, le ventre ou le côté) et les membres encore capables
-de bouger :
+**Involuntary motor programs.** Randomly drawn and weighted by mechanism, ground orientation
+(supine, prone, or side), and limbs still capable of moving:
 
-- tonus postural résiduel, qui s'éteint groupe par groupe ;
-- verrouillages articulaires (gel musculaire) ;
-- main vers la plaie, par cinématique inverse ;
-- repli fœtal ;
-- extension tonique (opisthotonos) ;
-- salves de myoclonies ;
-- pédalage ;
-- ruade ;
-- bras incontrôlé ;
-- tentative de roulade ;
-- rotation de tête ;
-- gasps agoniques ;
-- tête ballante ;
-- bras qui se tendent brusquement (aussi à l'instant de l'impact) ;
-- genoux qui se replient par saccades ;
-- secousses globales en flexion ou en extension ;
-- contorsions continues : chaque articulation dérive au hasard entre deux gestes francs ;
-- **crises de décortication** (coudes et poignets fléchis, bras ramenés sur la poitrine, jambes raides), avec
-  paroxysmes et clonus ;
-- **rigidité de posture** continue entre les gestes, qui prolonge la posture de la chute (lésions cérébrales surtout) ;
-- **signe de Lazare** : les bras se lèvent lentement et se croisent sur la poitrine, puis redescendent ;
-- crise tonico-clonique : phase tonique puis secousses dont le rythme ralentit ;
-- main tendue vers le ciel (ou devant soi), tremblante, qui retombe d'un coup ;
-- tentative de ramper et tentative de se relever sur les bras (sur le ventre) ; avec une paraplégie, le corps se
-  traîne sur les bras ;
-- tentative de se redresser sur les coudes (sur le dos) ; tête qui se relève puis retombe ;
-- genou qui remonte puis glisse ; talons qui tambourinent ; jambes en ciseaux ;
-- frappe le sol du plat de la main ; bras qui protègent le visage ; mains au visage ; balancement d'un flanc à l'autre ;
-- **pontage** (bassin soulevé en arc, appui sur les pieds et les épaules), **reptation sur les coudes**,
-  **tête qui frappe le sol**, **jambes qui se croisent**, **bras tendus au-dessus de la tête**, **mains qui pressent
-  la poitrine**, **torsion axiale continue**, **talon qui glisse vers la fesse**, **épaules haussées à chaque gaspe**,
-  **nuque cambrée**, **frisson de tout le corps** ;
-- **respiration laborieuse** visible (buste, tête, épaules), rapide puis de plus en plus lente, jusqu'à un
-  **dernier soupir** : inspiration profonde, temps d'arrêt, puis la tête roule sur le côté.
+- residual postural tone, fading group by group;
+- joint locks (muscle freezing);
+- hand to wound via inverse kinematics;
+- fetal curl;
+- tonic extension (opisthotonos);
+- myoclonus bursts;
+- pedaling;
+- kicking;
+- flailing arm;
+- roll attempt;
+- head turn;
+- agonal gasps;
+- lolling head;
+- arms suddenly extending (also at impact);
+- knees jerking up;
+- global flexion or extension jerks;
+- continuous contortions: each joint drifts randomly between discrete gestures;
+- **decorticate seizures** (elbows and wrists flexed, arms drawn to chest, stiff legs), with
+  paroxysms and clonus;
+- **continuous postural rigidity** between gestures, extending the fall posture (especially brain
+  injuries);
+- **Lazarus sign**: arms slowly rise and cross over the chest, then lower;
+- tonic-clonic seizure: tonic phase followed by slowing jerks;
+- hand reaching skyward (or forward), trembling, then dropping suddenly;
+- crawl attempt and push-up attempt (when prone); with paraplegia, the body drags itself with its
+  arms;
+- attempt to prop up on elbows (when supine); head lifting then dropping back;
+- knee drawing up then sliding down; heels drumming; scissoring legs;
+- slapping the ground with an open palm; arms shielding the face; hands to face; rocking from
+  flank to flank;
+- **bridging** (pelvis arched up, supported on feet and shoulders), **elbow crawl**, **head banging
+  the ground**, **crossed legs**, **arms stretched overhead**, **hands pressing chest**,
+  **continuous axial twist**, **heel sliding toward glute**, **shoulders shrugging on each gasp**,
+  **arched neck**, **full-body shudder**;
+- **visible labored breathing** (chest, head, shoulders), rapid then slowing down to a **final
+  breath**: deep inhale, pause, then head rolling to the side.
 
-Le même geste revient rarement deux fois de suite. Les gestes dépendent de l'orientation au sol (on ne rampe que sur
-le ventre) et des membres encore capables de bouger.
+The same gesture rarely repeats twice in a row. Gestures depend on ground orientation (crawling
+only happens prone) and still-mobile limbs.
 
-À chaque mort, un tirage construit une **palette** propre : quatre à six gestes sont privilégiés, trois à cinq sont
-atténués, et la cadence, l'asymétrie du corps et l'amplitude des contorsions varient avec elle. La mémoire des deux
-morts précédentes réduit encore le poids des gestes déjà vus. Deux agonies ne jouent donc ni la même sélection, ni
-le même ordre, ni la même cadence — et un bras détruit, une paraplégie ou un membre détaché écartent d'eux-mêmes les
-gestes qu'ils rendent impossibles.
+On every death, a draw builds a unique **palette**: four to six gestures are favored, three to five
+are attenuated, and cadence, body asymmetry, and contortion amplitude vary with it. Memory of the
+previous two deaths further reduces the weight of already-seen gestures. No two agonies play the
+same selection, order, or cadence — and a destroyed arm, paraplegia, or detached limb automatically
+excludes impossible gestures.
 
-Un premier geste franc est garanti dès que le corps touche le sol, et jusqu'à trois gestes
-peuvent se superposer.
+A first clear gesture is guaranteed as soon as the body touches the ground, and up to three gestures
+can overlap.
 
-**Impacts réels.** Une balle transmet sa quantité de mouvement p = m·v au point d'impact, avec
-la masse et la vitesse lues dans le gabarit de la munition et une perte de vitesse selon la
-distance. La part réellement transmise varie à chaque tir dans un intervalle propre à la classe de munition
-(déformation, fragmentation, basculement, sortie du projectile), avec une légère déviation et un bras de levier
-variable :
+**Real impacts.** A bullet transfers its momentum p = m·v at the impact point, using mass and
+velocity read from the ammo template with distance-based velocity loss. The actually transferred
+fraction varies per shot within a caliber-class interval (deformation, fragmentation, tumbling,
+exit), with slight angular scatter and variable lever arm:
 
-| Classe | Multiplicateur | Déviation |
+| Class | Multiplier | Scatter |
 |---|---|---|
-| Pistolet | ×0,85 à 1,4 | 9° |
-| Intermédiaire (5,45, 5,56…) | ×0,75 à 1,55 | 12° |
-| Pleine puissance (7,62×51, 7,62×54R, .338…) | ×0,9 à 1,85 | 6° |
-| Subsonique lourde (9×39, .300 BLK sub…) | ×1,05 à 1,75 | 5° |
-| Gros calibre (12,7 mm…) | ×1,15 à 2,1 | 6° |
-| Slug / chevrotine | ×1,1 à 2,1 / ×0,7 à 1,7 | 7° / 20° |
-| Perforante (pénétration > 40) | intervalle réduit jusqu'à −28 % | ×0,7 |
+| Pistol | ×0.85 to 1.4 | 9° |
+| Intermediate (5.45, 5.56…) | ×0.75 to 1.55 | 12° |
+| Full-power (7.62×51, 7.62×54R, .338…) | ×0.9 to 1.85 | 6° |
+| Heavy subsonic (9×39, .300 BLK sub…) | ×1.05 to 1.75 | 5° |
+| Heavy caliber (12.7 mm…) | ×1.15 to 2.1 | 6° |
+| Slug / buckshot | ×1.1 to 2.1 / ×0.7 to 1.7 | 7° / 20° |
+| Armor-piercing (penetration > 40) | interval narrowed up to −28% | ×0.7 |
 
-Le tirage du coup fatal module aussi la force de la chute dirigée et l'intensité de la réaction à l'impact. Le
-souffle des explosions varie de ×0,7 à ×1,4. Un souffle répartit son impulsion sur les segments selon leur masse et leur distance.
-L'énergie du projectile module l'intensité des réflexes.
+The fatal shot draw also modulates directional fall force and impact reaction intensity. Blast
+impulses vary from ×0.7 to ×1.4 and distribute across segments by mass and distance. Projectile
+energy modulates reflex intensity.
 
-**Arrêt garanti en 10 s maximum.** L'agonie reste à pleine intensité pendant près de la moitié de
-sa fenêtre, puis s'éteint au plus tard 1,5 s avant la fin. Une phase
-de dissipation amène ensuite le corps au repos, puis le jeu fige les rigidbodies. Si le corps est
-immobile plus tôt, l'arrêt est anticipé pour économiser le CPU.
+**Guaranteed stop within 10 s max.** Agony stays at full intensity for nearly half its window, then
+fades out no later than 1.5 s before the end. A dissipation phase brings the body to rest, then the
+game freezes rigidbodies (unless permanent simulation is enabled). If the body settles earlier,
+shutdown happens early to save CPU.
 
 ---
 
-### 3.1 Balle à la tête
+### 3.1 Headshot
 
-Une balle dans la tête coupe le tonus en 20 à 50 ms : le corps part de sa hauteur, mou, sans se raidir. Aucun
-posturing n'est joué (il suppose un tronc cérébral intact), aucune rigidité de fond ne s'installe, et la
-respiration agonique est quasi absente. Les secousses médullaires libérées (clonies, spasmes, signe de Lazare)
-subsistent plus tard, au sol.
+A headshot cuts tone in 20 to 50 ms: the body drops from standing height, limp, without stiffening.
+No posturing is played (it requires an intact brainstem), no background rigidity sets in, and agonal
+breathing is nearly absent. Released spinal jerks (clonus, spasms, Lazarus sign) remain later on
+the ground.
 
-### 3.2 Balle dans le dos
+### 3.2 Shot in the Back
 
-Un tir qui frappe le tronc par l'arrière ne fait plus basculer le corps d'un bloc sur des jambes tendues.
-Le rachis ne se replie que de la moitié de la douleur habituelle, les jambes ne sont plus raidies, et le
-quadriceps cède sous le poids du corps : le bassin descend, les genoux se ferment et la chute part d'un
-affaissement des jambes. La roulade n'est plus déclenchée par une mort à l'arrêt ; elle reste possible si
-la victime courait au moment du tir.
+A shot hitting the trunk from behind no longer tips the body over as a rigid block on stiff legs.
+The spine bends by only half the usual pain response, legs are no longer stiffened, and the
+quadriceps gives way under body weight: the pelvis drops, knees flex, and the fall begins with leg
+collapse. Rolling is no longer triggered from a stationary death; it remains possible if the victim
+was running when hit.
 
-## Moteur Euphoria et cadavres simulés en permanence
+## Euphoria Engine and Permanently Simulated Corpses
 
-La chute exécute un portage de [Delirium](https://github.com/PVCPC/delirium-physics), le projet
-open-source issu de la rétro-ingénierie d'Euphoria (le moteur des GTA) : les lois de Delirium, avec les
-valeurs par défaut du `behaviours.xml` de GTA V (les constantes de Delirium sont extraites du binaire
-de GTA IV et ne sont pas publiables). Depuis la 0.2.0, c'est le **seul moteur d'animation** : les
-chorégraphies procédurales de la 0.1.0 ont été retirées, l'agonie et le posturing cérébral de
-Brutality restant actifs par-dessus.
-Le mourant réagit au tir (relâchement, main sur la plaie avec traction `pull` et pronation de la paume, bras projeté, réflexe `upperBodyFlinch` sur rafale frontale), titube en posant de vrais pas, se dérobe d'une jambe ou des deux (simultanément ou en deux temps), tente de s'agripper aux murs, caisses et rebords proches (`grab` à force de rupture), fait des moulinets déphasés en partant en arrière, se rattrape ou roule (`rollDownStairs` + `bodyRollUp`), puis se tord au sol. Sous une rafale, il reste debout un instant (« dernier carré »). Les cadavres ne sont plus figés : ils restent simulés et bougent quand on leur tire dessus.
-Détails, correspondance Delirium et preuves formelles : `docs/EUPHORIA.md` et `tests/Brutality.DeliriumTests`.
+The fall runs a port of [Delirium](https://github.com/PVCPC/delirium-physics), the open-source
+reverse-engineering project of Euphoria (the GTA engine): Delirium's laws with GTA V
+`behaviours.xml` default values (Delirium's own constants are extracted from the GTA IV binary and
+are not redistributable). Since 0.2.0, it is the **sole animation engine**: 0.1.0 procedural
+choreographies were removed, while Brutality's agony and cerebral posturing remain active on top.
+The dying character reacts to gunfire (looseness, hand on wound with `pull` traction and palm
+pronation, flung arm, `upperBodyFlinch` guard reflex on frontal bursts), staggers with real steps,
+gives way on one or both legs (simultaneously or in two stages), reaches to grab nearby walls,
+crates, and ledges (`grab` with break force), windmills out of phase while falling backward, catches
+itself or rolls (`rollDownStairs` + `bodyRollUp`), then writhes on the ground. Under a burst, it
+briefly stays upright ("last stand"). Corpses are no longer frozen: they stay simulated and react
+when shot.
+Details, Delirium mapping, and formal proofs: `docs/EUPHORIA.md` and `tests/Brutality.DeliriumTests`.
 
-## Compatibilité avec les mods installés
+## Mod Compatibility
 
-| Mod | Statut | Action |
+| Mod | Status | Action |
 |---|---|---|
-| **Smoothie** | Compatible. Son réglage « Corpses stop moving after (s) » (5 s chez toi) est neutralisé pour les corps gérés par Brutality. Son plafond de physique à 60 Hz est respecté : Brutality agit avant chaque pas `Physics.Simulate`. | **Rien à désactiver.** Facultatif : régler « Corpses stop moving after (s) » sur **10** pour aligner les corps non gérés (Brutality désactivé, corps en surnombre). |
-| **HollywoodFX** | Compatible si ses ragdolls restent désactivés. C'est le cas dans ta config. Son option « Gore » applique à la mort une impulsion allant jusqu'à 200 N·s : Brutality la **neutralise** (option « Neutraliser les impulsions de mort des autres mods »). Le sang et les décalques sont conservés. | Garder « Enable Ragdoll Effects (RESTART) » et « Enable Cinematic Ragdolls (RESTART) » sur **false**. Si elles sont actives, HollywoodFX réanime les corps figés quand on leur tire dessus (un avertissement s'affiche dans le journal). |
-| **Fika** | Compatible. L'hôte simule la mort ; les clients animent leur copie et la pose finale de l'hôte est appliquée par Fika. | Aucune. |
-| **ReClassic** (inconscience) | Compatible. Un corps inconscient qui meurt est repris par Brutality. | Aucune. |
-| **Rupture** (non installé) | Conflit : les deux mods pilotent les ragdolls. | Le désactiver s'il est installé un jour. |
+| **Smoothie** | Compatible. Its "Corpses stop moving after (s)" setting is neutralized for Brutality-managed bodies. Its 60 Hz physics cap is respected: Brutality runs before each `Physics.Simulate` step. | **Nothing to disable.** Optional: set "Corpses stop moving after (s)" to **10** to align unmanaged bodies (Brutality disabled or beyond cap). |
+| **HollywoodFX** | Compatible if its ragdolls stay disabled. Its "Gore" option applies up to 200 N·s impulse at death: Brutality **neutralizes** it ("Neutralize death impulses from other mods"). Blood and decals are preserved. | Keep "Enable Ragdoll Effects (RESTART)" and "Enable Cinematic Ragdolls (RESTART)" set to **false**. If enabled, HollywoodFX reanimates frozen corpses when shot (a warning is logged). |
+| **Fika** | Compatible. Host simulates death; clients animate their local copy and Fika applies the host's final pose. | None. |
+| **ReClassic** (unconsciousness) | Compatible. An unconscious body that dies is taken over by Brutality. | None. |
+| **Rupture** | Conflict: both mods drive ragdolls. | Disable Rupture if installed. |
 
 ---
 
 ## Configuration
 
-Fichier `BepInEx/config/com.brutality.ragdoll.cfg`, modifiable en jeu avec F12
-(ConfigurationManager).
+File `BepInEx/config/com.brutality.ragdoll.cfg`, editable in-game with F12 (ConfigurationManager).
 
-| Section | Réglage | Défaut | Rôle |
+| Section | Setting | Default | Role |
 |---|---|---|---|
-| Général | Activer Brutality | true | Désactivé : comportement vanilla. |
-| | Durée maximale du mouvement (s) | 10 | 3 à 10 s. |
-| | Appliquer à votre propre corps | true | |
-| | Appliquer aux corps observés (Fika client) | true | |
-| | Corps simulés simultanément (max) | 12 | Au-delà : physique passive seule, sans agonie. |
-| | Distance de simulation complète (m) | 150 | Au-delà : pas d'agonie. |
-| Corps | Masse corporelle moyenne (kg) | 80 | |
-| | Variation de masse | 0,10 | |
-| | Inclure la masse du matériel porté | true | |
-| | Friction des tissus au sol | 0,8 | |
-| Comportement | Intensité des agonies | 1 | 0 = aucune agonie, 2 = double. |
-| | Vigueur des spasmes | 1 | Netteté et force des gestes involontaires, amplitude des contorsions. 0,5 = plus sobre. |
-| | Force des chutes dirigées | 1 | Intensité de la perte d'équilibre et de la bascule initiale des plans Euphoria. 0 = effondrement sous le poids seul. |
-| | Intensité du posturing cérébral | 1 | Décérébration, décortication, signe de Lazare, chutes en planche. 0 = jamais. |
-| | Variété des gestes | 1 | Fréquence des gestes élaborés et des chutes propres à la posture, écart entre les palettes de gestes d'une mort à l'autre. 0 = gestes de base et palettes neutres. |
-| | Respiration agonique visible | true | Respiration laborieuse et dernier soupir. |
-| | Intensité des réflexes | 1 | Sursaut, posturing, verrouillages. |
-| | Force musculaire | 1 | |
-| | Raideur passive des articulations | 1 | |
-| Impacts | Multiplicateur de quantité de mouvement des balles | 1 | 1 = physique réelle. |
-| | Multiplicateur du souffle des explosions | 1 | |
-| | Neutraliser les impulsions de mort des autres mods | true | |
-| Stabilité | Équilibrage des masses articulaires | 1 | 1 = méthode EFT, la plus stable. |
-| | Convention des drives articulaires | Auto | Auto = vérifiée pendant les premières morts du raid (message dans le journal). |
-| | Itérations du solveur PhysX | 12 | |
-| Debug | Journalisation détaillée | false | Chronologie motrice de chaque mort. |
+| General | Enable Brutality | true | Disabled: vanilla behavior. |
+| | Max motion duration (s) | 10 | 3 to 10 s. |
+| | Apply to your own corpse | true | |
+| | Apply to observed corpses (Fika client) | true | |
+| | Max simultaneous simulated corpses | 12 | Beyond cap: passive physics only, no agony. |
+| | Full simulation distance (m) | 150 | Beyond distance: no agony. |
+| Body | Average body mass (kg) | 80 | |
+| | Body mass variation | 0.10 | |
+| | Include carried gear mass | true | |
+| | Tissue ground friction | 0.8 | |
+| Behavior | Agony intensity | 1 | 0 = no agony, 2 = double. |
+| | Spasm vigor | 1 | Sharpness and force of involuntary gestures, contortion amplitude. 0.5 = subtler. |
+| | Directional fall drive | 1 | Loss-of-balance strength and initial tip of Euphoria plans. 0 = collapse under weight alone. |
+| | Cerebral posturing intensity | 1 | Decerebration, decortication, Lazarus sign, board falls. 0 = never. |
+| | Gesture variety | 1 | Frequency of elaborate gestures and posture-specific falls, spread between per-death palettes. 0 = basic gestures and neutral palettes. |
+| | Visible agonal breathing | true | Labored breathing and final breath. |
+| | Reflex intensity | 1 | Flinch, posturing, joint locks. |
+| | Muscle strength | 1 | |
+| | Passive joint stiffness | 1 | |
+| Impacts | Bullet momentum multiplier | 1 | 1 = real physics. |
+| | Explosion blast multiplier | 1 | |
+| | Neutralize death impulses from other mods | true | |
+| Stability | Joint mass balancing | 1 | 1 = EFT method, most stable. |
+| | Joint drive convention | Auto | Auto = verified during the first deaths of the raid (logged). |
+| | PhysX solver iterations | 12 | |
+| Debug | Detailed logging | false | Motor timeline of each death. |
 
 ---
 
-## Vérifier que ça fonctionne (premier test)
+## Verifying It Works (First Test)
 
-Dans `BepInEx/LogOutput.log`, au chargement :
-
-```
-Brutality : suivi des blessures sur N implémentation(s) de ApplyDamageInfo.
-Brutality : Smoothie détecté — son arrêt anticipé des cadavres est neutralisé ...
-Brutality 0.3.0 chargé.
-```
-
-Si ces lignes manquent, le plugin ne s'est pas activé : cherche « Brutality : configuration invalide »
-ou « échec de l'initialisation » dans le journal.
-
-Puis à chaque mort :
+In `BepInEx/LogOutput.log`, on load:
 
 ```
-Brutality : <nom> mort — Thoracic, zone Chest/RibcageUp, 545x39 (intermédiaire, poussée ×1,12), 1612 J, 3,2 N·s, masse 83 kg (+11,4 kg équipement), posture Stand, chute : main tendue
+Brutality: wound tracking on N ApplyDamageInfo implementation(s).
+Brutality: Smoothie detected — early corpse freeze neutralized ...
+Brutality 0.4.0 loaded.
 ```
 
-Pour diagnostiquer, active « Journalisation détaillée » : chaque programme moteur déclenché est
-alors listé avec son instant et son intensité, ainsi que les impulsions neutralisées.
+If these lines are missing, the plugin did not activate: look for `Brutality: invalid configuration`
+or `initialization failed` in the log.
 
-Au début du raid, la sonde PhysX doit écrire une ligne du type
-`Brutality : sonde PhysX — drive 30.0° (cible 30°) → normal ; butée X 60.0° → normale.`
-Si elle indique « indéterminé », envoie le journal.
+Then on each death:
 
-Messages à surveiller :
-- `ragdoll non pris en charge (segment manquant…)` : squelette inattendu, le corps reste vanilla.
-- `aucun pas Physics.Simulate intercepté` : mode de repli, moins précis.
-- `erreur de simulation` : le corps repasse en ragdoll passif ; merci de transmettre le journal.
+```
+Brutality: <name> died — Thoracic, zone Chest/RibcageUp, 545x39 (intermediate, push x1.12), 1612 J, 3.2 N·s, mass 83 kg (+11.4 kg gear), posture Stand, fall: reach
+```
+
+To diagnose, enable "Detailed logging": each triggered motor program is listed with its timestamp
+and intensity, along with any neutralized impulses.
+
+At raid start, the PhysX probe should log a line like
+`Brutality: PhysX probe — drive 30.0° (target 30°) -> normal; X limit 60.0° -> normal.`
+If it says `undetermined`, share the log.
+
+Messages to watch for:
+- `unsupported ragdoll (missing segment…)`: unexpected skeleton, body stays vanilla.
+- `no Physics.Simulate step intercepted`: fallback mode, less accurate.
+- `simulation error`: body falls back to passive ragdoll; please share the log.
 
 ---
 
-## Tests hors jeu
+## Off-Game Tests
 
-Les conventions anatomiques et la fidélité au portage Delirium sont couvertes par deux bancs de test autonomes qui compilent directement les vraies sources C# du plugin sans le jeu :
+Anatomical conventions and Delirium port fidelity are covered by two standalone test benches that
+compile the actual C# plugin sources directly without the game:
 
 ```bash
 dotnet run --project tests/Brutality.KinematicsTests
 dotnet run --project tests/Brutality.DeliriumTests
 ```
 
-La fiche de preuves générée automatiquement (**77 / 77** vérifications : lois Delirium, simulation 60 Hz, audit statistique de diversité sur 60 morts, cinématique ISB, IK et configuration BepInEx) est consultable dans [`docs/VERIFICATION.md`](docs/VERIFICATION.md), accompagnée d'empreintes SHA-256 et de scénarios reproductibles dans `demo/banc-essai.html`.
+The automatically generated proof sheet (**77 / 77** checks: Delirium laws, 60 Hz simulation,
+60-death statistical diversity audit, ISB kinematics, IK, and BepInEx config) can be viewed in
+[`docs/VERIFICATION.md`](docs/VERIFICATION.md), with SHA-256 digests and reproducible scenarios in
+`demo/test-bench.html`.
 
-Pour régénérer `docs/VERIFICATION.md` localement depuis une exécution fraîche :
+To regenerate `docs/VERIFICATION.md` locally from a fresh run:
 
 ```bash
 dotnet run --project tests/Brutality.DeliriumTests -- --report docs/VERIFICATION.md
 dotnet run --project tests/Brutality.KinematicsTests -- --append-report docs/VERIFICATION.md
 ```
 
-Un workflow GitHub Actions prêt à l'emploi (`.github/workflows/verify.yml`) exécute également ces deux suites sur Linux sans aucune DLL propriétaire et publie la fiche en artefact / résumé de build.
+A ready-to-use GitHub Actions workflow (`.github/workflows/verify.yml`) also runs both suites on
+Linux without any proprietary DLLs and publishes the sheet as a build artifact and workflow summary.
 
 ---
 
@@ -333,44 +338,42 @@ Un workflow GitHub Actions prêt à l'emploi (`.github/workflows/verify.yml`) ex
 
 ```
 src/Brutality/
-  Plugin.cs, Settings.cs, Compat.cs        point d'entrée BepInEx, configuration, compatibilité
-  Anatomy/AnatomyData.cs                   segments, articulations, de Leva, amplitudes, couples
+  Plugin.cs, Settings.cs, Compat.cs        BepInEx entry point, config, compatibility
+  Anatomy/AnatomyData.cs                   segments, joints, de Leva, ranges, torques
   Core/
-    JointKinematics.cs                     angles anatomiques (fonctions pures, testées hors jeu)
-    BodyModel.cs                           segments, repères, masses/inerties, joints, état
-    JointRig.cs                            remplacement des joints EFT par des joints anatomiques PhysX
-    DriveController.cs                     muscles en drives PhysX : activation, Hill, couplage bi-articulaire
-    DeathContext.cs                        analyse de la mort : mécanisme, balistique, santé, équipement
-    Wounds.cs                              historique des blessures, base des munitions
-    Impacts.cs                             impulsions balistiques et de souffle, variation par classe de munition
-    BrutalityRagdoll.cs                    cycle de vie du cadavre, horloge physique, arrêt ≤ 10 s
-    VarietyDirector.cs                     mémoire anti-répétition des plans et des gestes, palette propre à chaque mort
+    JointKinematics.cs                     anatomical angles (pure functions, off-game tested)
+    BodyModel.cs                           segments, frames, masses/inertias, joints, state
+    JointRig.cs                            replaces EFT joints with PhysX anatomical joints
+    DriveController.cs                     muscles as PhysX drives: activation, Hill, biarticular coupling
+    DeathContext.cs                        death analysis: mechanism, ballistics, health, gear
+    Wounds.cs                              wound history, ammo database
+    Impacts.cs                             ballistic & blast impulses, ammo-class variation
+    BrutalityRagdoll.cs                    corpse lifecycle, physics clock, stop <= 10 s
+    VarietyDirector.cs                     anti-repetition memory for plans & gestures, per-death palette
   Neural/
-    MechanismProfiles.cs                   chronologies par mécanisme lésionnel
-    NeuralController.cs                    construction des programmes et ordonnanceur d'agonie
-    Programs.cs, Motor.cs                  programmes moteurs, fusion des commandes, IK
-    Postures.cs                            décortication, crises de posturing, rigidité, signe de Lazare
-    AgonyMoves.cs                          réaction à l'impact, respiration, dernier soupir, gestes d'agonie élaborés
+    MechanismProfiles.cs                   timelines per injury mechanism
+    NeuralController.cs                    program construction and agony scheduler
+    Programs.cs, Motor.cs                  motor programs, command blending, IK
+    Postures.cs                            decortication, posturing seizures, rigidity, Lazarus sign
+    AgonyMoves.cs                          impact reaction, breathing, final breath, elaborate agony moves
   Patches/BrutalityPatches.cs              Physics.Simulate, Player.OnDead, ApplyDamageInfo, TryPutToSleep
-tests/Brutality.KinematicsTests/           banc de test cinématique hors jeu (46 tests)
-tests/Brutality.DeliriumTests/             preuves formelles de fidélité Delirium et diversité (31 tests)
-docs/SCIENCE.md                            correspondance corpus scientifique → implémentation
-docs/EUPHORIA.md                           architecture du portage Delirium
-docs/VERIFICATION.md                       fiche de preuves formelles générée par les tests (77 tests)
-.github/workflows/verify.yml               workflow CI GitHub Actions (77 tests sans DLL du jeu)
-demo/banc-essai.html                       studio de démonstration 3D interactif
+tests/Brutality.KinematicsTests/           off-game kinematics test bench (46 tests)
+tests/Brutality.DeliriumTests/             Delirium fidelity & diversity formal proofs (31 tests)
+docs/SCIENCE.md                            scientific corpus -> implementation mapping
+docs/EUPHORIA.md                           Delirium port architecture
+docs/VERIFICATION.md                       test-generated formal proof sheet (77 tests)
+.github/workflows/verify.yml               GitHub Actions CI workflow (77 tests without game DLLs)
+demo/test-bench.html                       interactive 3D demo studio
 ```
 
-## Limites de la version 0.3.0
-- Pas encore testée en jeu : les ordres de grandeur (tonus, gains, intensités) seront à ajuster
-  après le premier test, via la configuration ou les tables de `AnatomyData.cs` et
-  `MechanismProfiles.cs`.
-- Les pieds et les mains ne sont pas des segments simulés (absents du ragdoll EFT) : ils sont
-  fusionnés avec la jambe et l'avant-bras.
-- Pas de masse oscillante pour les tissus mous (piste du corpus, §10). Prévue pour une version
-  ultérieure.
-- Moteur Euphoria et simulation permanente des cadavres (sources et correspondance des paramètres :
-  `docs/EUPHORIA.md`) : non testés en jeu. Avec la simulation permanente, garder les ragdolls
-  HollywoodFX désactivés.
-- Les modes « Brutality » et « Mixte » de la 0.1.0 ont été retirés : la configuration ne propose plus
-  « Moteur des animations ». Euphoria est le moteur définitif.
+## Limitations of Version 0.4.0
+- Not yet tested in-game: orders of magnitude (tone, gains, intensities) will be tuned after the
+  first live test via configuration or the tables in `AnatomyData.cs` and `MechanismProfiles.cs`.
+- Feet and hands are not simulated segments (absent from EFT's ragdoll): they are merged with the
+  calf and forearm.
+- No wobbling mass for soft tissues (corpus lead, §10). Planned for a later version.
+- Euphoria engine and permanently simulated corpses (sources and parameter mapping:
+  `docs/EUPHORIA.md`): not yet tested in-game. With permanent simulation enabled, keep HollywoodFX
+  ragdolls disabled.
+- Legacy 0.1.0 "Brutality" and "Mixed" modes were removed: configuration no longer offers an
+  "Animation engine" selector. Euphoria is the permanent engine.

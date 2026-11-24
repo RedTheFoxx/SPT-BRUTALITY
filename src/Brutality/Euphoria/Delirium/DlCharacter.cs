@@ -7,18 +7,18 @@ using UnityEngine;
 namespace Brutality.Euphoria
 {
     /// <summary>
-    /// Constantes du portage Delirium adaptées au squelette SPT.
+    /// Delirium port constants adapted to the SPT skeleton.
     ///
-    /// Delirium (PVCPC/delirium-physics, GPL-3.0) lit ses nombres dans le binaire de GTA IV (macro `kv!`), qui
-    /// n'est pas publiable : on ne peut donc pas reprendre ses valeurs, seulement ses lois. Les raideurs ci-dessous
-    /// sont en revanche les valeurs publiées par NaturalMotion dans le behaviours.xml de GTA V (celles que Brutality
-    /// utilisait déjà) : elles décrivent les mêmes comportements et sont exprimées dans la même unité que Delirium
-    /// (stiffness = pulsation propre ω, damping = rapport d'amortissement ζ). Les endroits où Delirium choisit une
-    /// valeur propre sont signalés par un commentaire « Delirium : ».
+    /// Delirium (PVCPC/delirium-physics, GPL-3.0) reads its numbers from the GTA IV binary (`kv!` macro), which
+    /// cannot be published: so we cannot reuse its values, only its laws. The stiffnesses below, however,
+    /// are the values published by NaturalMotion in GTA V's behaviours.xml (which Brutality already used):
+    /// they describe the same behaviors and are expressed in the same unit as Delirium
+    /// (stiffness = natural angular frequency ω, damping = damping ratio ζ). Places where Delirium chooses
+    /// a custom value are marked with a "Delirium:" comment.
     /// </summary>
     internal static class DlCfg
     {
-        // Raideur/amortissement de repos d'une articulation (Delirium : JointDef.strength/damping du squelette).
+        // Resting joint stiffness/damping (Delirium: skeleton JointDef.strength/damping).
         public const float RestStiffness = 12f;
         public const float RestDamping = 1f;
         public const float MinDamping = 0.05f;
@@ -51,7 +51,7 @@ namespace Brutality.Euphoria
         public const float ShotSpinePainTime = 1f;
         public const float ShotTimeBeforeCollapseLeg = 0.3f;
 
-        // Chute (armsWindmill, rollDownStairs, bodyWrithe, bodyFoetal, bodyRollUp).
+        // Fall (armsWindmill, rollDownStairs, bodyWrithe, bodyFoetal, bodyRollUp).
         public const float WindmillShoulderStiffness = 12f;
         public const float WindmillElbowStiffness = 12f;
         public const float RollStiffness = 11f;
@@ -81,8 +81,8 @@ namespace Brutality.Euphoria
         public const float FlinchBodyStiffness = 11f;
         public const float FlinchDamping = 1f;
 
-        // Physique commune.
-        public const float CaptureHeightLead = 0.1f;   // horizon du point de capture (Pratt 2006)
+        // Shared physics.
+        public const float CaptureHeightLead = 0.1f;   // capture point horizon (Pratt 2006)
         public const float StepHeight = 0.1f;
         public const float StepClamp = 1f;
         public const float GiveUpHeight = 0.5f;
@@ -104,20 +104,20 @@ namespace Brutality.Euphoria
             max = d.MaxDeg * BMath.Deg;
         }
 
-        /// <summary>Rayon du cône de consigne : Delirium (rs::targets) resserre la cible quand le muscle est raide.</summary>
+        /// <summary>Target cone radius: Delirium (rs::targets) tightens the target when the muscle is stiff.</summary>
         public static float ConeRadius(float strength) => 1f + 25f / (strength + 256f);
     }
 
     /// <summary>
-    /// Effecteurs NaturalMotion, portés depuis <c>nmrs::Effector</c> / <c>nmrs::Character</c> de Delirium.
+    /// NaturalMotion effectors, ported from Delirium's <c>nmrs::Effector</c> / <c>nmrs::Character</c>.
     ///
-    /// Un effecteur porte un angle désiré absolu (rad, convention anatomique de Brutality), une raideur (ω) et un
-    /// amortissement (ζ) au sens de <c>set_stiffness(s, d)</c> de Delirium — strength = s², damping = 2·s·d, ce qui
-    /// redonne exactement ω = s et ζ = d après la conversion en Muscle (Delirium : stiffness = √strength,
-    /// damping ratio = damping / (2·stiffness)) —, une raideur musculaire passive et un facteur <c>oppose_gravity</c>.
+    /// An effector holds an absolute desired angle (rad, Brutality anatomical convention), a stiffness (ω) and
+    /// damping (ζ) in the sense of Delirium's <c>set_stiffness(s, d)</c> — strength = s², damping = 2·s·d, which
+    /// recovers exactly ω = s and ζ = d after Muscle conversion (Delirium: stiffness = √strength,
+    /// damping ratio = damping / (2·stiffness)) —, a passive muscle stiffness, and an <c>oppose_gravity</c> factor.
     ///
-    /// Delirium ne fait jamais bouger un segment directement : les comportements écrivent ces effecteurs et
-    /// <see cref="Flush"/> les transmet aux drives PhysX de Brutality.
+    /// Delirium never moves a segment directly: behaviors write these effectors and
+    /// <see cref="Flush"/> forwards them to Brutality's PhysX drives.
     /// </summary>
     internal sealed class DlCharacter
     {
@@ -132,7 +132,7 @@ namespace Brutality.Euphoria
         private readonly float[] _opposeGravity = new float[NJ];
         public readonly float[] BaseStrength = new float[NJ];
         public readonly float[] BaseDamping = new float[NJ];
-        /// <summary>Bras occupé par une prise ou un agrippement (Delirium : Character::busy[2]).</summary>
+        /// <summary>Arm occupied by a hold or grip (Delirium: Character::busy[2]).</summary>
         public readonly bool[] Busy = new bool[2];
 
         public DlCharacter(BodyModel body)
@@ -142,8 +142,8 @@ namespace Brutality.Euphoria
                 BaseStrength[j] = DlCfg.RestStiffness;
                 BaseDamping[j] = DlCfg.RestDamping;
                 _deathPose[j] = body.Joints[j].Phi0;
-                // Pose de référence anatomique neutre (comme la zero-pose debout de Delirium, et non la pose
-                // figée tenant le fusil au moment de la mort qui verrouillait les bras lors des blend_to_zero).
+                // Neutral anatomical reference pose (like Delirium's standing zero-pose, rather than the frozen
+                // rifle-holding pose at death which locked the arms during blend_to_zero).
                 var spec = AnatomyData.SpecOf(j);
                 _zero[j] = new Vector3(
                     spec.Dofs[0].NeutralDeg * BMath.Deg,
@@ -172,7 +172,7 @@ namespace Brutality.Euphoria
             for (int j = 0; j < NJ; j++) Reset(j);
         }
 
-        /// <summary>Sauvegarde/restaure les effecteurs hors du masque (Delirium : Character::lock / unlock).</summary>
+        /// <summary>Saves/restores effectors outside the mask (Delirium: Character::lock / unlock).</summary>
         public struct EffectorSnap
         {
             public Vector3 Desired;
@@ -209,7 +209,7 @@ namespace Brutality.Euphoria
             }
         }
 
-        /// <summary>set_stiffness(s, d) : Delirium stocke strength = s² et damping = 2·s·d.</summary>
+        /// <summary>set_stiffness(s, d): Delirium stores strength = s² and damping = 2·s·d.</summary>
         public void SetStiffness(float s, float d, float? ms = null)
         {
             for (int j = 0; j < NJ; j++) SetStiffness((JointId)j, s, d, ms);
@@ -224,7 +224,7 @@ namespace Brutality.Euphoria
             if (ms.HasValue) _muscleStiffness[i] = ms.Value;
         }
 
-        /// <summary>set_relaxation : strength = base·x², damping = base·x (un membre qui s'éteint progressivement).</summary>
+        /// <summary>set_relaxation: strength = base·x², damping = base·x (a limb gradually going limp).</summary>
         public void SetRelaxation(int j, float x)
         {
             x = Mathf.Clamp01(x);
@@ -245,15 +245,15 @@ namespace Brutality.Euphoria
         public float MuscleStiffness(int j) => _muscleStiffness[j];
         public float OpposeGravity(int j) => _opposeGravity[j];
 
-        /// <summary>Angle absolu courant (rad) d'une articulation, tel que le voit le comportement.</summary>
+        /// <summary>Current absolute angle (rad) of a joint, as seen by the behavior.</summary>
         public Vector3 Actual(int j, BodyModel b) => b.Joints[j].Phi;
 
-        // ---------------------------------------------------------------- cibles
+        // ---------------------------------------------------------------- targets
 
         /// <summary>
-        /// Angle désiré, en unités relatives au milieu de course (0 = centre, ±1 = butée).
-        /// Fidèle à Delirium (nmrs::Character::set_relative) : aucun pré-clamp brutal, le cône de
-        /// <see cref="Targets"/> borne ensuite la cible selon la raideur.
+        /// Desired angle, in units relative to mid-range (0 = center, ±1 = limit).
+        /// Faithful to Delirium (nmrs::Character::set_relative): no harsh pre-clamp; the cone in
+        /// <see cref="Targets"/> then bounds the target according to stiffness.
         /// </summary>
         public void SetRelative(int j, int dof, float x)
         {
@@ -278,7 +278,7 @@ namespace Brutality.Euphoria
             _desired[j] = d;
         }
 
-        /// <summary>Mélange une cible sur l'angle courant (les comportements Delirium écrivent en pondération).</summary>
+        /// <summary>Blends a target onto the current angle (Delirium behaviors write weighted commands).</summary>
         public void BlendDesired(int j, int dof, float rad, float w)
         {
             var d = _desired[j];
@@ -287,7 +287,7 @@ namespace Brutality.Euphoria
         }
         public Vector3 Desired(int j) => _desired[j];
 
-        /// <summary>blend_to_zero : ramène l'angle désiré vers la pose de la mort (Delirium : Effector::blend_to_zero).</summary>
+        /// <summary>blend_to_zero: brings the desired angle back toward the zero pose (Delirium: Effector::blend_to_zero).</summary>
         public void BlendToZero(int j, float k)
         {
             k = Mathf.Clamp01(k);
@@ -300,9 +300,9 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// targets() de Delirium : la consigne d'inclinaison est ramenée dans un cône dont le rayon vaut
-        /// k = 1 + 25/(strength+256) fois l'amplitude, et la torsion dans le même intervalle. Un muscle faible
-        /// laisse donc la consigne déborder (membre mou), un muscle raide la contient dans l'anatomie.
+        /// Delirium's targets(): the lean command is brought inside a cone whose radius is
+        /// k = 1 + 25/(strength+256) times the range, and twist within the same interval. A weak muscle
+        /// thus lets the command overflow (limp limb), while a stiff muscle keeps it within anatomy.
         /// </summary>
         public Vector3 Targets(int j)
         {
@@ -329,11 +329,11 @@ namespace Brutality.Euphoria
             return new Vector3(d0, d1, d2);
         }
 
-        // ---------------------------------------------------------------- écriture des drives
+        // ---------------------------------------------------------------- drive output
 
         /// <summary>
-        /// Transmet les effecteurs au tampon de commandes. <paramref name="weight"/> est la vivacité résiduelle du
-        /// mourant (setCharacterHealth) : à 0, plus aucune commande n'est écrite et les membres retombent.
+        /// Forwards effectors to the command buffer. <paramref name="weight"/> is the residual liveliness
+        /// of the dying character (setCharacterHealth): at 0, no more commands are written and limbs drop.
         /// </summary>
         public void Flush(NeuralState ns, BodyModel body, float weight)
         {
@@ -350,8 +350,8 @@ namespace Brutality.Euphoria
                 ns.Buffer.AddEffector(j, 0, target.x, weight, s, z, _muscleStiffness[j]);
                 if (kind == JointKind.Elbow)
                 {
-                    // La prono-supination de l'avant-bras (DOF 2 du coude) est pilotée par les comportements
-                    // Delirium (orientation de la paume sur une plaie, au sol, contre un mur, ou en posturing).
+                    // Forearm pronation-supination (elbow DOF 2) is driven by Delirium behaviors
+                    // (palm orientation on a wound, on the ground, against a wall, or during posturing).
                     ns.Buffer.AddEffector(j, 2, target.z, weight, s, z, _muscleStiffness[j]);
                 }
                 else if (kind != JointKind.Knee)
@@ -362,7 +362,7 @@ namespace Brutality.Euphoria
             }
         }
 
-        // ---------------------------------------------------------------- masques
+        // ---------------------------------------------------------------- masks
 
         private static readonly JointId[] All =
         {
@@ -381,12 +381,12 @@ namespace Brutality.Euphoria
         private static readonly JointId[] LeftLeg = { JointId.LHip, JointId.LKnee };
         private static readonly JointId[] RightLeg = { JointId.RHip, JointId.RKnee };
         private static readonly JointId[] BothLegs = { JointId.LHip, JointId.LKnee, JointId.RHip, JointId.RKnee };
-        private static readonly JointId[] NoWrist = Array.Empty<JointId>();   // main fusionnée avec l'avant-bras dans EFT
+        private static readonly JointId[] NoWrist = Array.Empty<JointId>();   // hand fused with forearm in EFT
 
         /// <summary>
-        /// Masques de message Euphoria (Delirium : Character::mask). « uc » (clavicules) vise les épaules :
-        /// le ragdoll EFT n'a pas d'articulation de ceinture scapulaire. « uw » (poignets) est vide : la main est
-        /// solidaire de l'avant-bras. « ut » couvre tronc + bras (sans cou).
+        /// Euphoria message masks (Delirium: Character::mask). "uc" (clavicles) targets the shoulders:
+        /// the EFT ragdoll has no shoulder-girdle joint. "uw" (wrists) is empty: the hand is
+        /// rigid with the forearm. "ut" covers trunk + arms (without neck).
         /// </summary>
         public static JointId[] Mask(string mask)
         {
@@ -436,8 +436,8 @@ namespace Brutality.Euphoria
     }
 
     /// <summary>
-    /// Capteurs et actions du corps, équivalents de <c>nmdbm::Body</c> et <c>nmshot::Ctx</c> de Delirium :
-    /// centre de masse, vitesse, moment cinétique, appuis, points articulaires, poussées et couples par segment.
+    /// Body sensors and actions, equivalent to Delirium's <c>nmdbm::Body</c> and <c>nmshot::Ctx</c>:
+    /// center of mass, velocity, angular momentum, contacts, joint positions, pushes, and per-segment torques.
     /// </summary>
     internal sealed class DlBody
     {
@@ -457,7 +457,7 @@ namespace Brutality.Euphoria
 
         public Segment Part(Seg s) => Body[s];
 
-        /// <summary>Position du pivot articulaire (origine du segment enfant).</summary>
+        /// <summary>Joint pivot position (child segment origin).</summary>
         public Vector3 JointPos(JointId j)
         {
             var jm = Body.Joints[(int)j];
@@ -468,32 +468,32 @@ namespace Brutality.Euphoria
 
         public Vector3 Point(Seg s) => Body[s].Pos;
 
-        /// <summary>Horizontale d'un vecteur (shz).</summary>
+        /// <summary>Horizontal projection of a vector (shz).</summary>
         public static Vector3 Horiz(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
-        /// <summary>sat(v) : place v à la hauteur h le long de l'axe monde vertical.</summary>
+        /// <summary>sat(v): places v at height h along the world vertical axis.</summary>
         public static Vector3 AtHeight(Vector3 v, float h) => new Vector3(v.x, h, v.z);
 
         public float Kinetic => 0.5f * Mass * Vel.sqrMagnitude + 0.5f * Vector3.Dot(AngVel, Ch.L);
 
-        /// <summary>Position de la main (extrémité distale de l'avant-bras).</summary>
+        /// <summary>Hand position (distal end of the forearm).</summary>
         public Vector3 HandPos(int side) => Ch.Hand[NmCharacter.Si(side)];
 
-        /// <summary>Vitesse linéaire au niveau de la main (v + ω × r).</summary>
+        /// <summary>Linear velocity at the hand (v + ω × r).</summary>
         public Vector3 HandVel(int side)
         {
             var fore = Body[side < 0 ? Seg.LForearm : Seg.RForearm];
             return fore.V + Vector3.Cross(fore.W, HandPos(side) - fore.Com);
         }
 
-        /// <summary>Poussée sur un segment (Delirium : Out::force).</summary>
+        /// <summary>Push on a segment (Delirium: Out::force).</summary>
         public void Force(Seg s, Vector3 f, ForceMode mode = ForceMode.Force)
         {
             var rb = Body[s].Rb;
             if (rb != null && f.sqrMagnitude > 1e-10f) rb.AddForce(f, mode);
         }
 
-        /// <summary>Poussée en un point monde d'un segment (force + moment au CdM).</summary>
+        /// <summary>Push at a world point of a segment (force + moment at CoM).</summary>
         public void ForceAt(Seg s, Vector3 worldPos, Vector3 f, ForceMode mode = ForceMode.Force)
         {
             var rb = Body[s].Rb;
@@ -502,13 +502,13 @@ namespace Brutality.Euphoria
             rb.AddTorque(Vector3.Cross(worldPos - Body[s].Com, f), mode);
         }
 
-        /// <summary>Impulsion en un point monde (Delirium : Out::impulse pour pull / grip).</summary>
+        /// <summary>Impulse at a world point (Delirium: Out::impulse for pull / grip).</summary>
         public void ImpulseAt(Seg s, Vector3 worldPos, Vector3 impulse)
         {
             ForceAt(s, worldPos, impulse, ForceMode.Impulse);
         }
 
-        /// <summary>Couple sur un segment (Delirium : Out::torque).</summary>
+        /// <summary>Torque on a segment (Delirium: Out::torque).</summary>
         public void Torque(Seg s, Vector3 t, ForceMode mode = ForceMode.Force)
         {
             var rb = Body[s].Rb;
@@ -516,13 +516,13 @@ namespace Brutality.Euphoria
         }
     }
 
-    /// <summary>Physique partagée du portage Delirium.</summary>
+    /// <summary>Shared physics for the Delirium port.</summary>
     internal static class DlPhys
     {
         /// <summary>
-        /// oppose_gravity de Delirium (nmdbm::oppose_gravity) : l'effecteur compense le couple de gravité du
-        /// sous-arbre autour du pivot, borné par max = og · strength · SCALE. Sur les charnières (genou, coude),
-        /// seul l'axe de flexion reçoit le couple ; la réaction opposée est appliquée au parent.
+        /// Delirium's oppose_gravity (nmdbm::oppose_gravity): the effector compensates the gravity torque of
+        /// the subtree around the pivot, clamped by max = og · strength · SCALE. On hinges (knee, elbow),
+        /// only the flexion axis receives the torque; the opposite reaction is applied to the parent.
         /// </summary>
         public static void OpposeGravity(DlCharacter ch, BodyModel body, float weight)
         {
@@ -566,14 +566,14 @@ namespace Brutality.Euphoria
         }
 
         /// <summary>
-        /// Angle de prono-supination de l'avant-bras (DOF 2 du coude, rad) qui oriente la paume face à la normale
-        /// d'une surface ou d'une plaie (équivalent EFT sans poignet de <c>nmshot::Shot::wrist</c>).
+        /// Forearm pronation-supination angle (elbow DOF 2, rad) that orients the palm facing the normal
+        /// of a surface or wound (wristless EFT equivalent of <c>nmshot::Shot::wrist</c>).
         /// </summary>
         public static float ForearmPronationForNormal(BodyModel body, int side, Vector3 surfaceNormal)
         {
             var fore = body[side < 0 ? Seg.LForearm : Seg.RForearm];
             Vector3 n = BMath.SafeNormalize(surfaceNormal, Vector3.up);
-            // Au neutre (phi.z = 0), la paume fait face vers la ligne médiane (-side * R).
+            // At neutral (phi.z = 0), the palm faces the midline (-side * R).
             Vector3 palmNow = -side * fore.R;
             Vector3 wantPalm = -n;
             float dTwist = BMath.SignedAngleOnPlane(palmNow, wantPalm, fore.U);
@@ -581,10 +581,10 @@ namespace Brutality.Euphoria
             return Mathf.Clamp(cur + dTwist, -75f * BMath.Deg, 75f * BMath.Deg);
         }
 
-        /// <summary>Accélération angulaire de corps entier (m·α×r sur chaque segment, plus α), comme Delirium.</summary>
+        /// <summary>Whole-body angular acceleration (m·α×r on each segment, plus α), like Delirium.</summary>
         public static void BodyAngularAccel(DlBody b, Vector3 alpha) => NmPhysics.BodyAngularAccel(b.Body, alpha);
 
-        /// <summary>Raycast sur le décor, en ignorant les corps gérés par Brutality.</summary>
+        /// <summary>Scenery raycast, ignoring bodies managed by Brutality.</summary>
         public static bool Cast(Vector3 from, Vector3 dir, float len, out Vector3 point, out Vector3 normal)
         {
             point = from + dir * len;
@@ -596,13 +596,13 @@ namespace Brutality.Euphoria
             return true;
         }
 
-        /// <summary>Bruit lissé 0..1, équivalent de <c>nmfl::noise01</c>.</summary>
+        /// <summary>Smoothed noise 0..1, equivalent to <c>nmfl::noise01</c>.</summary>
         public static float Noise01(float a, float b, float c)
         {
             return 0.5f + 0.5f * BMath.SmoothNoise(a * 0.7f + b * 1.3f, c * 2.1f);
         }
 
-        /// <summary>Enveloppe d'un geste : montée, maintien, retombée.</summary>
+        /// <summary>Gesture envelope: attack, hold, release.</summary>
         public static float Envelope(float t, float t0, float attack, float hold, float release)
         {
             if (t < t0) return 0f;

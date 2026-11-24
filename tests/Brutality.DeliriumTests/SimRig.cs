@@ -9,9 +9,9 @@ using UnityEngine;
 namespace DeliriumTests
 {
     /// <summary>
-    /// Mannequin articulé 3D (11 segments, 10 articulations) avec cinématique directe, intégration des forces/couples,
-    /// gravité, sol et suivi des consignes motrices issues de <see cref="MotorCommandBuffer"/>.
-    /// Permet de tester de bout en bout les vrais comportements Delirium en boucle fermée à 60 Hz.
+    /// Articulated 3D mannequin (11 segments, 10 joints) with forward kinematics, force/torque integration,
+    /// gravity, ground contact, and tracking of motor commands from <see cref="MotorCommandBuffer"/>.
+    /// Enables end-to-end closed-loop testing of the real Delirium behaviours at 60 Hz.
     /// </summary>
     internal sealed class SimRagdoll
     {
@@ -28,7 +28,7 @@ namespace DeliriumTests
         public readonly Vector3[] JointPhi = new Vector3[AnatomyData.JointCount];
         public readonly Vector3[] JointVel = new Vector3[AnatomyData.JointCount];
 
-        // Télémétrie enregistrée pendant la simulation.
+        // Telemetry recorded during the simulation.
         public float PeakPronationRad;
         public float PeakShockSpinTorque;
         public float PeakRollAngVel;
@@ -142,7 +142,7 @@ namespace DeliriumTests
             pv.V = RootVel;
             pv.W = RootAngVel;
 
-            // Helpers pour appliquer les rotations anatomiques parent→enfant
+            // Helpers to apply parent→child anatomical rotations
             Quaternion JointRot(int j)
             {
                 var p = JointPhi[j];
@@ -158,7 +158,7 @@ namespace DeliriumTests
                          * Quaternion.AngleAxis(p.z / BMath.Deg, Vector3.up);
                 if (k == JointKind.Knee)
                     return Quaternion.AngleAxis(p.x / BMath.Deg, Vector3.right);
-                // Elbow : flexion (-X) + prono-supination (+Y)
+                // Elbow: flexion (-X) + pronation-supination (+Y)
                 return Quaternion.AngleAxis(-p.x / BMath.Deg, Vector3.right)
                      * Quaternion.AngleAxis(p.z / BMath.Deg, Vector3.up);
             }
@@ -214,7 +214,7 @@ namespace DeliriumTests
             Perf.Impulses.Step(t, dt);
             Perf.Forces(t, dt);
 
-            // Intégration des commandes motrices articulaires (exactement les ω, ζ, target écrits dans MotorCommandBuffer).
+            // Integration of joint motor commands (exact ω, ζ, target written to MotorCommandBuffer).
             for (int j = 0; j < AnatomyData.JointCount; j++)
             {
                 var spec = AnatomyData.SpecOf(j);
@@ -236,7 +236,7 @@ namespace DeliriumTests
                 }
             }
 
-            // Agrégation des forces et couples de corps entier sur le mannequin.
+            // Aggregation of whole-body forces and torques on the mannequin.
             Vector3 netForce = Physics.gravity * Body.TotalMass;
             Vector3 netTorque = Vector3.zero;
             Vector3 com = Perf.Ch.Com;
@@ -249,12 +249,12 @@ namespace DeliriumTests
                 Vector3 tq = rb.TorqueAccum + rb.AngAccelAccum * ((s.InertiaDiag.x + s.InertiaDiag.y + s.InertiaDiag.z) / 3f);
                 netForce += f;
                 netTorque += tq + Vector3.Cross(s.Com - com, f);
-                // Transfert des impulsions appliquées directement aux rigidbodies.
+                // Transfer of impulses applied directly to rigidbodies.
                 RootVel += rb.ImpulseAccum / Body.TotalMass;
                 RootAngVel += rb.AngImpulseAccum / Ibody;
             }
 
-            // Soutien vertical des jambes uniquement quand debout en équilibre et jambes rigides (pas en dérobement!).
+            // Vertical leg support only when standing balanced with stiff legs (not while buckling!).
             float supportFrac = 0f;
             if (Perf.Phase == NmPhase.Balance && Perf.Balance != null && Perf.Balance.Active && !Perf.Balance.Failed)
             {
@@ -274,7 +274,7 @@ namespace DeliriumTests
             RootAngVel *= MathF.Exp(-1.2f * dt);
             RootPos += RootVel * dt;
 
-            // Contact au sol : empêche de passer sous GroundY + friction horizontale.
+            // Ground contact: prevents sinking below GroundY + horizontal friction.
             float minY = float.MaxValue;
             foreach (var s in Body.Segs) minY = MathF.Min(minY, MathF.Min(s.Com.y, s.DistalWorld.y));
             float pen = (Physics.GroundY + 0.04f) - minY;

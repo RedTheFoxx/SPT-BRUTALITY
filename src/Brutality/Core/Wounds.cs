@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Brutality.Core
 {
-    /// <summary>Une blessure enregistrée au moment où le joueur la reçoit.</summary>
+    /// <summary>A wound recorded at the moment the player receives it.</summary>
     internal sealed class WoundRecord
     {
         public float Time;
@@ -21,8 +21,8 @@ namespace Brutality.Core
         public Vector3 HitPointWorld;
         public Vector3 Direction;
         public Vector3 MasterOrigin;
-        public Transform Bone;        // os portant un RigidbodySpawner (segment du ragdoll)
-        public Vector3 LocalPoint;    // point d'impact dans le repère de l'os
+        public Transform Bone;        // bone carrying a RigidbodySpawner (ragdoll segment)
+        public Vector3 LocalPoint;    // impact point in the bone's local frame
         public string AmmoId;
         public Collider HitCollider;
 
@@ -34,7 +34,7 @@ namespace Brutality.Core
         public readonly List<WoundRecord> Wounds = new List<WoundRecord>(8);
     }
 
-    /// <summary>Historique des blessures par joueur (alimenté par les patchs ApplyDamageInfo).</summary>
+    /// <summary>Per-player wound history (fed by ApplyDamageInfo patches).</summary>
     internal static class WoundRegistry
     {
         private static readonly ConditionalWeakTable<Player, WoundLedger> Table = new ConditionalWeakTable<Player, WoundLedger>();
@@ -50,7 +50,7 @@ namespace Brutality.Core
             int frame = UnityEngine.Time.frameCount;
             var list = ledger.Wounds;
 
-            // Dédoublonnage : une surcharge qui appelle base.ApplyDamageInfo déclenche deux postfix.
+            // Deduplication: an override calling base.ApplyDamageInfo triggers two postfixes.
             for (int i = list.Count - 1; i >= 0 && list[i].Frame == frame; i--)
             {
                 var w = list[i];
@@ -58,7 +58,7 @@ namespace Brutality.Core
                     return;
             }
 
-            // Purge des blessures anciennes.
+            // Purge old wounds.
             int remove = 0;
             while (remove < list.Count && now - list[remove].Time > KeepSeconds) remove++;
             if (remove > 0) list.RemoveRange(0, remove);
@@ -90,7 +90,7 @@ namespace Brutality.Core
             list.Add(rec);
         }
 
-        /// <summary>Remonte la hiérarchie jusqu'à l'os qui porte un RigidbodySpawner.</summary>
+        /// <summary>Walks up the hierarchy to the bone carrying a RigidbodySpawner.</summary>
         public static Transform FindSegmentBone(Transform t)
         {
             int guard = 0;
@@ -103,7 +103,7 @@ namespace Brutality.Core
         }
     }
 
-    /// <summary>Données balistiques d'une munition (gabarit EFT).</summary>
+    /// <summary>Ballistic data for an ammunition type (EFT template).</summary>
     internal sealed class AmmoInfo
     {
         public string Id;
@@ -118,7 +118,7 @@ namespace Brutality.Core
         public float MomentumAt(float speed) => BulletMassKg * speed;
         public float EnergyAt(float speed) => 0.5f * BulletMassKg * speed * speed;
 
-        /// <summary>Vitesse d'impact approchée (perte de vitesse quasi linéaire aux distances de combat).</summary>
+        /// <summary>Approximate impact speed (velocity loss is nearly linear at combat distances).</summary>
         public float ImpactSpeed(float distance)
         {
             float loss = IsBuckshot ? 0.0028f : (BulletMassKg < 0.006f ? 0.0013f : 0.0009f);
@@ -162,8 +162,8 @@ namespace Brutality.Core
             {
                 Plugin.LogDebug("AmmoDatabase: " + e.Message);
             }
-            // Un résultat lu avant le chargement des gabarits d'objets n'est pas mémorisé : sinon l'absence
-            // resterait définitive pour cette munition pendant toute la session.
+            // A result read before item templates are loaded is not cached: otherwise the miss
+            // would remain permanent for that ammo for the entire session.
             if (resolvable) Cache[id] = info;
             return info;
         }
