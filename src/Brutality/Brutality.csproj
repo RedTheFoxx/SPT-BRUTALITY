@@ -6,6 +6,7 @@
     <Version>0.4.0</Version>
     <AssemblyVersion>0.4.0.0</AssemblyVersion>
     <FileVersion>0.4.0.0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <LangVersion>9</LangVersion>
     <Nullable>disable</Nullable>
     <Optimize>true</Optimize>
@@ -15,6 +16,9 @@
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <!-- Automatic install into BepInEx/plugins/Brutality: dotnet build -c Release -p:Install=true -->
     <Install Condition="'$(Install)' == ''">false</Install>
+    <!-- Forge-compliant release archive: dotnet build -c Release -p:Package=true -->
+    <Package Condition="'$(Package)' == ''">false</Package>
+    <PackageOutputDir Condition="'$(PackageOutputDir)' == ''">$(MSBuildProjectDirectory)/../../dist</PackageOutputDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,9 +38,31 @@
     <Reference Include="UnityEngine.AnimationModule"><HintPath>$(SptManaged)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
+  <Target Name="ValidatePluginVersion" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_PluginCs>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/Plugin.cs'))</_PluginCs>
+      <_ExpectedVersionDecl>public const string Version = "$(Version)";</_ExpectedVersionDecl>
+    </PropertyGroup>
+    <Error Condition="!$(_PluginCs.Contains('$(_ExpectedVersionDecl)'))"
+           Text="Version mismatch: Plugin.cs must declare '$(_ExpectedVersionDecl)' to match Brutality.csproj &lt;Version&gt;$(Version)&lt;/Version&gt;." />
+  </Target>
+
   <Target Name="BrutalityInstall" AfterTargets="Build" Condition="'$(Install)' == 'true'">
     <MakeDir Directories="$(SptGame)/BepInEx/plugins/Brutality" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SptGame)/BepInEx/plugins/Brutality" />
     <Message Importance="high" Text="Brutality installed to $(SptGame)/BepInEx/plugins/Brutality" />
+  </Target>
+
+  <Target Name="BrutalityPackage" AfterTargets="Build" Condition="'$(Package)' == 'true'">
+    <PropertyGroup>
+      <_StageDir>$(IntermediateOutputPath)package</_StageDir>
+      <_PluginStageDir>$(_StageDir)/BepInEx/plugins/Brutality</_PluginStageDir>
+      <_ArchivePath>$([System.IO.Path]::GetFullPath('$(PackageOutputDir)/SPT-BRUTALITY-$(Version).zip'))</_ArchivePath>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_StageDir)" />
+    <MakeDir Directories="$(_PluginStageDir);$(PackageOutputDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(_PluginStageDir)" />
+    <ZipDirectory SourceDirectory="$(_StageDir)" DestinationFile="$(_ArchivePath)" Overwrite="true" />
+    <Message Importance="high" Text="Forge release archive created: $(_ArchivePath) (BepInEx/plugins/Brutality/$(AssemblyName).dll)" />
   </Target>
 </Project>

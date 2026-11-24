@@ -1,0 +1,109 @@
+# Builds, verifies, packages, and publishes a Forge-compliant GitHub Release when a v* tag is pushed.
+#
+# Required repository secret (because EFT/Unity/BepInEx DLLs are proprietary and not in the repo):
+#   - SPT_REFS_URL   : Direct download URL to a .tar.gz or .zip containing ONLY the 14 referenced DLLs
+#                      preserving the relative layout:
+#                        BepInEx/core/{BepInEx,0Harmony}.dll
+#                        EscapeFromTarkov_Data/Managed/{Assembly-CSharp,Comfort,Comfort.Unity,
+#                          CommonExtensions,ItemComponent.Types,ItemTemplate.Types,
+#                          Sirenix.Serialization,Newtonsoft.Json,UnityEngine,
+#                          UnityEngine.CoreModule,UnityEngine.PhysicsModule,UnityEngine.AnimationModule}.dll
+#   - SPT_REFS_TOKEN : (Optional) GitHub PAT / Bearer token if SPT_REFS_URL points to a private repo/asset.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.4.0)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Verify & Publish Forge Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate tag, GUID, and version match
+        id: meta
+        run: |
+          raw_tag="${{ inputs.tag || github.ref_name }}"
+          tag_ver="${raw_tag#v}"
+          csproj_ver=$(grep -oP '(?<=<Version>)[^<]+' src/Brutality/Brutality.csproj)
+          plugin_ver=$(grep -oP 'public const string Version = "\K[^"]+' src/Brutality/Plugin.cs)
+          plugin_guid=$(grep -oP 'public const string Guid = "\K[^"]+' src/Brutality/Plugin.cs)
+
+          echo "Tag: $raw_tag ($tag_ver) | GUID: $plugin_guid | csproj: $csproj_ver | Plugin.cs: $plugin_ver"
+          test -n "$plugin_guid"
+          test "$tag_ver" = "$csproj_ver"
+          test "$csproj_ver" = "$plugin_ver"
+
+          echo "tag=$raw_tag" >> "$GITHUB_OUTPUT"
+          echo "version=$csproj_ver" >> "$GITHUB_OUTPUT"
+          echo "guid=$plugin_guid" >> "$GITHUB_OUTPUT"
+
+      - name: Run Delirium & Kinematics formal proofs (77 tests)
+        run: |
+          dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
+          dotnet run --project tests/Brutality.KinematicsTests -c Release -- --append-report docs/VERIFICATION.md
+
+      - name: Fetch EFT/SPT reference DLLs
+        env:
+          SPT_REFS_URL: ${{ secrets.SPT_REFS_URL }}
+          SPT_REFS_TOKEN: ${{ secrets.SPT_REFS_TOKEN }}
+        run: |
+          if [ -z "$SPT_REFS_URL" ]; then
+            echo "::error::Secret SPT_REFS_URL is not configured. Add a secret pointing to a .tar.gz/.zip of the 14 EFT/BepInEx reference DLLs."
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/spt-refs"
+          archive="$RUNNER_TEMP/spt-refs-archive"
+          if [ -n "$SPT_REFS_TOKEN" ]; then
+            curl -fsSL -H "Authorization: Bearer $SPT_REFS_TOKEN" -H "Accept: application/octet-stream" -o "$archive" "$SPT_REFS_URL"
+          else
+            curl -fsSL -o "$archive" "$SPT_REFS_URL"
+          fi
+
+          if file "$archive" | grep -qi 'zip'; then
+            unzip -q "$archive" -d "$RUNNER_TEMP/spt-refs"
+          else
+            tar -xzf "$archive" -C "$RUNNER_TEMP/spt-refs"
+          fi
+
+      - name: Build and package Forge-compliant archive
+        run: |
+          dotnet build src/Brutality/Brutality.csproj -c Release -p:SptGame="$RUNNER_TEMP/spt-refs" -p:Package=true
+
+      - name: Verify Forge archive structure
+        run: |
+          archive="dist/SPT-BRUTALITY-${{ steps.meta.outputs.version }}.zip"
+          test -f "$archive"
+          unzip -t "$archive"
+          entries=$(unzip -Z1 "$archive")
+          echo "$entries"
+          test "$entries" = "BepInEx/plugins/Brutality/Brutality.dll"
+          sha256sum "$archive"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Brutality ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/SPT-BRUTALITY-${{ steps.meta.outputs.version }}.zip
+            docs/VERIFICATION.md

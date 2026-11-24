@@ -23,10 +23,21 @@ This command builds and copies `Brutality.dll` into `BepInEx/plugins/Brutality/`
 The game path is configured in `Directory.Build.props`. For a custom installation path:
 `-p:SptGame=/path/to/SPT`.
 
-Manual installation: copy `src/Brutality/bin/Release/Brutality.dll` into `BepInEx/plugins/Brutality/`.
+Manual installation: extract the release archive into your SPT root folder so `Brutality.dll` is placed at `BepInEx/plugins/Brutality/Brutality.dll` (or copy `src/Brutality/bin/Release/Brutality.dll` there).
 
 Nothing needs to be installed server-side: the plugin is 100% client-side. With Fika, it should be
 installed on the **host** (and ideally on clients).
+
+### Packaging for SPT Forge
+
+- **Plugin GUID**: `com.brutality.ragdoll`
+- **Version**: `0.4.0` (must match across `src/Brutality/Brutality.csproj`, `src/Brutality/Plugin.cs`, and the Forge release)
+
+```bash
+dotnet build src/Brutality/Brutality.csproj -c Release -p:Package=true
+```
+
+This creates `dist/SPT-BRUTALITY-0.4.0.zip` with `BepInEx/plugins/Brutality/Brutality.dll` at the archive root (no wrapper folder, no version number in the plugin folder name).
 
 ---
 

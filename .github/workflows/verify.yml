@@ -20,6 +20,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Verify Forge plugin metadata (GUID & version sync)
+        run: |
+          csproj_ver=$(grep -oP '(?<=<Version>)[^<]+' src/Brutality/Brutality.csproj)
+          plugin_ver=$(grep -oP 'public const string Version = "\K[^"]+' src/Brutality/Plugin.cs)
+          plugin_guid=$(grep -oP 'public const string Guid = "\K[^"]+' src/Brutality/Plugin.cs)
+          echo "GUID: $plugin_guid | csproj: $csproj_ver | Plugin.cs: $plugin_ver"
+          test -n "$plugin_guid"
+          test "$csproj_ver" = "$plugin_ver"
+
       - name: Run Delirium proofs (31 tests)
         run: dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
 
