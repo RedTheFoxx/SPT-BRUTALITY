@@ -1,0 +1,37 @@
+# Exécute les deux suites de preuves formelles Brutality à chaque push/PR
+# Aucune DLL propriétaire EFT/SPT n'est nécessaire : la CI compile et exécute directement les vraies sources C# du plugin.
+name: Preuves formelles Brutality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Delirium & Kinematics (77 tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Exécuter les preuves Delirium (31 tests)
+        run: dotnet run --project tests/Brutality.DeliriumTests -c Release -- --report docs/VERIFICATION.md
+
+      - name: Exécuter les preuves Cinématique & Anatomie (46 tests)
+        run: dotnet run --project tests/Brutality.KinematicsTests -c Release -- --append-report docs/VERIFICATION.md
+
+      - name: Publier la fiche de preuves dans le résumé du workflow
+        run: cat docs/VERIFICATION.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Archiver docs/VERIFICATION.md (artefact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: brutality-verification-report
+          path: docs/VERIFICATION.md
+          retention-days: 90

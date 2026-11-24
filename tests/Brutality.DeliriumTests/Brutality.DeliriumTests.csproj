@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Suite de preuves formelles Delirium : compile directement les VRAIES sources Euphoria/Delirium du plugin
+       contre un simulateur physique articulé 3D hors-jeu (sol, murs, caisses, raycasts, forces, couples). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Brutality/Core/BMath.cs" />
+    <Compile Include="../../src/Brutality/Core/JointKinematics.cs" />
+    <Compile Include="../../src/Brutality/Anatomy/AnatomyData.cs" />
+    <Compile Include="../../src/Brutality/Neural/Motor.cs" />
+    <Compile Include="../../src/Brutality/Core/VarietyDirector.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/NmParams.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/NmCharacter.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/NmCore.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlCharacter.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlBalance.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlShot.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlBehaviours.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/Delirium/DlGrab.cs" />
+    <Compile Include="../../src/Brutality/Euphoria/NmPerformance.cs" />
+  </ItemGroup>
+</Project>

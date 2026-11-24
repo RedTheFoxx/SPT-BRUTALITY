@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Banc de test hors jeu des conventions anatomiques : compile les sources mathématiques du plugin
+       contre une réimplémentation minimale de Vector3/Quaternion/Mathf (mêmes formules qu'Unity). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Brutality/Core/BMath.cs" />
+    <Compile Include="../../src/Brutality/Core/JointKinematics.cs" />
+    <Compile Include="../../src/Brutality/Anatomy/AnatomyData.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project>
+  <!-- Surcharge locale optionnelle (ignorée par git via *.user) -->
+  <Import Project="Directory.Build.props.user" Condition="Exists('Directory.Build.props.user')" />
+
+  <!-- Chemin de l'installation SPT (surchargeable : dotnet build -p:SptGame=/chemin/vers/SPT) -->
+  <PropertyGroup>
+    <SptGame Condition="'$(SptGame)' == ''">C:/SPT</SptGame>
+    <SptManaged>$(SptGame)/EscapeFromTarkov_Data/Managed</SptManaged>
+  </PropertyGroup>
+</Project>
