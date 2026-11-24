@@ -1,4 +1,4 @@
-# Brutality 1.0.0 — Biomechanical Ragdolls for SPT
+# Brutality : A Biomechanical Ragdolls modification for Tushonka enjoyers
 
 [![Brutality Formal Proofs](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml/badge.svg)](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml)
 
