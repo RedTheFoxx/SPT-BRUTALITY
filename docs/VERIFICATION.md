@@ -1,4 +1,4 @@
-# Brutality 0.4.0 — Formal Proof Sheet
+# Brutality 1.0.0 — Formal Proof Sheet
 
 > **Automatically generated document** by running the out-of-game test suites (`Brutality.DeliriumTests` and `Brutality.KinematicsTests`) directly against the plugin's real C# sources. No result row below is hand-typed.
 
@@ -6,11 +6,11 @@
 
 | Field | Value |
 |---|---|
-| Plugin version | `0.4.0` |
-| Execution date | `2026-11-24 14:03 UTC` |
+| Plugin version | `1.0.0` |
+| Execution date | `2026-11-24 14:25 UTC` |
 | Runtime & OS | `.NET 10.0.14` / `Unix 7.3.5.2` |
 | SHA-256 hash of the 14 tested C# sources | `4c638c0aee72bb7acebaaf393118fc3f75548f6f11e9864abcb29b9b2230ea82` |
-| SHA-256 hash of `Brutality.dll` (Release) | `d4e6bcb3592881ee67d8808f8eb6c6bf808b4bafc199efb89f65576e23f19f48` (235,008 bytes) |
+| SHA-256 hash of `Brutality.dll` (Release) | `8a574a9502d3c8b50f65ca3d932e1b9fbe49f95486c190982f3f3c35e0832962` (232,448 bytes) |
 | Local reproduction | `dotnet run --project tests/Brutality.DeliriumTests -- --report docs/VERIFICATION.md` then `dotnet run --project tests/Brutality.KinematicsTests -- --append-report docs/VERIFICATION.md` |
 
 ## Overall Summary
@@ -156,7 +156,7 @@ Tests executed on `Core/BMath.cs`, `Core/JointKinematics.cs`, `Anatomy/AnatomyDa
 
 ## See It Yourself in the 3D Studio (`demo/test-bench.html`)
 
-The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `0.4.0`:
+The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `1.0.0`:
 
 1. **Wall grab + break (`DlGrab`)** — Choose the **`Close right wall (grab)`** scene, **`Standing`** posture, **`Auto`** behaviour (or **`Side collapse`**), then click the mannequin's left flank to throw it toward the right: the right arm reaches toward the wall, the forearm pronates palm toward the surface, a yellow anchor point appears on contact, then snaps when the load exceeds the threshold.
 2. **Crate / ledge grab (`GrabHelper`)** — Choose **`Crate / ledge ahead (grab)`**, **`Standing`** posture, and shoot the back or thorax to topple forward: probes detect the top edge of the crate in front of the body and lock a grip.

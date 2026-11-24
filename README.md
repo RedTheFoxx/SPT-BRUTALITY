@@ -1,4 +1,4 @@
-# Brutality 0.4.0 — Biomechanical Ragdolls for SPT
+# Brutality 1.0.0 — Biomechanical Ragdolls for SPT
 
 [![Brutality Formal Proofs](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml/badge.svg)](https://github.com/RedTheFoxx/SPT-BRUTALITY/actions/workflows/verify.yml)
 
@@ -26,12 +26,12 @@ Brutality replaces EFT's death dynamics with three coupled layers running before
 
 100% **client-side** (no server mod required). With **Fika**, install on the host and ideally on clients.
 
-- **Manual (Release):** Extract `SPT-BRUTALITY-0.4.0.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
+- **Manual (Release):** Extract `SPT-BRUTALITY-1.0.0.zip` into your SPT root so the DLL sits at `BepInEx/plugins/Brutality/Brutality.dll`.
 - **Build from source:**
   ```bash
   dotnet build src/Brutality/Brutality.csproj -c Release -p:Install=true
   ```
-  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-0.4.0.zip`.)*
+  *(Pass `-p:SptGame=/path/to/SPT` for a custom path, or `-p:Package=true` to generate `dist/SPT-BRUTALITY-1.0.0.zip`.)*
 
 **Configuration:** `BepInEx/config/com.brutality.ragdoll.cfg` — editable in-game via `F12` (ConfigurationManager).
 

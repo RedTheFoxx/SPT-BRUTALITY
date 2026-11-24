@@ -819,10 +819,10 @@ namespace DeliriumTests
         private static string ReadPluginVersion(string repoRoot)
         {
             string pluginPath = Path.Combine(repoRoot, "src", "Brutality", "Plugin.cs");
-            if (!File.Exists(pluginPath)) return "0.4.0";
+            if (!File.Exists(pluginPath)) return "1.0.0";
             string text = File.ReadAllText(pluginPath);
             var m = Regex.Match(text, @"PluginVersion\s*=\s*""([^""]+)""");
-            return m.Success ? m.Groups[1].Value : "0.4.0";
+            return m.Success ? m.Groups[1].Value : "1.0.0";
         }
 
         private static string ComputeSourcesSha256(string repoRoot, out int fileCount)

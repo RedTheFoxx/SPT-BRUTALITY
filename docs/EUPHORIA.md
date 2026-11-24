@@ -37,7 +37,7 @@ Since version 0.2.0, it is the **sole animation engine** of the plugin: the lega
 | `injuredOnGround`, `bodyWrithe`, `bodyFoetal` | `DlBehaviours`, coexisting with Brutality agony |
 | `setCharacterHealth` | `NmPerformance.U(t)`: liveliness fades with health (the body goes limp) |
 
-## Formal Proofs and Delirium Fidelity (0.4.0)
+## Formal Proofs and Delirium Fidelity (1.0.0)
 The `tests/Brutality.DeliriumTests` suite compiles and runs the actual C# plugin sources directly in an off-game 3D simulation at 60 Hz:
 - **Execution order (`nm.rs`)**: `Balance` runs before `Shot` so it does not overwrite reaching for the wound or giving way at the knees.
 - **Effector laws (`nmrs`)**: `set_stiffness(s, d)` (`strength = s²`, `damping = 2·s·d`, `ω = √strength`, `ζ = damping / (2·ω)`), `set_relaxation` with invariant `ζ`, cone `1 + 25 / (strength + 256)`, masks and `lock`/`unlock`, and DOF 2 pronation emission on elbows.

@@ -2,7 +2,7 @@
 
 This document maps each layer of the corpus
 (`Scientific Corpus — Biomechanics for an Ultra-Realistic Ragdoll.md`) to its implementation
-in Brutality 0.4.0. Numerical values are adult male orders of magnitude, subject to
+in Brutality 1.0.0. Numerical values are adult male orders of magnitude, subject to
 recalibration after in-game testing.
 
 ## 1. Mass and Inertia — de Leva (1996)

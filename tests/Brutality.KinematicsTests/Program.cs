@@ -454,7 +454,7 @@ internal static class Program
     {
         sb.AppendLine("## See It Yourself in the 3D Studio (`demo/test-bench.html`)");
         sb.AppendLine();
-        sb.AppendLine("The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `0.4.0`:");
+        sb.AppendLine("The embedded 3D studio in the repository lets you visually reproduce each behaviour above in a browser, using the same logic as version `1.0.0`:");
         sb.AppendLine();
         sb.AppendLine("1. **Wall grab + break (`DlGrab`)** — Choose the **`Close right wall (grab)`** scene, **`Standing`** posture, **`Auto`** behaviour (or **`Side collapse`**), then click the mannequin's left flank to throw it toward the right: the right arm reaches toward the wall, the forearm pronates palm toward the surface, a yellow anchor point appears on contact, then snaps when the load exceeds the threshold.");
         sb.AppendLine("2. **Crate / ledge grab (`GrabHelper`)** — Choose **`Crate / ledge ahead (grab)`**, **`Standing`** posture, and shoot the back or thorax to topple forward: probes detect the top edge of the crate in front of the body and lock a grip.");

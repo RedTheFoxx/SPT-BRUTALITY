@@ -21,7 +21,7 @@ namespace Brutality
     {
         public const string Guid = "com.brutality.ragdoll";
         public const string Name = "Brutality";
-        public const string Version = "0.4.0";
+        public const string Version = "1.0.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
