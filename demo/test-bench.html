@@ -283,10 +283,10 @@ const HEAD_WHIP = 14;
 const dof = (min, max, neutral, A, B, K0, damp, tpos, tneg, vmax) => ({ min, max, neutral, A, B, K0, damp, tpos, tneg, vmax });
 const SPECS = {
   lumbar: [dof(-30, 75, 5, 30, 9, 8, 3, 150, 230, 8), dof(-35, 35, 0, 25, 9, 6, 2.5, 140, 140, 8), dof(-40, 40, 0, 20, 9, 5, 2, 70, 70, 8)],
-  neck: [dof(-60, 50, 10, 6, 10, 1.5, 0.35, 30, 50, 10), dof(-45, 45, 0, 5, 10, 1.2, 0.3, 35, 35, 10), dof(-80, 80, 0, 4, 10, 0.8, 0.25, 20, 20, 10)],
+  neck: [dof(-28, 42, 8, 10, 12, 2.5, 0.5, 30, 50, 10), dof(-30, 30, 0, 8, 12, 2, 0.45, 35, 35, 10), dof(-55, 55, 0, 7, 11, 1.5, 0.4, 20, 20, 10)],
   hip: [dof(-20, 125, 20, 20, 9, 3, 1.5, 150, 230, 12), dof(-30, 45, 5, 18, 9, 2.5, 1.2, 120, 110, 12), dof(-40, 40, 0, 12, 9, 1.5, 0.8, 60, 60, 12)],
   knee: [dof(-5, 140, 25, 18, 10, 1, 0.8, 130, 210, 16), dof(-6, 6, 0, 25, 14, 15, 1, 0, 0, 1), dof(-20, 20, 0, 10, 10, 2, 0.5, 25, 25, 10)],
-  shoulder: [dof(-55, 180, 15, 8, 9, 1, 0.6, 80, 85, 16), dof(-40, 90, 10, 8, 9, 1, 0.6, 75, 90, 16), dof(-80, 80, 0, 6, 9, 0.6, 0.4, 45, 45, 16)],
+  shoulder: [dof(-40, 155, 15, 10, 10, 1.5, 0.6, 80, 85, 16), dof(-22, 78, 10, 10, 10, 1.5, 0.6, 75, 90, 16), dof(-48, 48, 0, 9, 10, 1, 0.5, 45, 45, 16)],
   elbow: [dof(-5, 145, 50, 8, 11, 0.5, 0.3, 75, 55, 20), dof(-8, 8, 0, 12, 14, 6, 0.4, 0, 0, 1), dof(-80, 80, 0, 3, 10, 0.3, 0.15, 12, 12, 20)],
 };
 // Joint coordinate frame: resting bone axis, flexion sign, side.
@@ -1437,7 +1437,7 @@ class Neural {
     // posturing, locks, agony, breathing, and final breath remain active on top.
     const u0 = ctx.pose === 'prone' ? 0.25 : ctx.pose === 'duck' ? 0.4 : 0.55; this.initialTone = u0;
     this.add(new PosturalTone(u0, P.toneDelay, P.toneTau, rng, ctx.pose !== 'prone'));
-    if (reflex > 0.01 && c.mechanism === 'Cerebral' && S.posturing > 0.01) {
+    if (reflex > 0.01 && ctx.mechanism === 'Cerebral' && S.posturing > 0.01) {
       const roll = rng.next(), pz = Math.min(1, S.posturing) * 0.5, pCor = P.decor * pz;
       if (roll < pCor) this.add(new Posturing(rng.range(0.05, 0.12), rng.range(0.6, 1.5), clamp01(0.55 * reflex), rng));
       else if (roll < pCor + P.fencing * pz) this.add(new Fencing(rng.chance(0.5) ? 1 : -1, rng.range(0.05, 0.15), rng.range(1.5, 4), clamp01(0.7 * reflex)));
@@ -4135,7 +4135,7 @@ function livePose(posture, t) {
   } else if (posture === 'prone') {
     // Prone, propped on elbows (prone shooting pose).
     const sw = Math.sin(t * 1.1);
-    set(J.Lumbar, -15 + sw); set(J.Neck, -35);
+    set(J.Lumbar, -15 + sw); set(J.Neck, -24);
     for (const s of [-1, 1]) { set(Hip(s), -3, 15); set(Knee(s), 5); set(Shoulder(s), 110, 25); set(Elbow(s), 70); }
   } else {
     const sw = Math.sin(t * 1.3);
