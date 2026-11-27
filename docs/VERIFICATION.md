@@ -1,4 +1,4 @@
-# Brutality 1.1.2 — Formal Proof Sheet
+# Brutality 1.1.3 — Formal Proof Sheet
 
 > **Automatically generated document** by running the out-of-game test suites (`Brutality.DeliriumTests` and `Brutality.KinematicsTests`) directly against the plugin's real C# sources. No result row below is hand-typed.
 
@@ -6,9 +6,9 @@
 
 | Field | Value |
 |---|---|
-| Plugin version | `1.1.2` |
-| Execution date | `2026-11-27 15:14 UTC` |
-| Runtime & OS | `.NET 10.0.14` / `Unix 7.3.6.2` |
+| Plugin version | `1.1.3` |
+| Execution date | `2026-11-27 16:37 UTC` |
+| Runtime & OS | `.NET 10.0.14` / `Unix 7.3.6.3` |
 | SHA-256 hash of the 15 tested C# sources | `99800462fd82530b8729e97f3b8583635386987a2247870e404f9d1c8dd64a49` |
 | SHA-256 hash of `Brutality.dll` (Release) | `616c1efa31fb5ec1991909204d63bfcd63cfadb80a9afb295134c4ec3ea193b9` (251,392 bytes) |
 | Local reproduction | `dotnet run --project tests/Brutality.DeliriumTests -- --report docs/VERIFICATION.md` then `dotnet run --project tests/Brutality.KinematicsTests -- --append-report docs/VERIFICATION.md` |

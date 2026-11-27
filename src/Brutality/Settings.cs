@@ -3,7 +3,7 @@ using BepInEx.Configuration;
 namespace Brutality
 {
     /// <summary>
-    /// BepInEx configuration (BepInEx/config/com.brutality.ragdoll.cfg, editable in-game via F12).
+    /// BepInEx configuration (BepInEx/config/com.red.brutality.cfg, editable in-game via F12).
     /// </summary>
     internal static class Settings
     {

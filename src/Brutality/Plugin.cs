@@ -19,9 +19,9 @@ namespace Brutality
     [BepInDependency(Compat.ReClassicGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
-        public const string Guid = "com.brutality.ragdoll";
+        public const string Guid = "com.red.brutality";
         public const string Name = "Brutality";
-        public const string Version = "1.1.2";
+        public const string Version = "1.1.3";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
