@@ -62,6 +62,7 @@ namespace Brutality.Core
         public float GearThoraxKg;
         public float GearBackKg;
         public float GearHeadKg;
+        public bool HasThoraxGear, HasBackpack, HasHelmet;
         public float BodyMassKg;
 
         public DeathMechanism Mechanism;
@@ -210,11 +211,15 @@ namespace Brutality.Core
 
         private static void ReadEquipment(DeathContext ctx, Player player)
         {
-            if (!Settings.IncludeEquipmentMass.Value) return;
             try
             {
                 var eq = player.Equipment;
                 if (eq == null) return;
+                ctx.HasThoraxGear = eq.GetSlot(EquipmentSlot.ArmorVest)?.ContainedItem != null
+                                 || eq.GetSlot(EquipmentSlot.TacticalVest)?.ContainedItem != null;
+                ctx.HasBackpack = eq.GetSlot(EquipmentSlot.Backpack)?.ContainedItem != null;
+                ctx.HasHelmet = eq.GetSlot(EquipmentSlot.Headwear)?.ContainedItem != null;
+                if (!Settings.IncludeEquipmentMass.Value) return;
                 ctx.GearThoraxKg = SlotWeight(eq, EquipmentSlot.ArmorVest) + SlotWeight(eq, EquipmentSlot.TacticalVest);
                 ctx.GearBackKg = SlotWeight(eq, EquipmentSlot.Backpack);
                 ctx.GearHeadKg = SlotWeight(eq, EquipmentSlot.Headwear) + SlotWeight(eq, EquipmentSlot.Earpiece)

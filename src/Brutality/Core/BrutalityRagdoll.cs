@@ -401,6 +401,14 @@ namespace Brutality.Core
             // Passive tone (pull toward NeutralDeg) fades out in ~0.45 s after muscle cutoff
             // so limbs drop completely under their own weight instead of freezing flexed.
             float passiveTone = muscles ? 1f : 1f - BMath.SmoothStep(musclesEnd, musclesEnd + 0.45f, t);
+            var nmActive = _neural.Nm;
+            if (nmActive != null)
+            {
+                if (nmActive.Phase == NmPhase.Ground && nmActive.GroundT >= 0f)
+                    passiveTone = Mathf.Min(passiveTone, 1f - BMath.SmoothStep(nmActive.GroundT, nmActive.GroundT + 0.5f, t));
+                else if (!nmActive.Plan.Conscious)
+                    passiveTone = Mathf.Min(passiveTone, 1f - BMath.SmoothStep(0.15f, 0.55f, t));
+            }
             // Light terminal dissipation only in the final moments (and at least 1.2 s after musclesEnd)
             // so limbs do not fall in slow-motion "molasses".
             float settleStart = Mathf.Min(Mathf.Max(musclesEnd + 1.2f, _maxDuration - 0.85f), _maxDuration - 0.45f);
@@ -409,7 +417,8 @@ namespace Brutality.Core
             DriveController.Step(_body, _neural.Buffer, dt, 1f + 1.5f * _fade, muscles, passiveTone);
             _impulses.Step(t, dt);
             _neural.Nm?.Forces(t, dt);
-            ApplyThoraxArmClearance(dt);
+            bool relaxing = !muscles || (nmActive != null && (nmActive.Phase == NmPhase.Ground || !nmActive.Plan.Conscious));
+            ApplyThoraxArmClearance(dt, relaxing);
             ApplySettling();
 
             // Early stop ONLY AFTER muscle cutoff, full muscle deactivation,
@@ -556,38 +565,46 @@ namespace Brutality.Core
         }
 
         /// <summary>
-        /// Soft-tissue barrier between the thorax and upper arms / forearms (corpse colliders do not collide
-        /// with each other): critically-damped pushback (stable for any dt) on any arm or forearm point
-        /// penetrating the ribcage, with equal and opposite reaction on the thorax.
+        /// Soft-tissue barrier between the thorax/gear/head and upper arms / forearms (corpse colliders do not
+        /// collide with each other): critically-damped pushback (stable for any dt) on any arm or forearm point
+        /// penetrating the ribcage/gear/head, with equal and opposite reaction on the trunk/head.
         /// </summary>
-        private void ApplyThoraxArmClearance(float dt)
+        private void ApplyThoraxArmClearance(float dt, bool slideOff = true)
         {
             var thorax = _body[Seg.Thorax];
             if (thorax?.Rb == null) return;
             Vector3 tPos = thorax.Pos;
             Vector3 tR = thorax.R, tU = thorax.U, tF = thorax.F;
-            float chestZ = _body.ThoraxChestZ;
+            float chestZ = _body.ThoraxGearChestZ;
             float yBot = _body.ThoraxYBot, yTop = _body.ThoraxYTop;
-            float maxUpperRx = Mathf.Max(0.10f, _body.ThoraxHalfShoulderW - 0.005f);
-            float upperRx = Mathf.Min(_body.ThoraxRx + 0.036f, maxUpperRx);
-            float upperRz = _body.ThoraxRz + 0.036f;
-            float foreRx = _body.ThoraxRx + 0.030f;
-            float foreRz = _body.ThoraxRz + 0.030f;
+            float maxUpperRx = Mathf.Max(0.11f, _body.ThoraxHalfShoulderW - 0.004f);
+            float upperRx = Mathf.Min(_body.ThoraxClearRx + 0.036f, maxUpperRx);
+            float upperRz = _body.ThoraxClearRz + 0.038f;
+            float foreRx = _body.ThoraxClearRx + 0.032f;
+            float foreRz = _body.ThoraxClearRz + 0.034f;
 
             float c = Mathf.Min(40f, dt > 1e-4f ? 0.6f / dt : 40f);
             float k = Mathf.Min(600f, dt > 1e-4f ? 0.12f / (dt * dt) : 600f);
 
-            PushArmSegment(thorax, _body[Seg.LUpperArm], -1, tPos, tR, tU, tF, chestZ, yBot, yTop, upperRx, upperRz, k, c, isForearm: false);
-            PushArmSegment(thorax, _body[Seg.RUpperArm],  1, tPos, tR, tU, tF, chestZ, yBot, yTop, upperRx, upperRz, k, c, isForearm: false);
-            PushArmSegment(thorax, _body[Seg.LForearm],  -1, tPos, tR, tU, tF, chestZ, yBot, yTop, foreRx, foreRz, k, c, isForearm: true);
-            PushArmSegment(thorax, _body[Seg.RForearm],   1, tPos, tR, tU, tF, chestZ, yBot, yTop, foreRx, foreRz, k, c, isForearm: true);
+            PushArmSegment(thorax, _body[Seg.LUpperArm], -1, tPos, tR, tU, tF, chestZ, yBot, yTop, upperRx, upperRz, k, c, isForearm: false, slideOff: slideOff);
+            PushArmSegment(thorax, _body[Seg.RUpperArm],  1, tPos, tR, tU, tF, chestZ, yBot, yTop, upperRx, upperRz, k, c, isForearm: false, slideOff: slideOff);
+            PushArmSegment(thorax, _body[Seg.LForearm],  -1, tPos, tR, tU, tF, chestZ, yBot, yTop, foreRx, foreRz, k, c, isForearm: true, slideOff: slideOff);
+            PushArmSegment(thorax, _body[Seg.RForearm],   1, tPos, tR, tU, tF, chestZ, yBot, yTop, foreRx, foreRz, k, c, isForearm: true, slideOff: slideOff);
+
+            var head = _body[Seg.Head];
+            if (head?.Rb != null)
+            {
+                float headRad = _body.HeadClearRadius + 0.035f;
+                PushForearmFromHead(head, _body[Seg.LForearm], -1, tR, headRad, k, c);
+                PushForearmFromHead(head, _body[Seg.RForearm],  1, tR, headRad, k, c);
+            }
         }
 
         private static void PushArmSegment(
             Segment thorax, Segment arm, int side,
             Vector3 tPos, Vector3 tR, Vector3 tU, Vector3 tF,
             float chestZ, float yBot, float yTop, float rx, float rz,
-            float k, float c, bool isForearm)
+            float k, float c, bool isForearm, bool slideOff)
         {
             if (arm?.Rb == null) return;
             Vector3 p0 = arm.Pos;
@@ -598,10 +615,12 @@ namespace Brutality.Core
             Vector3 bestN = Vector3.zero;
 
             // Deepest point along the segment (without testing the proximal shoulder socket).
-            int count = isForearm ? 3 : 2;
+            int count = isForearm ? 4 : 2;
             for (int i = 0; i < count; i++)
             {
-                float frac = isForearm ? (i == 0 ? 0.35f : (i == 1 ? 0.68f : 1.0f)) : (i == 0 ? 0.55f : 1.0f);
+                float frac = isForearm
+                    ? (i == 0 ? 0.35f : (i == 1 ? 0.68f : (i == 2 ? 1.0f : 1.18f)))
+                    : (i == 0 ? 0.55f : 1.0f);
                 Vector3 pt = p0 + distalDir * (len * frac);
                 if (JointKinematics.ThoraxPenetration(pt, tPos, tR, tU, tF, chestZ, yBot, yTop, rx, BodyModel.ThoraxRyCap, rz, side, out float depth, out Vector3 n)
                     && depth > bestDepth)
@@ -615,16 +634,54 @@ namespace Brutality.Core
             if (bestDepth <= 0.004f) return;
             bestDepth -= 0.004f;
 
+            if (slideOff && Vector3.Dot(bestPt - tPos, tF) > chestZ && Mathf.Abs(Vector3.Dot(bestPt - tPos, tR)) < rx * 0.65f)
+                bestN = BMath.SafeNormalize(bestN + tR * (0.32f * side), bestN);
+
+            ApplySoftClearancePush(thorax, arm, bestPt, bestN, bestDepth, k, c);
+        }
+
+        private static void PushForearmFromHead(Segment head, Segment forearm, int side, Vector3 tR, float radius, float k, float c)
+        {
+            if (forearm?.Rb == null) return;
+            Vector3 p0 = forearm.Pos;
+            Vector3 distalDir = -forearm.U;
+            float len = forearm.Length;
+            float bestDepth = 0f;
+            Vector3 bestPt = Vector3.zero;
+            Vector3 bestN = Vector3.zero;
+
+            for (int i = 0; i < 3; i++)
+            {
+                float frac = i == 0 ? 0.65f : (i == 1 ? 1.0f : 1.18f);
+                Vector3 pt = p0 + distalDir * (len * frac);
+                Vector3 diff = pt - head.Com;
+                float dist = diff.magnitude;
+                float depth = radius - dist;
+                if (depth > bestDepth)
+                {
+                    bestDepth = depth;
+                    bestPt = pt;
+                    bestN = dist > 1e-4f ? diff / dist : tR * side;
+                }
+            }
+            if (bestDepth <= 0.004f) return;
+            bestDepth -= 0.004f;
+            bestN = BMath.SafeNormalize(bestN + tR * (0.28f * side), bestN);
+            ApplySoftClearancePush(head, forearm, bestPt, bestN, bestDepth, k, c);
+        }
+
+        private static void ApplySoftClearancePush(Segment bodySeg, Segment arm, Vector3 bestPt, Vector3 bestN, float depth, float k, float c)
+        {
             Vector3 rArm = bestPt - arm.Com;
-            Vector3 rTho = bestPt - thorax.Com;
+            Vector3 rBody = bestPt - bodySeg.Com;
             Vector3 vArm = arm.V + Vector3.Cross(arm.W, rArm);
-            Vector3 vTho = thorax.V + Vector3.Cross(thorax.W, rTho);
-            float vIn = -Vector3.Dot(vArm - vTho, bestN);
-            float accel = k * bestDepth + c * vIn;
+            Vector3 vBody = bodySeg.V + Vector3.Cross(bodySeg.W, rBody);
+            float vIn = -Vector3.Dot(vArm - vBody, bestN);
+            float accel = k * depth + c * vIn;
             if (accel <= 0f) return;
 
             // Effective mass at the contact point (translation + rotation) for exact stability under symplectic Euler.
-            float invM = 1f / Mathf.Max(0.2f, arm.Mass) + 1f / Mathf.Max(2f, thorax.Mass);
+            float invM = 1f / Mathf.Max(0.2f, arm.Mass) + 1f / Mathf.Max(1.5f, bodySeg.Mass);
             Vector3 cArm = Vector3.Cross(rArm, bestN);
             float cArm2 = cArm.sqrMagnitude;
             if (cArm2 > 1e-6f)
@@ -632,17 +689,17 @@ namespace Brutality.Core
                 float iArm = Mathf.Max(0.005f, BMath.MomentAboutAxis(arm.Q * arm.InertiaRotLocal, arm.InertiaDiag, cArm / Mathf.Sqrt(cArm2)));
                 invM += cArm2 / iArm;
             }
-            Vector3 cTho = Vector3.Cross(rTho, bestN);
-            float cTho2 = cTho.sqrMagnitude;
-            if (cTho2 > 1e-6f)
+            Vector3 cBody = Vector3.Cross(rBody, bestN);
+            float cBody2 = cBody.sqrMagnitude;
+            if (cBody2 > 1e-6f)
             {
-                float iTho = Mathf.Max(0.05f, BMath.MomentAboutAxis(thorax.Q * thorax.InertiaRotLocal, thorax.InertiaDiag, cTho / Mathf.Sqrt(cTho2)));
-                invM += cTho2 / iTho;
+                float iBody = Mathf.Max(0.02f, BMath.MomentAboutAxis(bodySeg.Q * bodySeg.InertiaRotLocal, bodySeg.InertiaDiag, cBody / Mathf.Sqrt(cBody2)));
+                invM += cBody2 / iBody;
             }
             float fMag = Mathf.Min(accel / invM, 120f);
             Vector3 force = bestN * fMag;
             arm.Rb.AddForceAtPosition(force, bestPt, ForceMode.Force);
-            thorax.Rb.AddForceAtPosition(-force, bestPt, ForceMode.Force);
+            bodySeg.Rb.AddForceAtPosition(-force, bestPt, ForceMode.Force);
         }
 
         /// <summary>

@@ -344,11 +344,16 @@ namespace Brutality.Euphoria
         /// Forwards effectors to the command buffer. <paramref name="weight"/> is the residual liveliness
         /// of the dying character (setCharacterHealth): at 0, no more commands are written and limbs drop.
         /// </summary>
-        public void Flush(NeuralState ns, BodyModel body, float weight)
+        public void Flush(NeuralState ns, BodyModel body, float weight, float armWeightScale = 1f)
         {
             if (weight <= 0.01f) return;
+            float armScale = Mathf.Clamp01(armWeightScale);
             for (int j = 0; j < NJ; j++)
             {
+                bool isArm = j == (int)JointId.LShoulder || j == (int)JointId.LElbow
+                          || j == (int)JointId.RShoulder || j == (int)JointId.RElbow;
+                float wj = isArm ? weight * armScale : weight;
+                if (wj <= 0.01f) continue;
                 float s = Mathf.Sqrt(Mathf.Max(0f, _strength[j]));
                 if (s <= 0.05f) continue;
                 float damp = Mathf.Max(_damping[j], DlCfg.MinDamping);
@@ -356,17 +361,17 @@ namespace Brutality.Euphoria
                 z = Mathf.Clamp(z, DlCfg.MinDamping, 3f);
                 var target = Targets(j);
                 var kind = body.Joints[j].Kind;
-                ns.Buffer.AddEffector(j, 0, target.x, weight, s, z, _muscleStiffness[j]);
+                ns.Buffer.AddEffector(j, 0, target.x, wj, s, z, _muscleStiffness[j]);
                 if (kind == JointKind.Elbow)
                 {
                     // Forearm pronation-supination (elbow DOF 2) is driven by Delirium behaviors
                     // (palm orientation on a wound, on the ground, against a wall, or during posturing).
-                    ns.Buffer.AddEffector(j, 2, target.z, weight, s, z, _muscleStiffness[j]);
+                    ns.Buffer.AddEffector(j, 2, target.z, wj, s, z, _muscleStiffness[j]);
                 }
                 else if (kind != JointKind.Knee)
                 {
-                    ns.Buffer.AddEffector(j, 1, target.y, weight, s, z, _muscleStiffness[j]);
-                    ns.Buffer.AddEffector(j, 2, target.z, weight, s, z, _muscleStiffness[j]);
+                    ns.Buffer.AddEffector(j, 1, target.y, wj, s, z, _muscleStiffness[j]);
+                    ns.Buffer.AddEffector(j, 2, target.z, wj, s, z, _muscleStiffness[j]);
                 }
             }
         }

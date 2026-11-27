@@ -314,6 +314,8 @@ namespace Brutality.Neural
             if (_agonyI0 > 0f && AgonyStart < agonyCap - 0.3f)
             {
                 AgonyEnd = Mathf.Min(AgonyStart + Mathf.Max(1.5f, _agonyDur), agonyCap);
+                if (_ctx.Mechanism == DeathMechanism.Cerebral)
+                    AgonyEnd = Mathf.Min(AgonyEnd, AgonyStart + 1.6f);
                 ActiveEnd = Mathf.Min(Mathf.Max(programsEnd, AgonyEnd), _musclesCap);
             }
             else
@@ -468,7 +470,7 @@ namespace Brutality.Neural
                 Mul(AgonyEvent.ElbowDrag, 1.6f); Mul(AgonyEvent.HeadBang, 1.2f);
             }
             if (!onBack) Zero(AgonyEvent.SitUp);
-            else { Mul(AgonyEvent.HipBridge, 1.5f); Mul(AgonyEvent.ArmsOverhead, 1.4f); Mul(AgonyEvent.ChestClutch, 1.2f); }
+            else { Mul(AgonyEvent.HipBridge, 1.5f); Mul(AgonyEvent.ArmsOverhead, 0.5f); Mul(AgonyEvent.ChestClutch, 1.2f); }
             if (Mathf.Abs(sideUp) > 0.6f) { Mul(AgonyEvent.Rocking, 0.5f); Mul(AgonyEvent.KneeRaise, 1.3f); Mul(AgonyEvent.LegCross, 1.3f); }
 
             // Elaborate gestures (beyond basic reflexes): "Gesture variety" setting.

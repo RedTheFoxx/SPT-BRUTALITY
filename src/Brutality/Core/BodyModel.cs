@@ -80,10 +80,14 @@ namespace Brutality.Core
         // used to prevent upper arms and forearms from penetrating the thorax.
         public float ThoraxHalfShoulderW = 0.18f;
         public float ThoraxChestZ = 0.03f;
-        public float ThoraxYBot = -0.05f;
+        public float ThoraxYBot = -0.16f;
         public float ThoraxYTop = 0.25f;
         public float ThoraxRx = 0.14f;
         public float ThoraxRz = 0.125f;
+        public float ThoraxGearChestZ = 0.045f;
+        public float ThoraxClearRx = 0.155f;
+        public float ThoraxClearRz = 0.165f;
+        public float HeadClearRadius = 0.135f;
         public const float ThoraxRyCap = 0.06f;
         private static PhysicMaterial _tissue;
 
@@ -99,7 +103,7 @@ namespace Brutality.Core
             try
             {
                 if (!body.MapSegments(ragdoll, out error)) return null;
-                body.BuildFrames(player);
+                body.BuildFrames(player, ctx);
                 body.ApplyAnthropometry(ctx);
                 body.BuildJoints(ctx);
                 body.ConfigureRigidbodies();
@@ -226,7 +230,7 @@ namespace Brutality.Core
             return true;
         }
 
-        private void BuildFrames(Player player)
+        private void BuildFrames(Player player, DeathContext ctx)
         {
             var pelvis = this[Seg.Pelvis].T;
             var thorax = this[Seg.Thorax].T;
@@ -264,10 +268,17 @@ namespace Brutality.Core
                 ThoraxChestZ = Mathf.Clamp(Vector3.Dot(tc - lumbar, tf), shZ - 0.04f, shZ + 0.08f);
             else
                 ThoraxChestZ = shZ + 0.03f;
-            ThoraxYBot = -0.05f;
+            ThoraxYBot = -0.16f;
             ThoraxYTop = Mathf.Max(0.10f, shY - 0.04f);
             ThoraxRx = 0.78f * ThoraxHalfShoulderW;
             ThoraxRz = Mathf.Clamp(0.72f * ThoraxHalfShoulderW, 0.11f, 0.15f);
+            float frontPad = ctx != null && ctx.HasThoraxGear ? 0.065f : 0.035f;
+            float backPad = ctx != null && ctx.HasBackpack ? 0.055f : (ctx != null && ctx.HasThoraxGear ? 0.025f : 0.010f);
+            float sidePad = ctx != null && ctx.HasThoraxGear ? 0.024f : 0.012f;
+            ThoraxClearRx = Mathf.Min(ThoraxRx + sidePad, Mathf.Max(0.11f, ThoraxHalfShoulderW - 0.008f));
+            ThoraxClearRz = ThoraxRz + 0.5f * (frontPad + backPad);
+            ThoraxGearChestZ = ThoraxChestZ + 0.5f * (frontPad - backPad);
+            HeadClearRadius = ctx != null && ctx.HasHelmet ? 0.145f : 0.125f;
             // Head: toward cranial colliders center; anterior from eye collider if present.
             Vector3 headTop;
             if (CollidersCenter(this[Seg.Head], out var hc) && (hc - neck).sqrMagnitude > 1e-4f)

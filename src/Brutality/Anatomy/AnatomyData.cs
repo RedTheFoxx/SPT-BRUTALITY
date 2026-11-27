@@ -209,8 +209,8 @@ namespace Brutality.Anatomy
                 {
                     // No clavicle joint in EFT: keep flexion below 180° PhysX twist wrap-around and abduction below
                     // the ±90° sagittal gimbal-lock pole, with bounded humeral twist.
-                    new DofSpec(-40f, 155f, 15f, 10f, 10f, 1.5f, 0.6f, 80f, 85f, 16f),
-                    new DofSpec(-22f, 78f, 10f, 10f, 10f, 1.5f, 0.6f, 75f, 90f, 16f),
+                    new DofSpec(-40f, 155f, 6f, 10f, 10f, 1.5f, 0.6f, 80f, 85f, 16f),
+                    new DofSpec(-22f, 78f, 16f, 10f, 10f, 1.5f, 0.6f, 75f, 90f, 16f),
                     new DofSpec(-48f, 48f, 0f, 9f, 10f, 1.0f, 0.5f, 45f, 45f, 16f),
                 }
             };
@@ -219,7 +219,7 @@ namespace Brutality.Anatomy
                 Kind = JointKind.Elbow,
                 Dofs = new[]
                 {
-                    new DofSpec(-5f, 145f, 50f, 8f, 11f, 0.5f, 0.3f, 75f, 55f, 20f),
+                    new DofSpec(-5f, 145f, 18f, 8f, 11f, 0.5f, 0.3f, 75f, 55f, 20f),
                     new DofSpec(-8f, 8f, 0f, 12f, 14f, 6f, 0.4f, 0f, 0f, 1f),
                     new DofSpec(-80f, 80f, 0f, 3f, 10f, 0.3f, 0.15f, 12f, 12f, 20f),
                 }

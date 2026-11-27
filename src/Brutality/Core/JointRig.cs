@@ -89,6 +89,14 @@ namespace Brutality.Core
             }
             float halfY = HalfAround(1);
             float halfZ = HalfAround(2);
+            if (jm.Kind == JointKind.Shoulder)
+            {
+                float py = phi0.y / BMath.Deg;
+                halfY = py < 25f
+                    ? Mathf.Clamp(Mathf.Max(spec.Dofs[1].MaxDeg - py, 58f), 58f, 95f)
+                    : Mathf.Clamp(Mathf.Max(py - spec.Dofs[1].MinDeg, spec.Dofs[1].MaxDeg - py), 50f, 78f);
+                halfZ = 75f;
+            }
 
             Joint old = jm.UnityJoint;
             Vector3 anchor = old != null ? old.anchor : Vector3.zero;

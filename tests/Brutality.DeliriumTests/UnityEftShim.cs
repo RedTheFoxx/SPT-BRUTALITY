@@ -295,7 +295,7 @@ namespace EFT
     public enum EBodyPart { Head, Chest, Stomach, LeftArm, RightArm, LeftLeg, RightLeg }
     public enum EBodyPartColliderType
     {
-        None, Pelvis, RibcageUp, HeadCommon, LeftUpperArm, LeftForearm, RightUpperArm, RightForearm,
+        None, Pelvis, RibcageUp, HeadCommon, NeckFront, LeftUpperArm, LeftForearm, RightUpperArm, RightForearm,
         LeftThigh, LeftCalf, RightThigh, RightCalf
     }
 }
@@ -391,10 +391,14 @@ namespace Brutality.Core
         public float TotalMass;
         public float ThoraxHalfShoulderW = 0.18f;
         public float ThoraxChestZ = 0.03f;
-        public float ThoraxYBot = -0.05f;
+        public float ThoraxYBot = -0.16f;
         public float ThoraxYTop = 0.25f;
         public float ThoraxRx = 0.14f;
         public float ThoraxRz = 0.125f;
+        public float ThoraxGearChestZ = 0.045f;
+        public float ThoraxClearRx = 0.155f;
+        public float ThoraxClearRz = 0.165f;
+        public float HeadClearRadius = 0.135f;
         public const float ThoraxRyCap = 0.06f;
         public float MaxSpeed;
 

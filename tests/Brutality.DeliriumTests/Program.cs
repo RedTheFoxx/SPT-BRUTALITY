@@ -121,6 +121,8 @@ namespace DeliriumTests
             Test_MeleeGuard_CrouchAndOverheadPronation();
             Test_WeaponClass_CaliberDifferentiation();
             Test_Roll_StandingMomentumWithoutMovingFlag();
+            Test_Headshot_RunningLateralNoPirouetteOrLaunch();
+            Test_Ground_ArmsRelaxNoAntiGravityAndClearFace();
 
             _currentLevel = 3;
             Console.WriteLine("\n=== LEVEL 3: STATISTICAL & KINEMATIC DIVERSITY AUDIT (60 DEATHS) ===");
@@ -896,6 +898,117 @@ namespace DeliriumTests
                 !sim.Perf.Plan.Moving && sim.AnyRollActivated && sim.PeakRollAngVel > 1.5f && !sim.AnyNaN,
                 $"(moving={sim.Perf.Plan.Moving}, roll={sim.AnyRollActivated}, peakω={sim.PeakRollAngVel:0.0} rad/s)",
                 "nmrds (RollDownStairs)", "NmPerformance.cs (Update)");
+        }
+
+        private static void Test_Headshot_RunningLateralNoPirouetteOrLaunch()
+        {
+            Settings.EuphoriaForce.Value = "Auto";
+            bool allOk = true;
+            float worstBroomW = 0f, worstRootW = 0f, worstY = 0f;
+            var cases = new[]
+            {
+                (Seed: 401, Mech: DeathMechanism.Cerebral, Col: EBodyPartColliderType.HeadCommon),
+                (Seed: 402, Mech: DeathMechanism.NeckVascular, Col: EBodyPartColliderType.NeckFront),
+            };
+            foreach (var c in cases)
+            {
+                Physics.ResetWorld(0f);
+                var ctx = MakeCtx(c.Seed, c.Mech, EBodyPart.Head, c.Col,
+                    dir: new Vector3(-1f, 0f, 0f), vel: new Vector3(0f, 0f, 2.6f), kick: 1.2f, kickClass: "intermediate");
+                var sim = new SimRagdoll(ctx);
+                sim.Perf.OnBullet(0f, NmHit.Make(sim.Body, sim.Body[Seg.Head], sim.Body[Seg.Head].Com + new Vector3(0.08f, 0f, 0f),
+                    new Vector3(-1f, 0f, 0f), 3.5f));
+                sim.Step(0f, 0.016f);
+                float broomW = sim.Body[Seg.Thorax].Rb.angularVelocity.magnitude;
+                worstBroomW = MathF.Max(worstBroomW, broomW);
+                float maxRootW = sim.RootAngVel.magnitude;
+                float maxY = sim.RootPos.y;
+                for (int s = 1; s < 90; s++)
+                {
+                    sim.Step(s * 0.016f, 0.016f);
+                    maxRootW = MathF.Max(maxRootW, sim.RootAngVel.magnitude);
+                    maxY = MathF.Max(maxY, sim.RootPos.y);
+                }
+                worstRootW = MathF.Max(worstRootW, maxRootW);
+                worstY = MathF.Max(worstY, maxY);
+                if (sim.Perf.Plan.Kind == NmPlanKind.RollDownStairs || sim.AnyRollActivated
+                    || broomW > 2.5f || maxRootW > 3.5f || maxY >= 1.05f || sim.AnyNaN)
+                    allOk = false;
+            }
+            Check("Running lateral headshot (Cerebral & NeckVascular): no RollDownStairs, no pirouette, no launch",
+                allOk,
+                $"(maxBroomω={worstBroomW:0.00} rad/s, maxRootω={worstRootW:0.00} rad/s, maxY={worstY:0.00} m)",
+                "nmshot + nmrds", "NmPerformance.cs, NmCore.cs, DlBehaviours.cs");
+        }
+
+        private static void Test_Ground_ArmsRelaxNoAntiGravityAndClearFace()
+        {
+            Physics.ResetWorld(0f);
+            Settings.EuphoriaForce.Value = "Collapse";
+            var sim = new SimRagdoll(MakeCtx(403, DeathMechanism.Thoracic, EBodyPart.Chest, EBodyPartColliderType.RibcageUp), riflePose: true);
+            Settings.EuphoriaForce.Value = "Auto";
+            if (sim.Perf.Balance != null) sim.Perf.Balance.MaxTime = 0.4f;
+            sim.Neural.MusclesCap = 9.0f;
+            sim.Neural.AgonyEnd = 8.0f;
+            sim.Perf.OnBullet(0f, NmHit.Make(sim.Body, sim.Body[Seg.Thorax], sim.Body[Seg.Thorax].Com + new Vector3(0f, 0f, 0.12f),
+                new Vector3(0f, 0f, -1f), 3.5f));
+
+            bool reachedGround = false;
+            bool ogClearedOnGround = true;
+            bool armStiffSoft = true;
+            bool lateArmCommandZero = false;
+            float peakGroundArmStiff = 0f;
+            for (int s = 0; s < 520; s++)
+            {
+                float t = s * 0.016f;
+                sim.Step(t, 0.016f);
+                if (sim.Perf.Phase == NmPhase.Ground)
+                {
+                    reachedGround = true;
+                    if (sim.Perf.Grab == null || !sim.Perf.Grab.Active)
+                    {
+                        float ogMax = MathF.Max(
+                            MathF.Max(sim.Perf.Eff.OpposeGravity((int)JointId.LShoulder), sim.Perf.Eff.OpposeGravity((int)JointId.RShoulder)),
+                            MathF.Max(sim.Perf.Eff.OpposeGravity((int)JointId.LElbow), sim.Perf.Eff.OpposeGravity((int)JointId.RElbow)));
+                        if (ogMax > 0.01f) ogClearedOnGround = false;
+                    }
+                    float kL = MathF.Sqrt(sim.Perf.Eff.Strength((int)JointId.LShoulder));
+                    float kR = MathF.Sqrt(sim.Perf.Eff.Strength((int)JointId.RShoulder));
+                    peakGroundArmStiff = MathF.Max(peakGroundArmStiff, MathF.Max(kL, kR));
+                    if (t - sim.Perf.GroundT > 0.1f && MathF.Max(kL, kR) > 7.5f) armStiffSoft = false;
+                    if (t - sim.Perf.GroundT > 3.3f)
+                    {
+                        bool hasArm = sim.Buffer.Resolve((int)JointId.LShoulder, 0, out MotorCommand mc) && mc.U >= 0.02f;
+                        if (!hasArm) lateArmCommandZero = true;
+                    }
+                }
+            }
+
+            // Also verify DlFoetal / DlWrithe on prone abdominal ground settle: arms stay below 70° flex and abducted (>0°).
+            Physics.ResetWorld(0f);
+            var groundSim = new SimRagdoll(MakeCtx(404, DeathMechanism.Abdominal, EBodyPart.Stomach, EBodyPartColliderType.Pelvis, pose: EPlayerPose.Prone), riflePose: true);
+            bool armsClearFace = true;
+            float maxFlexDeg = 0f, minAbdDeg = 99f;
+            for (int s = 0; s < 80; s++)
+            {
+                groundSim.Step(s * 0.016f, 0.016f);
+                if (s >= 25)
+                {
+                    for (int sd = -1; sd <= 1; sd += 2)
+                    {
+                        var d = groundSim.Perf.Eff.Desired((int)AnatomyData.Shoulder(sd));
+                        float fDeg = d.x / BMath.Deg, aDeg = d.y / BMath.Deg;
+                        maxFlexDeg = MathF.Max(maxFlexDeg, fDeg);
+                        minAbdDeg = MathF.Min(minAbdDeg, aDeg);
+                        if (fDeg > 70f || aDeg <= 0f) armsClearFace = false;
+                    }
+                }
+            }
+
+            Check("Grounded corpse: arm opposeGravity=0, soft ground stiffness (<=7.5), late arm fadeout, arms clear chest/face",
+                reachedGround && ogClearedOnGround && armStiffSoft && lateArmCommandZero && armsClearFace && !sim.AnyNaN,
+                $"(ground={reachedGround}, og0={ogClearedOnGround}, peakω={peakGroundArmStiff:0.0}, lateZero={lateArmCommandZero}, shFlexMax={maxFlexDeg:0.0}°, shAbdMin={minAbdDeg:0.0}°)",
+                "nmdbm + nmbw + nmbf", "NmPerformance.cs, DlCharacter.cs, DlBehaviours.cs");
         }
 
         // ------------------------------------------------------------------ LEVEL 3

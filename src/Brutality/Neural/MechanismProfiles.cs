@@ -141,7 +141,7 @@ namespace Brutality.Neural
                         AgonyStart = V(0.6f, 1.2f), AgonyI0 = V(0.05f, 0.18f), AgonyDuration = V(1.2f, 2.5f), EventRate = 0.30f,
                         TremorDeg = 2f, GaspProb = 0.1f, Writhing = 0.05f, HeadLoll = false,
                     }.W(AgonyEvent.Clonic, 0.4f).W(AgonyEvent.Spasm, 0.3f).W(AgonyEvent.ArmThrust, 0.15f).W(AgonyEvent.LegJerk, 0.2f)
-                     .W(AgonyEvent.Decorticate, 0.5f).W(AgonyEvent.Shudder, 0.4f).W(AgonyEvent.HeadTurn, 0.2f)
+                     .W(AgonyEvent.Decorticate, 0.15f).W(AgonyEvent.Shudder, 0.4f).W(AgonyEvent.HeadTurn, 0.2f)
                      .W(AgonyEvent.HipBridge, 0f).W(AgonyEvent.HeadBang, 0f).W(AgonyEvent.ArmsOverhead, 0f)
                      .W(AgonyEvent.Lazarus, 0f).W(AgonyEvent.GroundSlap, 0f).W(AgonyEvent.HeelDrum, 0f)
                      .Set(breathing: 0.15f, lastBreath: 0.1f);

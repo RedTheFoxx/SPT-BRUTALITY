@@ -393,7 +393,7 @@ namespace Brutality.Euphoria
                     Vector3 flailTarget = th.Com + th.U * 0.25f + th.F * 0.22f + th.R * (sd * 0.36f);
                     Vector3 target = Vector3.Lerp(flailTarget, chestTarget, swat);
                     target = JointKinematics.ClampOutsideThorax(target, th.Pos, th.R, th.U, th.F,
-                        B.Body.ThoraxChestZ, B.Body.ThoraxYBot, B.Body.ThoraxYTop, B.Body.ThoraxRx, BodyModel.ThoraxRyCap, B.Body.ThoraxRz, sd);
+                        B.Body.ThoraxGearChestZ, B.Body.ThoraxYBot, B.Body.ThoraxYTop, B.Body.ThoraxClearRx, BodyModel.ThoraxRyCap, B.Body.ThoraxClearRz, sd);
                     ArmTo(sd, target, 0.85f * u, DlCfg.OnFireBodyStiffness, 0.9f);
                     Ch.BlendDesired((int)AnatomyData.Elbow(sd), 2, DlPhys.ForearmPronationForNormal(B.Body, sd, th.F), 0.7f * u);
                     Ch.SetOpposeGravity((int)AnatomyData.Shoulder(sd), 0.85f);

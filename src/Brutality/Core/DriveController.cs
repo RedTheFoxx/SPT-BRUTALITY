@@ -23,9 +23,9 @@ namespace Brutality.Core
         private const float TauDeactivation = 0.050f;
         private const float PassiveK = 4f;                    // passive tone (rad/s²/rad) during active phase
         private const float PassiveC = 2.6f;                  // passive viscosity (1/s) during active phase
-        private const float FlaccidC = 1.1f;                  // light viscosity of a relaxed limb (lets gravity drop it)
+        private const float FlaccidC = 0.55f;                 // light viscosity of a relaxed limb (lets gravity drop it)
         private const float BiarticularK = 25f;
-        private const float ShoulderBarrierK = 1200f;         // implicit soft ribcage limit (rad/s²)
+        private const float ShoulderBarrierK = 220f;          // implicit soft ribcage limit (rad/s²)
         private const float RefOmegaMin = MotorCommandBuffer.RefOmegaMin;      // command smoothing (rad/s)
 
         // PhysX targetRotation convention: forced setting, else probe measurement, else in-game check.
@@ -112,11 +112,11 @@ namespace Brutality.Core
                     if (jm.Kind == JointKind.Shoulder && d == 1)
                     {
                         float minNow = minShoulderAbd;
-                        float pen = minNow - phi;
+                        float pen = minNow - phi - 2f * BMath.Deg;
                         if (pen > 0f)
                         {
-                            float bw = BMath.SmoothStep(0f, 6f * BMath.Deg, pen);
-                            kBar = ShoulderBarrierK * Mathf.Max(0.5f, passive) * (0.25f + 0.75f * bw);
+                            float bw = BMath.SmoothStep(0f, 10f * BMath.Deg, pen);
+                            kBar = ShoulderBarrierK * Mathf.Max(0.5f, passive) * (0.20f + 0.80f * bw);
                             barTarget = minNow;
                             barrierY = true;
                         }
@@ -181,7 +181,7 @@ namespace Brutality.Core
                     // Passive/biarticular/barrier damping: critical on active springs, light during relaxation.
                     float cBase = Mathf.Lerp(FlaccidC, PassiveC, tone);
                     float cPassive = Mathf.Max(cBase, 1.6f * Mathf.Sqrt(kPasDof + kBia)) * dampingScale;
-                    float cBar = kBar > 0f ? 2f * Mathf.Sqrt(kBar) : 0f;
+                    float cBar = kBar > 0f ? 1.3f * Mathf.Sqrt(kBar) : 0f;
                     kd[d] = inertia * (cMus + cPassive + cBar);
 
                     // Available torque: bell-shaped torque-angle and Hill force-velocity curves.

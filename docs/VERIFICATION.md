@@ -1,4 +1,4 @@
-# Brutality 1.1.1 — Formal Proof Sheet
+# Brutality 1.1.2 — Formal Proof Sheet
 
 > **Automatically generated document** by running the out-of-game test suites (`Brutality.DeliriumTests` and `Brutality.KinematicsTests`) directly against the plugin's real C# sources. No result row below is hand-typed.
 
@@ -6,20 +6,20 @@
 
 | Field | Value |
 |---|---|
-| Plugin version | `1.1.1` |
-| Execution date | `2026-11-24 21:40 UTC` |
-| Runtime & OS | `.NET 10.0.14` / `Unix 7.3.6.1` |
-| SHA-256 hash of the 15 tested C# sources | `f6075d47627af2a7e2f76c61ef46f9ae1370ce02154fc729bb07abdaa6bce4ac` |
-| SHA-256 hash of `Brutality.dll` (Release) | `49132b76897bdbe70100d646d27b063cb61fddb5d70222313c72bdaf78f1176a` (248,320 bytes) |
+| Plugin version | `1.1.2` |
+| Execution date | `2026-11-27 15:14 UTC` |
+| Runtime & OS | `.NET 10.0.14` / `Unix 7.3.6.2` |
+| SHA-256 hash of the 15 tested C# sources | `99800462fd82530b8729e97f3b8583635386987a2247870e404f9d1c8dd64a49` |
+| SHA-256 hash of `Brutality.dll` (Release) | `616c1efa31fb5ec1991909204d63bfcd63cfadb80a9afb295134c4ec3ea193b9` (251,392 bytes) |
 | Local reproduction | `dotnet run --project tests/Brutality.DeliriumTests -- --report docs/VERIFICATION.md` then `dotnet run --project tests/Brutality.KinematicsTests -- --append-report docs/VERIFICATION.md` |
 
 ## Overall Summary
 
 | Suite | Scope | Result | Status |
 |---|---|---:|---|
-| `tests/Brutality.DeliriumTests` | Delirium laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nmcf`, `nmgr`, `nmrds`, `nmfl`, `nmbr`, `nmfow`, `nmhf`, `onfire`), 60 Hz simulation & 60-death diversity | **40 / 40** | `PASS` |
-| `tests/Brutality.KinematicsTests` | ISB anatomy, IK, pose solver, thorax envelope, BepInEx keys | **48 / 48** | `PASS` |
-| **Verified total** | **Complete out-of-game formal proofs** | **88 / 88** | `PASS` |
+| `tests/Brutality.DeliriumTests` | Delirium laws (`nmrs`, `nmdbm`, `nmbb`, `nmshot`, `nmcf`, `nmgr`, `nmrds`, `nmfl`, `nmbr`, `nmfow`, `nmhf`, `onfire`), 60 Hz simulation & 60-death diversity | **42 / 42** | `PASS` |
+| `tests/Brutality.KinematicsTests` | ISB anatomy, IK, pose solver, thorax envelope, BepInEx keys | **49 / 49** | `PASS` |
+| **Verified total** | **Complete out-of-game formal proofs** | **91 / 91** | `PASS` |
 
 ## Level 1 — Law-by-Law Mathematical Fidelity (Delirium Rust vs Brutality C#)
 
@@ -40,41 +40,43 @@
 | 13 | `nmrs.rs (muscles) + nmshot` | `DlCharacter.cs (Flush DOF 2)` | Flush elbow pronation (DOF 2): emitted on L/R elbows, ignored on knees | `(R=-48,7°, L=48,7°, knee=False)` | `PASS` |
 | 14 | `nmshot (wrist)` | `DlCharacter.cs (DlPhys.ForearmPronationForNormal)` | Shot::wrist / ForearmPronationForNormal: L/R palms rotated to face the floor | `(pR=-75,0°, dotR=0,97 ; pL=75,0°, dotL=0,97)` | `PASS` |
 | 15 | `nmdbm.rs (oppose_gravity)` | `DlCharacter.cs (DlPhys.OpposeGravity)` | nmdbm::oppose_gravity: action+reaction=0, bounded torque, and hinge projected onto axis | `(\|Στ\|=0,0000, τSh=8,4 N·m, τEl=2,3 N·m, align=1,000)` | `PASS` |
-| 16 | `nmbb.rs (BodyBalance)` | `DlBalance.cs (Tick)` | nmbb::BodyBalance: shoulder=11, elbow=6.6, Busy preserved, BlendToZero no longer freezes on rifle | `(ωSh=11,0, ωEl=6,6, busyKept=True, shDes=50,3°)` | `PASS` |
+| 16 | `nmbb.rs (BodyBalance)` | `DlBalance.cs (Tick)` | nmbb::BodyBalance: shoulder=11, elbow=6.6, Busy preserved, BlendToZero no longer freezes on rifle | `(ωSh=11,0, ωEl=6,6, busyKept=True, shDes=45,5°)` | `PASS` |
 | 17 | `nm.rs (Balance → Shot order)` | `NmPerformance.cs (Tick)` | nm.rs order Balance → Shot: Shot survives Balance (Reach active, collapsed knee not overwritten) | `(reached=True, ωKneeL=3,7, ωKneeR=13,0, phase=Balance)` | `PASS` |
 
 ## Level 2 — Behavioral Proofs in 60 Hz Physics Simulation
 
 | # | Delirium Reference | Brutality Source | Verified Invariant | Observed Measurement | Status |
 |---:|---|---|---|---|---|
-| 18 | `nmshot (reach, pull, wrist)` | `DlShot.cs (Reach, Forces)` | nmshot::reach + pull + wrist: hand brought closer to wound, exact action/reaction pull, active pronation | `(d0=0,57m→min=0,25m, pull=True, ΣF=0:True, pron=61,2°)` | `PASS` |
+| 18 | `nmshot (reach, pull, wrist)` | `DlShot.cs (Reach, Forces)` | nmshot::reach + pull + wrist: hand brought closer to wound, exact action/reaction pull, active pronation | `(d0=0,57m→min=0,26m, pull=True, ΣF=0:True, pron=61,2°)` | `PASS` |
 | 19 | `nmshot (shock_spin)` | `DlShot.cs (OnBullet, Forces)` | nmshot::shock_spin: torque in N·m (20..90 N·m, not Deg2Rad) proportional to lever arm | `(spin=58,7 N·m, τThorax=58,7 N·m)` | `PASS` |
 | 20 | `nmshot (LOOSE_L)` | `DlShot.cs (OnBullet, Tick)` | nmshot::LOOSE_L: hit left arm goes limp, right arm reaches for injured arm | `(ωElL=2,2, ωElR=11,0, reachR=True)` | `PASS` |
 | 21 | `nmshot (GiveWay)` | `DlShot.cs, DlBalance.cs` | nmshot::GiveWay (back shot): knee stiffness drops (<4), knees flex, pelvis descends | `(minωKnee=1,8, kneeFlex=117,0°, drop=0,45m)` | `PASS` |
 | 22 | `nmshot + nmdbm` | `DlBalance.cs (LegBuckle, Forces)` | Leg buckling: 1-leg (unilateral), 2-leg (synchronous) AND 2-leg staggered (2-step) proven | `(uni=True, sync=True, staggerMid=True, bothLate=True)` | `PASS` |
 | 23 | `nmcf (CatchFall)` | `DlBehaviours.cs (DlCatchFall)` | nmcf::CatchFall: probes toward FLOOR (y<0), forward>0, hits floor, neck in rad, palm pronation | `(down=True, fwd=True, hit=True, neckRad=True, pron=True)` | `PASS` |
 | 24 | `nmgr (Grab, GrabHelper)` | `DlGrab.cs (DlGrab)` | nmgr::Grab + GrabHelper: detects wall & crate, 0 flat-ground false positives, physical grip + force + snap + Busy release | `(act=True, grip=True, force=True, snap=True, rel=True[b0=False,b1=False,gAct=False], openFP=False, crate=True)` | `PASS` |
-| 25 | `nmrds + nmru` | `DlBehaviours.cs (DlRollDownStairs, DlRollUp)` | nmrds::RollDownStairs + nmru::RollUp: active roll, real rotation, Lumbar without oppose_gravity | `(plan=RollDownStairs, peakW=2,9 rad/s, lumbarOg0=True)` | `PASS` |
+| 25 | `nmrds + nmru` | `DlBehaviours.cs (DlRollDownStairs, DlRollUp)` | nmrds::RollDownStairs + nmru::RollUp: active roll, real rotation, Lumbar without oppose_gravity | `(plan=RollDownStairs, peakW=2,3 rad/s, lumbarOg0=True)` | `PASS` |
 | 26 | `nmaw (ArmsWindmill)` | `DlBehaviours.cs (DlWindmill)` | nmaw::Windmill: out-of-phase arms (≠ synchronous robot) and individual stop on impact | `(phase=3,75 rad, Δsh=151,8°, leftStopped=True)` | `PASS` |
 | 27 | `nmbw (BodyWrithe)` | `DlBehaviours.cs (DlWrithe)` | nmbw::Writhe: asymmetric L/R legs + real rollOver torque in Forces() | `(Δhip=10,2°, peakRollTq=9,3 N·m)` | `PASS` |
-| 28 | `nmbf (BodyFoetal)` | `DlBehaviours.cs (DlFoetal)` | nmbf::Foetal: per-joint stiffness asymmetry + crossed pronation over chest | `(sL=66,2, sR=77,6, pronL=39,3°, pronR=-40,5°)` | `PASS` |
+| 28 | `nmbf (BodyFoetal)` | `DlBehaviours.cs (DlFoetal)` | nmbf::Foetal: per-joint stiffness asymmetry + crossed pronation over chest | `(sL=64,8, sR=93,4, pronL=34,8°, pronR=-35,9°)` | `PASS` |
 | 29 | `nmfl (UpperBodyFlinch)` | `DlGrab.cs (DlFlinch)` | nmfl::UpperBodyFlinch: protective reflex on frontal burst + forearm pronation | `(flinch=True, peakPron=32,4°)` | `PASS` |
 | 30 | `nmdbm (staggerFall)` | `DlBalance.cs` | nmdbm::Balance: grounded leg weight support sustains >= 2 stagger steps under rifle recoil | `(steps=5, horizDisp=1,44 m)` | `PASS` |
-| 31 | `nmdbm (staggerFall)` | `DlBalance.cs + DlShot.cs` | nmdbm::Stagger (backward): knees bend during swing/stance (not locked straight), LowerK decays without Shot overwrite, bounded vertical support | `(steps=4, kneeL=128,0°, kneeR=131,1°, maxUp=1,04·mg, minKneeω=1,8)` | `PASS` |
+| 31 | `nmdbm (staggerFall)` | `DlBalance.cs + DlShot.cs` | nmdbm::Stagger (backward): knees bend during swing/stance (not locked straight), LowerK decays without Shot overwrite, bounded vertical support | `(steps=4, kneeL=129,9°, kneeR=132,9°, maxUp=1,05·mg, minKneeω=1,8)` | `PASS` |
 | 32 | `nmbr (Brace)` | `DlExtraBehaviours.cs (DlWallBrace)` | nmbr::BalancerCollisionsReaction: wall brace + slump softening behind character | `(brace=True, slump=True, kneeRed=7,7)` | `PASS` |
 | 33 | `nmfow (FallOverWall)` | `DlExtraBehaviours.cs (DlWallBrace)` | nmfow::FallOverWall: low obstacle at waist height with clear air above triggers tip-over | `(fallOverWall=True, wallBrace=True)` | `PASS` |
 | 34 | `nmhf (HighFall)` | `DlExtraBehaviours.cs (DlHighFall)` | nmhf::HighFall: airborne orientation + time-to-impact landing brace on downward descent | `(highFall=True, preparingToLand=True)` | `PASS` |
 | 35 | `onfire (OnFire)` | `DlExtraBehaviours.cs (DlOnFire)` | onfire::OnFire: Molotov stagger swatting + ground stop-drop-roll torque | `(onFire=True, peakGroundRollTq=34,0 N·m)` | `PASS` |
 | 36 | `meleetask (Melee)` | `DlExtraBehaviours.cs (DlMeleeGuard)` | meleetask::MeleeGuard: defensive knee duck + overhead pronated forearm guard | `(meleeGuard=True, peakPron=42,2°, sink=0,23 m)` | `PASS` |
 | 37 | `shottask.rs` | `NmPerformance.cs (ClassifyWeapon)` | weapons.gif::ClassifyWeapon: distinct Pistol / SmgBurst / Sniper / Shotgun classes + scaled recoil | `(pistol=Pistol 0,02m/s, smg=SmgBurst, sniper=Sniper 0,14m/s, shotgun=Shotgun 0,13m/s)` | `PASS` |
-| 38 | `nmrds (RollDownStairs)` | `NmPerformance.cs (Update)` | nmrds::RollDownStairs: high horizontal knockback velocity triggers roll without Plan.Moving | `(moving=False, roll=True, peakω=3,2 rad/s)` | `PASS` |
+| 38 | `nmrds (RollDownStairs)` | `NmPerformance.cs (Update)` | nmrds::RollDownStairs: high horizontal knockback velocity triggers roll without Plan.Moving | `(moving=False, roll=True, peakω=2,4 rad/s)` | `PASS` |
+| 39 | `nmshot + nmrds` | `NmPerformance.cs, NmCore.cs, DlBehaviours.cs` | Running lateral headshot (Cerebral & NeckVascular): no RollDownStairs, no pirouette, no launch | `(maxBroomω=0,03 rad/s, maxRootω=0,91 rad/s, maxY=0,95 m)` | `PASS` |
+| 40 | `nmdbm + nmbw + nmbf` | `NmPerformance.cs, DlCharacter.cs, DlBehaviours.cs` | Grounded corpse: arm opposeGravity=0, soft ground stiffness (<=7.5), late arm fadeout, arms clear chest/face | `(ground=True, og0=True, peakω=6,5, lateZero=True, shFlexMax=12,1°, shAbdMin=18,8°)` | `PASS` |
 
 ## Level 3 — Statistical Kinematic Diversity Audit (60 Tactical Deaths, Seeds 1000..1059)
 
 | # | Delirium Reference | Brutality Source | Verified Invariant | Observed Measurement | Status |
 |---:|---|---|---|---|---|
-| 39 | `VarietyDirector + NmPlan` | `NmPerformance.cs, VarietyDirector.cs` | 60-death diversity: ≥ 8 distinct plans, no plan > 35%, all 3 sectors covered | `(12 plans, max=9/60, Fwd/Side/Back=24/12/24)` | `PASS` |
-| 40 | `Full Delirium suite` | `DlBalance, DlShot, DlGrab, DlBehaviours` | 60-death diversity: env grabs + wounds + pronations + rolls + 1L & 2L buckles all proven | `(10 grabs, 31 wounds, 54 pronations, 15 rolls, 1L=10, 2L=32, NaN=0)` | `PASS` |
+| 41 | `VarietyDirector + NmPlan` | `NmPerformance.cs, VarietyDirector.cs` | 60-death diversity: ≥ 8 distinct plans, no plan > 35%, all 3 sectors covered | `(12 plans, max=9/60, Fwd/Side/Back=24/12/24)` | `PASS` |
+| 42 | `Full Delirium suite` | `DlBalance, DlShot, DlGrab, DlBehaviours` | 60-death diversity: env grabs + wounds + pronations + rolls + 1L & 2L buckles all proven | `(10 grabs, 31 wounds, 54 pronations, 11 rolls, 1L=10, 2L=32, NaN=0)` | `PASS` |
 
 ### Observed Metrics Across 60 Deaths (12 Scenarios × 5 Iterations)
 
@@ -86,10 +88,10 @@
 | Environment grabs (`grab`) | `>= 6` | `10 / 60` | `PASS` |
 | Hands reaching for wound (`Shot::reach`) | `>= 25` | `31 / 60` | `PASS` |
 | Forearm pronations (`> 15°`) | `>= 35` | `54 / 60` | `PASS` |
-| Rolls (`rollDownStairs` / `rollUp`) | `>= 5` | `15 / 60` | `PASS` |
+| Rolls (`rollDownStairs` / `rollUp`) | `>= 5` | `11 / 60` | `PASS` |
 | 1-leg buckling (unilateral) | `>= 8` | `10 / 60` | `PASS` |
 | 2-leg buckling (synchronous / staggered) | `>= 8` | `32 / 60` | `PASS` |
-| Arm windmills (`armsWindmill`) | informational | `15 / 60` | `INFO` |
+| Arm windmills (`armsWindmill`) | informational | `18 / 60` | `INFO` |
 | Guard reflexes (`upperBodyFlinch`) | informational | `14 / 60` | `INFO` |
 | Numerical errors (`NaN`) | `0` | `0` | `PASS` |
 
@@ -163,7 +165,8 @@ Tests executed on `Core/BMath.cs`, `Core/JointKinematics.cs`, `Anatomy/AnatomyDa
 | 45 | Stability, axes & thorax envelope | thorax envelope: detection, outward normals, and exterior projection | `(dSide=61cm, dFront=111cm)` | `PASS` |
 | 46 | Stability, axes & thorax envelope | neck ROM: bounded extension, lateral tilt, and twist | `(flex [-28,42], lat ±30, twist ±55)` | `PASS` |
 | 47 | Stability, axes & thorax envelope | shoulder ROM: clear of 180° wrap, 90° abduction pole, and bounded twist | `(flex [-40,155], abd [-22,78], twist ±48)` | `PASS` |
-| 48 | BepInEx Configuration | configuration: valid sections and keys for BepInEx | `(38 names)` | `PASS` |
+| 48 | Stability, axes & thorax envelope | relaxed neutral arm pose: shoulder down/outward, elbow nearly extended | `(shNeutral=6°/16°, elNeutral=18°)` | `PASS` |
+| 49 | BepInEx Configuration | configuration: valid sections and keys for BepInEx | `(38 names)` | `PASS` |
 
 ## See It Yourself in the 3D Studio (`demo/test-bench.html`)
 

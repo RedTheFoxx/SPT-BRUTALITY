@@ -261,7 +261,7 @@ namespace Brutality.Euphoria
                 else if (m == DeathMechanism.Burn) kind = NmPlanKind.OnFire;
                 else if (m == DeathMechanism.Melee) kind = NmPlanKind.MeleeGuard;
                 else if (!plan.Conscious || plan.LegsDead) kind = NmPlanKind.Relax;
-                else if (speed > 2.4f) kind = NmPlanKind.RollDownStairs;
+                else if (speed > 2.75f && c.BodyPart != EBodyPart.Head) kind = NmPlanKind.RollDownStairs;
                 else if (speed > 1.8f) kind = NmPlanKind.Collapse;
                 else
                 {
@@ -377,8 +377,8 @@ namespace Brutality.Euphoria
             if (kind == NmPlanKind.Windmill) plan.RbVel = Mathf.Max(plan.RbVel, 1.05f * Settings.FallDrive.Value);
             string kc = (c.KickClass ?? string.Empty).ToLowerInvariant();
             bool heavy = kc.Contains("buckshot") || kc.Contains("slug") || kc.Contains("heavy");
-            plan.Snap = c.KickScale > 1.3f || heavy || plan.WeaponClass == NmWeaponClass.Sniper
-                || plan.WeaponClass == NmWeaponClass.Rifle || plan.WeaponClass == NmWeaponClass.HeavyPistol;
+            plan.Snap = plan.Conscious && c.BodyPart != EBodyPart.Head && (c.KickScale > 1.3f || heavy || plan.WeaponClass == NmWeaponClass.Sniper
+                || plan.WeaponClass == NmWeaponClass.Rifle || plan.WeaponClass == NmWeaponClass.HeavyPistol);
             plan.ShockSpin = (heavy || plan.WeaponClass == NmWeaponClass.HeavyPistol
                 || (plan.WeaponClass == NmWeaponClass.Rifle && c.WoundSide != 0)) && torso;
             VarietyDirector.RecordPlan((int)kind, plan.ToppleAzimuth);
@@ -646,7 +646,8 @@ namespace Brutality.Euphoria
             Vector3 rbDir = hit.Dir;
             rbDir.y = Mathf.Max(0f, rbDir.y);
             rbDir = BMath.SafeNormalize(rbDir, Ch.Fwd);
-            Vector3 rb = rbDir * (Body.TotalMass * Plan.RbVel * leak * (Wounds.Count == 1 ? 1f : 0.6f) * (falling ? 0.5f : 1f));
+            float headScale = hit.Part.Id == Seg.Head ? 0.35f : 1f;
+            Vector3 rb = rbDir * (Body.TotalMass * Plan.RbVel * leak * headScale * (Wounds.Count == 1 ? 1f : 0.6f) * (falling ? 0.5f : 1f));
             Impulses.Queue(t, hit.Part, hit.World, hit.Dir * hit.P, rb);
             // Headshot: the projectile imparts a torque to the head around the neck, not just translation.
             // Without this torque, the trunk moves before the head and the relaxed neck leaves it behind (extension),
@@ -666,7 +667,7 @@ namespace Brutality.Euphoria
                     tb.angularVelocity -= ax * (dw * ih / Mathf.Max(1e-4f, it));
                 }
             }
-            if (Plan.Snap) { _snapT0 = t; _snapDone = false; _unsnapDone = false; }
+            if (Plan.Snap && Plan.Conscious && hit.Part.Id != Seg.Head) { _snapT0 = t; _snapDone = false; _unsnapDone = false; }
             if (hit.ArmSide != 0)
             {
                 _injArmT0 = t;
@@ -726,10 +727,9 @@ namespace Brutality.Euphoria
             // whole-body torque applied over 0.45 s. It decides the fall direction, instead of an identical
             // forward topple on every death.
             Vector3 dir = ToppleDir(Plan.ToppleAzimuth);
-            StartTopple(t + Plan.ToppleDelay, dir, Plan.ToppleGain);
-
             if (Plan.Kind == NmPlanKind.HighFall)
             {
+                StartTopple(t + Plan.ToppleDelay, dir, Plan.ToppleGain);
                 _highFall = new DlHighFall(this, t);
                 if (Plan.Catch) _catchFall = new DlCatchFall(this, t);
                 return;
@@ -739,8 +739,11 @@ namespace Brutality.Euphoria
             bool back = Vector3.Dot(dir, BMath.SafeNormalize(NmCharacter.Flat(Ch.Fwd), Vector3.forward)) < -0.35f;
             float slope = GroundSlope(vH.sqrMagnitude > 0.04f ? vH.normalized : dir);
             // Standing knockbacks with high horizontal velocity, rapid spin, or steep stairs/slope can roll naturally.
-            if (Plan.Kind == NmPlanKind.RollDownStairs || (Plan.Conscious && !Plan.StiffFall && Plan.Kind != NmPlanKind.Dive
-                && (vH.magnitude > 1.35f || Body[Seg.Thorax].W.magnitude > 2.6f || slope > 0.22f)))
+            bool canRoll = Plan.Kind == NmPlanKind.RollDownStairs || (Plan.Conscious && !Plan.StiffFall && Plan.Kind != NmPlanKind.Dive
+                && Ctx.BodyPart != EBodyPart.Head
+                && (vH.magnitude > 2.4f || (Body[Seg.Thorax].W.magnitude > 4.2f && vH.magnitude > 1.4f) || slope > 0.26f));
+            StartTopple(t + Plan.ToppleDelay, dir, canRoll ? Plan.ToppleGain * 0.75f : Plan.ToppleGain);
+            if (canRoll)
             {
                 Vector3 rollDir = vH.sqrMagnitude > 0.04f ? vH.normalized : dir;
                 _rds = new DlRollDownStairs(this, t, rollDir);
@@ -812,12 +815,16 @@ namespace Brutality.Euphoria
             _highFall?.Stop(t);
             _meleeGuard?.Stop(t);
             _wallBrace?.Stop(t);
+            // Clear anti-gravity and stale raised/guarding arm effectors from standing/falling behaviors so arms drop under gravity.
+            Eff.SetOpposeGravity("fb", 0f);
+            Eff.SetStiffness("ua", 4.5f, 0.9f, 0.45f);
+            Eff.BlendToZero("ua", 1f);
             // Roll: Delirium keeps rollDownStairs active as long as the body is spinning, instead of stopping at impact.
-            if (_rds == null && Plan.Conscious && !Plan.StiffFall)
+            if (_rds == null && Plan.Conscious && !Plan.StiffFall && Ctx.BodyPart != EBodyPart.Head)
             {
                 Vector3 vH = NmCharacter.Flat(Ch.Vel);
                 float slope = GroundSlope(vH.sqrMagnitude > 0.01f ? vH.normalized : Ch.Fwd);
-                bool tumble = vH.magnitude > 1.35f || Body[Seg.Thorax].W.magnitude > 2.6f || slope > 0.22f;
+                bool tumble = vH.magnitude > 2.4f || (Body[Seg.Thorax].W.magnitude > 4.2f && vH.magnitude > 1.4f) || slope > 0.26f;
                 if (tumble)
                 {
                     _rds = new DlRollDownStairs(this, t, vH.sqrMagnitude > 0.01f ? vH.normalized : Ch.Fwd, 2.4f);
@@ -831,8 +838,8 @@ namespace Brutality.Euphoria
                 _iog = new DlInjuredOnGround(this, t);
                 _writhe = new DlWrithe(this, t, (m == DeathMechanism.Burn ? 1.1f : m == DeathMechanism.Abdominal ? 0.6f : 0.75f)
                 * Settings.SpasmVigor.Value * BMath.Range(Rng, 0.8f, 1.25f));
-                if (m == DeathMechanism.Abdominal || m == DeathMechanism.Burn
-                    || BMath.Chance(Rng, 0.15f + 0.25f * Mathf.Clamp01(Settings.GestureVariety.Value)))
+                if (m == DeathMechanism.Burn || (m == DeathMechanism.Abdominal && BMath.Chance(Rng, 0.45f))
+                    || BMath.Chance(Rng, 0.08f * Mathf.Clamp01(Settings.GestureVariety.Value)))
                     _foetal = new DlFoetal(this, t);
             }
             _toppleT0 = -1f;
@@ -950,6 +957,7 @@ namespace Brutality.Euphoria
 
             if (Phase == NmPhase.Ground)
             {
+                if (_grab == null || !_grab.Active) Eff.SetOpposeGravity("fb", 0f);
                 float g = BMath.SmoothStep(GroundT, GroundT + 0.4f, t);
                 float I = ns.Agony;
                 float ig = Mathf.Max(I, Plan.Conscious ? 0.35f * w : 0f) * g;
@@ -979,7 +987,19 @@ namespace Brutality.Euphoria
             }
 
             // Delirium effectors are the sole command source for Euphoria behaviors: once per step.
-            Eff.Flush(ns, Body, w);
+            if (Phase == NmPhase.Ground && (_rds == null || !_rds.Active))
+            {
+                float groundAge = Mathf.Max(0f, t - GroundT);
+                float bodyGroundW = w * Mathf.Clamp01(Mathf.Max(ns.Agony * 0.85f, 0.35f * Mathf.Exp(-groundAge / 1.5f)));
+                float armGroundW = w * Mathf.Clamp01(Mathf.Max(ns.Agony * 0.55f, 0.25f * Mathf.Exp(-groundAge / 1.0f)))
+                                 * (1f - BMath.SmoothStep(1.5f, 3.2f, groundAge));
+                if (_grab != null && _grab.Active) armGroundW = Mathf.Max(armGroundW, w);
+                Eff.Flush(ns, Body, bodyGroundW, bodyGroundW > 1e-4f ? armGroundW / bodyGroundW : 0f);
+            }
+            else
+            {
+                Eff.Flush(ns, Body, w);
+            }
         }
 
         // ------------------------------------------------------------------ forces

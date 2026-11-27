@@ -437,7 +437,7 @@ namespace Brutality.Euphoria
                 if (Wound.Torso)
                 {
                     target = JointKinematics.ClampOutsideThorax(target, th.Pos, th.R, th.U, th.F,
-                        _b.Body.ThoraxChestZ, _b.Body.ThoraxYBot, _b.Body.ThoraxYTop, _b.Body.ThoraxRx, BodyModel.ThoraxRyCap, _b.Body.ThoraxRz, sd);
+                        _b.Body.ThoraxGearChestZ, _b.Body.ThoraxYBot, _b.Body.ThoraxYTop, _b.Body.ThoraxClearRx, BodyModel.ThoraxRyCap, _b.Body.ThoraxClearRz, sd);
                 }
                 float env = BMath.SmoothStep(0f, 0.14f, rt - P.TimeBeforeReach)
                           * (1f - BMath.SmoothStep(P.GrabHoldTime - 0.3f, P.GrabHoldTime, rt - P.TimeBeforeReach));

@@ -358,6 +358,7 @@ namespace Brutality.Euphoria
         public override void Stop(float t)
         {
             ReleaseAll();
+            Ch.SetOpposeGravity("ua", 0f);
             Active = false;
         }
     }

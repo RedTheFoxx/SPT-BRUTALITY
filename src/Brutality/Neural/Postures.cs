@@ -36,8 +36,8 @@ namespace Brutality.Neural
         {
             return new PostureShape
             {
-                ShFlex = BMath.Range(rng, 25f, 48f), ShAbd = BMath.Range(rng, -15f, -4f), ShRot = BMath.Range(rng, 25f, 45f),
-                Elbow = BMath.Range(rng, 112f, 138f), Pron = BMath.Range(rng, 5f, 25f),
+                ShFlex = BMath.Range(rng, 25f, 48f), ShAbd = BMath.Range(rng, 12f, 20f), ShRot = BMath.Range(rng, 25f, 45f),
+                Elbow = BMath.Range(rng, 90f, 110f), Pron = BMath.Range(rng, 5f, 25f),
                 HipFlex = BMath.Range(rng, -8f, 0f), HipAbd = BMath.Range(rng, -12f, -5f), HipRot = BMath.Range(rng, 12f, 25f),
                 Knee = BMath.Range(rng, 0f, 6f),
                 Lumbar = BMath.Range(rng, -8f, 2f), LumbarSide = 0f,

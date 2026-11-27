@@ -421,6 +421,7 @@ internal static class Program
         {
             var neckSpec = AnatomyData.Specs[(int)JointKind.Neck];
             var shSpec = AnatomyData.Specs[(int)JointKind.Shoulder];
+            var elSpec = AnatomyData.Specs[(int)JointKind.Elbow];
             Check("neck ROM: bounded extension, lateral tilt, and twist",
                 neckSpec.Dofs[0].MinDeg >= -30f && neckSpec.Dofs[0].MaxDeg <= 45f
                 && neckSpec.Dofs[1].MaxDeg <= 32f && neckSpec.Dofs[2].MaxDeg <= 60f,
@@ -430,6 +431,9 @@ internal static class Program
                 && shSpec.Dofs[1].MinDeg >= -22f && shSpec.Dofs[1].MaxDeg <= 80f
                 && shSpec.Dofs[2].MaxDeg <= 50f,
                 $"(flex [{shSpec.Dofs[0].MinDeg},{shSpec.Dofs[0].MaxDeg}], abd [{shSpec.Dofs[1].MinDeg},{shSpec.Dofs[1].MaxDeg}], twist ±{shSpec.Dofs[2].MaxDeg})");
+            Check("relaxed neutral arm pose: shoulder down/outward, elbow nearly extended",
+                shSpec.Dofs[0].NeutralDeg <= 10f && shSpec.Dofs[1].NeutralDeg >= 12f && elSpec.Dofs[0].NeutralDeg <= 25f,
+                $"(shNeutral={shSpec.Dofs[0].NeutralDeg}°/{shSpec.Dofs[1].NeutralDeg}°, elNeutral={elSpec.Dofs[0].NeutralDeg}°)");
         }
 
         _domain = "BepInEx Configuration";

@@ -71,7 +71,9 @@ namespace Brutality.Euphoria
             com /= m;
             foreach (var s in body.Segs)
             {
-                s.Rb.AddForce(Vector3.Cross(alpha, s.Com - com), ForceMode.Acceleration);
+                Vector3 aLin = Vector3.Cross(alpha, s.Com - com);
+                if (aLin.y > 2.5f) aLin.y = 2.5f;
+                s.Rb.AddForce(aLin, ForceMode.Acceleration);
                 s.Rb.AddTorque(alpha, ForceMode.Acceleration);
             }
         }
@@ -145,16 +147,19 @@ namespace Brutality.Euphoria
             float M = Mathf.Max(20f, _body.TotalMass);
             Vector3 dv = J / M;
             Vector3 r = point - _ch.Com;
+            r.y = Mathf.Clamp(r.y, -0.30f, 0.30f);
             Vector3 mom = Vector3.Cross(r, J) * NmBullets.RbMoment;
             Vector3 twist = Vector3.up * Vector3.Dot(mom, Vector3.up), broom = mom - twist;
             float jh = Mathf.Max(1e-6f, NmCharacter.Flat(J).magnitude), jt = Mathf.Max(1e-6f, J.magnitude);
             twist = Vector3.ClampMagnitude(twist, NmBullets.RbMaxTwistMomentArm * jh);
             broom = Vector3.ClampMagnitude(broom, NmBullets.RbMaxBroomMomentArm * jt);
-            Vector3 dw = (twist + broom) / _ch.IBody;
+            Vector3 dw = Vector3.ClampMagnitude((twist + broom) / _ch.IBody, 2.2f);
             foreach (var s in _body.Segs)
             {
                 if (s.Rb == null) continue;
-                s.Rb.AddForce(dv + Vector3.Cross(dw, s.Com - _ch.Com), ForceMode.VelocityChange);
+                Vector3 rotV = Vector3.Cross(dw, s.Com - _ch.Com);
+                if (rotV.y > 0.6f) rotV.y = 0.6f;
+                s.Rb.AddForce(dv + rotV, ForceMode.VelocityChange);
                 s.Rb.AddTorque(dw, ForceMode.VelocityChange);
             }
         }

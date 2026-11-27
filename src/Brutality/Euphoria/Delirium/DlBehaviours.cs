@@ -374,8 +374,8 @@ namespace Brutality.Euphoria
     /// </summary>
     internal sealed class DlRollDownStairs : DlBehaviour
     {
-        public bool SpinWhenInAir = true;
-        public float ForceMag = DlCfg.RollStiffness > 0f ? 0.65f : 0.55f;
+        public bool SpinWhenInAir = false;
+        public float ForceMag = 0.65f;
         public float ZAxisSpinReduction = 0.35f;
 
         private Vector3 _dir, _sum;
@@ -428,25 +428,29 @@ namespace Brutality.Euphoria
             if (!Active) return;
             float w = Mathf.Clamp01(weight);
             if (w <= 0.02f) return;
+            if (Sensors.Airborne && !SpinWhenInAir) return;
             Vector3 axis = Vector3.Cross(Vector3.up, _dir);
             if (axis.sqrMagnitude < 1e-4f) return;
             axis.Normalize();
 
-            bool touching = Sensors.Contact[0] || Sensors.Contact[1] || Sensors.HandContact[0] || Sensors.HandContact[1]
-                          || (B.Part(Seg.Pelvis).Com.y - Sensors.GroundY < 0.45f)
-                          || (B.Part(Seg.Thorax).Com.y - Sensors.GroundY < 0.45f);
+            bool torsoLow = (B.Part(Seg.Pelvis).Com.y - Sensors.GroundY < 0.78f)
+                          || (B.Part(Seg.Thorax).Com.y - Sensors.GroundY < 0.85f)
+                          || Sensors.HandContact[0] || Sensors.HandContact[1];
+            bool touching = torsoLow || Sensors.Contact[0] || Sensors.Contact[1];
+            if (!touching && !SpinWhenInAir) return;
+
             float speed = Horiz(B.Vel).magnitude;
             float spin = B.AngVel.magnitude;
             float wNow = Vector3.Dot(B.AngVel, axis);
-            if (!touching && !SpinWhenInAir) return;
-
-            float airScale = touching ? 1f : Mathf.Clamp01(1f - spin * 0.25f) * 0.55f;
-            float targetW = Mathf.Max(2.4f, speed / 0.40f);
-            float alphaMag = Mathf.Clamp((targetW - wNow) * 4.2f, -14f, 14f) * ForceMag * airScale * w;
+            bool upright = !torsoLow && Vector3.Dot(B.Part(Seg.Thorax).U, Vector3.up) > 0.65f;
+            float groundScale = upright ? 0.85f : 1f;
+            float targetW = Mathf.Clamp(speed / 0.50f, 2.6f, 5.2f);
+            if (spin > targetW + 0.8f && wNow > 0f) return;
+            float alphaMag = Mathf.Clamp((targetW - wNow) * 4.2f, -13.5f, 13.5f) * ForceMag * groundScale * w;
             DlPhys.BodyAngularAccel(B, axis * alphaMag);
 
             // Reduction of parasitic spin around the vertical axis (nmcf::spin_reduction).
-            if (ZAxisSpinReduction > 0f && touching)
+            if (ZAxisSpinReduction > 0f && torsoLow)
             {
                 float yawW = Vector3.Dot(B.AngVel, Vector3.up);
                 Vector3 antiSpin = Vector3.up * (-yawW * B.Mass * ZAxisSpinReduction * 0.25f * w);
@@ -580,7 +584,7 @@ namespace Brutality.Euphoria
             _rollForce = BMath.Chance(perf.Rng, 0.5f) ? 1f : -1f;
             _rollTimer = 1.2f;
             for (int k = 0; k < DlCharacter.NJ; k++) Ch.SetMuscleStiffness(k, 0.6f);
-            Ch.SetStiffness("ua", DlCfg.WritheArmStiffness, DlCfg.WritheDamping);
+            Ch.SetStiffness("ua", 5.5f, 0.85f, 0.45f);
             Ch.SetStiffness("uk", DlCfg.WritheBackStiffness, DlCfg.WritheDamping);
             Ch.SetStiffness("lb", DlCfg.WritheLegStiffness, DlCfg.WritheDamping);
         }
@@ -614,9 +618,11 @@ namespace Brutality.Euphoria
                 if (!Ch.Busy[i])
                 {
                     Ch.BlendToZero(sh, 0.35f);
-                    for (int d = 0; d < 3; d++) Ch.BlendDesired(sh, d, LerpMid(sh, d, x[d]), u * armsBlend);
+                    Ch.BlendDesired(sh, 0, Mathf.Lerp(0f, 38f, 0.5f + 0.5f * x[0]) * BMath.Deg, u * armsBlend);
+                    Ch.BlendDesired(sh, 1, Mathf.Lerp(16f, 52f, 0.5f + 0.5f * Mathf.Clamp(x[1] * 0.5f, -1f, 1f)) * BMath.Deg, u * armsBlend);
+                    Ch.BlendDesired(sh, 2, Mathf.Clamp(x[2] * 0.35f, -0.35f, 0.35f), u * armsBlend);
                     float elbow = Mathf.Clamp((i == 0 ? Mathf.Sin(a + p22) : Mathf.Cos(a + p23)) * amp, -1f, 1f);
-                    Ch.BlendDesired(el, 0, LerpMid(el, 0, elbow), u * armsBlend);
+                    Ch.BlendDesired(el, 0, Mathf.Lerp(12f, 55f, 0.5f + 0.5f * elbow) * BMath.Deg, u * armsBlend);
                     // Agonic forearm pronation-supination.
                     Ch.BlendDesired(el, 2, LerpMid(el, 2, Mathf.Sin(a * 0.8f + (i == 0 ? p15 : p24)) * 0.8f), u * armsBlend);
                 }
@@ -707,6 +713,7 @@ namespace Brutality.Euphoria
             float u = Mathf.Clamp01(intensity) * Mathf.Clamp01(weight);
             if (u <= 0.02f) return;
             for (int j = 0; j < DlCharacter.NJ; j++) Ch.SetStiffness((JointId)j, _jointS[j], _jointD[j]);
+            Ch.SetStiffness("ua", 5.5f, 1.0f, 0.5f);
             Ch.BlendDesired((int)JointId.Lumbar, 0, LerpRel((int)JointId.Lumbar, 0, 0.6f), u);
             Ch.BlendDesired((int)JointId.Lumbar, 2, LerpRel((int)JointId.Lumbar, 2, _twist), u);
             Ch.BlendDesired((int)JointId.Neck, 0, LerpRel((int)JointId.Neck, 0, 0.5f), u);
@@ -721,10 +728,11 @@ namespace Brutality.Euphoria
                 Ch.BlendDesired(knee, 0, LerpRel(knee, 0, 0.75f * a), u);
                 if (!Ch.Busy[i])
                 {
-                    Ch.BlendDesired(sh, 0, LerpRel(sh, 0, 0.55f * a), u);
-                    Ch.BlendDesired(sh, 2, 0.45f * Motor.InternalRotSign(sd), u);
-                    Ch.BlendDesired(el, 0, LerpRel(el, 0, 0.8f * a), u);
-                    Ch.BlendDesired(el, 2, 0.65f * Motor.InternalRotSign(sd), u);
+                    Ch.BlendDesired(sh, 0, LerpRel(sh, 0, -0.22f * a), u);
+                    Ch.BlendDesired(sh, 1, 22f * BMath.Deg, u);
+                    Ch.BlendDesired(sh, 2, 0.20f * Motor.InternalRotSign(sd), u);
+                    Ch.BlendDesired(el, 0, LerpRel(el, 0, 0.08f * a), u);
+                    Ch.BlendDesired(el, 2, 0.55f * Motor.InternalRotSign(sd), u);
                 }
             }
         }
@@ -759,6 +767,7 @@ namespace Brutality.Euphoria
             float u = Mathf.Clamp01(intensity) * Mathf.Clamp01(weight);
             if (u <= 0.02f) return;
             var th = B.Part(Seg.Thorax);
+            float reachFade = 1f - BMath.SmoothStep(1.4f, 2.2f, t - Start);
             int n = 0;
             NmHit last = null;
             for (int i = Perf.Wounds.Count - 1; i >= 0 && n < 2; i--)
@@ -767,15 +776,16 @@ namespace Brutality.Euphoria
                 if (!h.Reachable) continue;
                 n++;
                 if (last == null) last = h;
+                if (reachFade <= 0.02f) continue;
                 int side = h.Side != 0 ? -h.Side : (n == 1 ? 1 : -1);
                 if (h.ArmSide == side || Nm.ElbowCap(B.Body, side) < 0.25f) side = -side;
                 if (Nm.ElbowCap(B.Body, side) < 0.25f || h.ArmSide == side || Ch.Busy[NmCharacter.Si(side)]) continue;
                 Vector3 woundNormal = BMath.SafeNormalize(h.World - th.Com, th.F);
                 Vector3 target = h.World + woundNormal * 0.05f;
                 target = JointKinematics.ClampOutsideThorax(target, B.Part(Seg.Thorax).Pos, th.R, th.U, th.F,
-                    B.Body.ThoraxChestZ, B.Body.ThoraxYBot, B.Body.ThoraxYTop, B.Body.ThoraxRx, BodyModel.ThoraxRyCap, B.Body.ThoraxRz, side);
-                ArmTo(side, target, u * 0.85f, DlCfg.ShotArmStiffness, 1f);
-                Ch.BlendDesired((int)AnatomyData.Elbow(side), 2, DlPhys.ForearmPronationForNormal(B.Body, side, woundNormal), u * 0.8f);
+                    B.Body.ThoraxGearChestZ, B.Body.ThoraxYBot, B.Body.ThoraxYTop, B.Body.ThoraxClearRx, BodyModel.ThoraxRyCap, B.Body.ThoraxClearRz, side, 0.025f);
+                ArmTo(side, target, u * 0.85f * reachFade, 6.5f, 1f);
+                Ch.BlendDesired((int)AnatomyData.Elbow(side), 2, DlPhys.ForearmPronationForNormal(B.Body, side, woundNormal), u * 0.8f * reachFade);
             }
             float supine = Vector3.Dot(th.F, Vector3.up);
             Ch.BlendDesired((int)JointId.Neck, 0, supine > 0.3f ? 0.45f : 0.2f, u * 0.7f);

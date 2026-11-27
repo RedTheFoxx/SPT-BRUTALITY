@@ -28,9 +28,9 @@ namespace Brutality.Euphoria
         public const float ImpulsePeriod = 0.1f, ImpulseTorqueScale = 1f, ImpulseMinLeakage = 0.2f;
         public const bool DoCounterImpulse = false;
         public const float CounterImpulseDelay = 0.03333f, CounterImpulseMag = 0.5f, CounterImpulse2Hips = 1f;
-        public const float RbMoment = 1f, RbMaxTwistMomentArm = 0.5f, RbMaxBroomMomentArm = 1f;
+        public const float RbMoment = 1f, RbMaxTwistMomentArm = 0.5f, RbMaxBroomMomentArm = 0.30f;
         /// <summary>Head whip torque on a headshot (rad/s for a reference round).</summary>
-        public const float HeadWhip = 14f;
+        public const float HeadWhip = 12f;
     }
 
     internal static class NmBalance

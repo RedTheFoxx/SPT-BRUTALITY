@@ -75,7 +75,7 @@ namespace Brutality.Neural
             _armSag = armSag;
             _sagStart = BMath.Range(rng, 0.01f, 0.08f);
             _sagDur = BMath.Range(rng, 0.18f, 0.38f);
-            _hangShoulder = new Vector3(BMath.Range(rng, 2f, 18f), BMath.Range(rng, 6f, 16f), 0f) * BMath.Deg;
+            _hangShoulder = new Vector3(BMath.Range(rng, 2f, 18f), BMath.Range(rng, 14f, 24f), 0f) * BMath.Deg;
             _hangElbow = new Vector3(BMath.Range(rng, 10f, 30f), 0f, 0f) * BMath.Deg;
             Start = 0f;
             Attack = 0f;
@@ -223,8 +223,8 @@ namespace Brutality.Neural
             {
                 Vector3 safeTarget = JointKinematics.ClampOutsideThorax(
                     target, thorax.Pos, thorax.R, thorax.U, thorax.F,
-                    body.ThoraxChestZ, body.ThoraxYBot, body.ThoraxYTop,
-                    body.ThoraxRx + 0.035f, BodyModel.ThoraxRyCap, body.ThoraxRz + 0.035f, side, 0.02f);
+                    body.ThoraxGearChestZ, body.ThoraxYBot, body.ThoraxYTop,
+                    body.ThoraxClearRx + 0.035f, BodyModel.ThoraxRyCap, body.ThoraxClearRz + 0.035f, side, 0.02f);
                 if (ArmIK(ns, side, safeTarget, out float f, out float a, out float e))
                 {
                     a = Mathf.Max(a, JointKinematics.MinShoulderAbductionRad(f * BMath.Deg) / BMath.Deg);
@@ -267,8 +267,8 @@ namespace Brutality.Neural
             {
                 Pose(ns, AnatomyData.Hip(s), 95f, 8f, NoChange, u, 0.75f);
                 Pose(ns, AnatomyData.Knee(s), 115f, NoChange, NoChange, u, 0.75f);
-                Pose(ns, AnatomyData.Shoulder(s), 70f, -15f, NoChange, u * 0.8f, 0.75f);
-                Pose(ns, AnatomyData.Elbow(s), 120f, NoChange, NoChange, u * 0.8f, 0.75f);
+                Pose(ns, AnatomyData.Shoulder(s), 38f, 18f, NoChange, u * 0.55f, 0.55f);
+                Pose(ns, AnatomyData.Elbow(s), 82f, NoChange, NoChange, u * 0.55f, 0.55f);
             }
         }
     }
@@ -695,12 +695,14 @@ namespace Brutality.Neural
                 float n1 = BMath.SmoothNoise(t * _speed[j] * 0.8f, _seed[2 * j + 1]);
                 float a0 = Amp[j].x * _amp * BMath.Deg;
                 float a1 = Amp[j].y * _amp * BMath.Deg;
-                ns.Buffer.Add(j, 0, _baseline[j].x + a0 * n0, u, 0.7f);
+                var id = (JointId)j;
+                float armScale = (id == JointId.LShoulder || id == JointId.LElbow || id == JointId.RShoulder || id == JointId.RElbow) ? 0.55f : 1f;
+                float uj = u * armScale;
+                ns.Buffer.Add(j, 0, _baseline[j].x + a0 * n0, uj, 0.7f);
                 if (a1 > 0f)
                 {
-                    var id = (JointId)j;
                     int dof = id == JointId.Lumbar || id == JointId.Neck ? 2 : 1;
-                    ns.Buffer.Add(j, dof, _baseline[j][dof] + a1 * n1, u * 0.8f, 0.6f);
+                    ns.Buffer.Add(j, dof, _baseline[j][dof] + a1 * n1, uj * 0.8f, 0.6f);
                 }
             }
             _init = true;
@@ -1015,8 +1017,8 @@ namespace Brutality.Neural
             foreach (int side in _sides)
             {
                 Vector3 target = JointKinematics.ClampOutsideThorax(centre + th.R * (side * 0.05f), th.Pos, th.R, th.U, th.F,
-                    ns.Body.ThoraxChestZ, ns.Body.ThoraxYBot, ns.Body.ThoraxYTop,
-                    ns.Body.ThoraxRx + 0.02f, BodyModel.ThoraxRyCap, ns.Body.ThoraxRz + 0.02f, side);
+                    ns.Body.ThoraxGearChestZ, ns.Body.ThoraxYBot, ns.Body.ThoraxYTop,
+                    ns.Body.ThoraxClearRx + 0.02f, BodyModel.ThoraxRyCap, ns.Body.ThoraxClearRz + 0.02f, side);
                 if (!ArmIK(ns, side, target, out float f, out float a, out float e)) continue;
                 Pose(ns, AnatomyData.Shoulder(side), f, a, NoChange, u, 0.55f);
                 Pose(ns, AnatomyData.Elbow(side), e, NoChange, NoChange, u, 0.55f);

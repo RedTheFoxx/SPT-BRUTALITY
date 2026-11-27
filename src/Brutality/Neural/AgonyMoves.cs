@@ -505,8 +505,8 @@ namespace Brutality.Neural
             Name = "Shielding face";
             _sides = sides;
             _legs = legs;
-            _flex = BMath.Range(rng, 98f, 118f);
-            _elbow = BMath.Range(rng, 105f, 128f);
+            _flex = BMath.Range(rng, 72f, 88f);
+            _elbow = BMath.Range(rng, 80f, 98f);
             _turn = BMath.Range(rng, 25f, 45f) * (BMath.Chance(rng, 0.5f) ? -1f : 1f);
             Start = start; Duration = duration; Attack = 0.12f; Release = 0.4f;
             _u = u;
@@ -522,7 +522,7 @@ namespace Brutality.Neural
             foreach (int s in _sides)
             {
                 float ir = InternalRotSign(s);
-                Pose(ns, AnatomyData.Shoulder(s), _flex + shake, -12f, 30f * ir, u, 0.85f);
+                Pose(ns, AnatomyData.Shoulder(s), _flex + shake, 14f, 30f * ir, u, 0.85f);
                 Pose(ns, AnatomyData.Elbow(s), _elbow, NoChange, NoChange, u, 0.85f);
             }
             Pose(ns, JointId.Neck, 20f, NoChange, _turn, u * 0.8f, 0.7f);
@@ -620,10 +620,10 @@ namespace Brutality.Neural
             float u = _u * k;
             foreach (int s in _sides)
             {
-                Vector3 target = head.Com + head.F * 0.12f + head.R * (0.04f * s);
+                Vector3 target = head.Com + head.F * 0.22f + head.R * (0.09f * s);
                 if (ArmIK(ns, s, target, out float f, out float a, out float e))
                 {
-                    a = Mathf.Max(a, JointKinematics.MinShoulderAbductionRad(f * BMath.Deg) / BMath.Deg);
+                    a = Mathf.Max(14f, Mathf.Max(a, JointKinematics.MinShoulderAbductionRad(f * BMath.Deg) / BMath.Deg));
                     Pose(ns, AnatomyData.Shoulder(s), f, a, NoChange, u, 0.6f);
                     Pose(ns, AnatomyData.Elbow(s), e, NoChange, NoChange, u, 0.6f);
                 }
